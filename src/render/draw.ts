@@ -731,39 +731,14 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
           }
           ctx.closePath();
         };
-        // Vidro: corpo translúcido com degradê da ponta para a base, chanfro interno fino,
-        // reflexo claro numa face e um leve arco-íris refratado lá dentro.
         const tipX = x + Math.cos(a) * s;
         const tipY = y + Math.sin(a) * s;
-        const baseX = x - Math.cos(a) * s * 0.5;
-        const baseY = y - Math.sin(a) * s * 0.5;
-        const body = ctx.createLinearGradient(tipX, tipY, baseX, baseY);
-        body.addColorStop(0, 'rgba(255,255,255,0.32)');
-        body.addColorStop(1, 'rgba(255,255,255,0.06)');
-        tri(s);
-        ctx.fillStyle = 'rgba(12,12,20,0.6)'; // escurece o brilho por trás para o vidro aparecer
-        ctx.fill();
-        ctx.fillStyle = body;
-        ctx.fill();
-        const spec = ctx.createLinearGradient(baseX + Math.sin(a) * s, baseY - Math.cos(a) * s, baseX - Math.sin(a) * s, baseY + Math.cos(a) * s);
-        for (const [o, col] of [[0.2, '#ff3358'], [0.5, '#29f58a'], [0.8, '#4c7dff']] as const) spec.addColorStop(o, col);
-        ctx.save();
-        tri(s * 0.62);
-        ctx.clip();
-        ctx.globalAlpha = 0.3;
-        ctx.fillStyle = spec;
-        ctx.fillRect(x - s, y - s, s * 2, s * 2);
-        ctx.restore();
-        ctx.globalAlpha = 0.55;
-        ctx.lineWidth = 1;
-        tri(s * 0.62);
-        ctx.stroke();
-        // Reflexo: traço claro curto ao longo de uma face, perto da ponta.
+        // Contorno vazio como antes, só com um reflexo claro curto ao longo de uma face, perto da ponta.
         const t1 = a + (2 * Math.PI) / 3;
         const ex = x + Math.cos(t1) * s;
         const ey = y + Math.sin(t1) * s;
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = 1.8;
+        ctx.globalAlpha = 0.75;
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.moveTo(tipX + (ex - tipX) * 0.18 + (x - tipX) * 0.12, tipY + (ey - tipY) * 0.18 + (y - tipY) * 0.12);
         ctx.lineTo(tipX + (ex - tipX) * 0.5 + (x - tipX) * 0.12, tipY + (ey - tipY) * 0.5 + (y - tipY) * 0.12);
