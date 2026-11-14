@@ -122,6 +122,51 @@ export interface PieceView {
   mirrorAngle: (i: number) => number; // i = índice da peça móvel; radianos ('/' = -45°)
   filterColor: (i: number) => { from: number; to: number; k: number }; // índices em FILTER_COLORS
   targetFill: (x: number, y: number) => number; // 0..1
+  targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
+}
+
+const COMPONENTS = [1, 2, 4] as const;
+
+// Disco interno com a mistura que chega + marcadores R/G/B no anel: cheio = chegou, oco = falta, riscado = sobra.
+function drawTargetHints(ctx: Ctx, x: number, y: number, r: number, need: number, got: number): void {
+  if (got !== 0 && got !== need) {
+    ctx.globalAlpha = 0.45;
+    ctx.fillStyle = CONFIG.colors[got as keyof typeof CONFIG.colors];
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.42, 0, TAU);
+    ctx.fill();
+  }
+  const dot = Math.max(3.5, r * 0.22);
+  COMPONENTS.forEach((comp, i) => {
+    const needs = (need & comp) !== 0;
+    const has = (got & comp) !== 0;
+    if (!needs && !has) return;
+    const a = -Math.PI / 2 + (i * TAU) / 3;
+    const px = x + Math.cos(a) * r;
+    const py = y + Math.sin(a) * r;
+    const col = CONFIG.colors[comp];
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#07070d';
+    ctx.beginPath();
+    ctx.arc(px, py, dot + 1.5, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(px, py, dot, 0, TAU);
+    if (has) ctx.fill();
+    else ctx.stroke();
+    if (has && !needs) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(px - dot * 1.4, py + dot * 1.4);
+      ctx.lineTo(px + dot * 1.4, py - dot * 1.4);
+      ctx.stroke();
+    }
+  });
+  ctx.lineWidth = CONFIG.piece.stroke;
+  ctx.globalAlpha = 1;
 }
 
 function mix(a: string, b: string, k: number): string {
@@ -199,14 +244,12 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         const fill = view.targetFill(cell.x, cell.y);
         const col = CONFIG.colors[cell.color];
         ctx.strokeStyle = col;
+        ctx.lineWidth = p.stroke * 1.5;
         ctx.beginPath();
         ctx.arc(x, y, r, 0, TAU);
         ctx.stroke();
-        ctx.globalAlpha = 0.35;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.55, 0, TAU);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
+        ctx.lineWidth = p.stroke;
+        drawTargetHints(ctx, x, y, r, cell.color, view.targetReceived(cell.x, cell.y));
         if (fill > 0) {
           ctx.fillStyle = col;
           ctx.beginPath();

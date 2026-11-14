@@ -29,6 +29,7 @@ export class Game {
   private level!: Level;
   private rots: Rots = [];
   private result!: TraceResult;
+  private shown!: TraceResult; // o que os alvos exibem; alcança result quando o feixe termina de desenhar
   private pieceCells: Cell[] = [];
   private anims: Anim[] = [];
   private now = 0;
@@ -55,6 +56,7 @@ export class Game {
       return { from: v, to: v, at: -Infinity };
     });
     this.result = trace(this.level, this.rots);
+    this.shown = this.result;
     this.litAt = new Map(this.litKeys(this.result).map((k) => [k, -Infinity]));
     this.pending = false;
     this.pendingDown = false;
@@ -113,6 +115,7 @@ export class Game {
     // Efeitos de alvo só disparam quando o feixe termina de ser desenhado.
     if (this.pending && this.beamT() >= 1) {
       this.pending = false;
+      this.shown = this.result;
       if (this.pendingDown) this.synth.down();
       this.pendingDown = false;
       for (const k of this.litKeys(this.result)) {
@@ -152,6 +155,7 @@ export class Game {
         const at = this.litAt.get(key(x, y));
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
+      targetReceived: (x, y) => this.shown.received[key(x, y)] ?? 0,
     });
     this.fx.draw(ctx, l.w, l.h);
     drawHud(ctx, l, {
