@@ -297,6 +297,7 @@ export interface PieceView {
   filterColor: (i: number) => { from: number; to: number; k: number }; // índices em FILTER_COLORS
   targetFill: (x: number, y: number) => number; // 0..1
   targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
+  prismAngle: (x: number, y: number) => number; // direção da ponta (radianos, y para baixo)
   time: number; // segundos
 }
 
@@ -541,10 +542,12 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         break;
       case 'prism': {
         const s = p.prismSize * c;
+        const a = view.prismAngle(cell.x, cell.y);
         ctx.beginPath();
-        ctx.moveTo(x, y - s);
-        ctx.lineTo(x + s * 0.87, y + s * 0.5);
-        ctx.lineTo(x - s * 0.87, y + s * 0.5);
+        for (let k = 0; k < 3; k++) {
+          const t = a + (k * 2 * Math.PI) / 3;
+          ctx.lineTo(x + Math.cos(t) * s, y + Math.sin(t) * s);
+        }
         ctx.closePath();
         ctx.stroke();
         break;

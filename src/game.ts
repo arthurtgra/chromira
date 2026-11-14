@@ -52,6 +52,7 @@ export class Game {
   private beamMs = 1;
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
+  private prismAngle = new Map<string, { cur: number; to: number }>(); // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
   private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
   private pulseAt = Infinity;
@@ -80,6 +81,8 @@ export class Game {
       return { from: v, to: v, at: -Infinity };
     });
     this.result = trace(this.level, this.rots);
+    this.prismAngle = new Map();
+    this.aimPrisms(true);
     this.litAt = new Map();
     this.quiet = true;
     this.plan = planBeams([], this.beamSegments());
@@ -161,6 +164,7 @@ export class Game {
 
     const before = visibleSegments(this.plan, this.front());
     this.result = trace(this.level, this.rots);
+    this.aimPrisms(false);
     this.plan = planBeams(before, this.beamSegments());
     this.quiet = false;
     // Recolhe o que sumiu a partir do ponto que mudou: trechos encadeados recolhem em sequência.
@@ -179,6 +183,8 @@ export class Game {
     this.now += dtMs;
     this.fps += (1000 / Math.max(1, dtMs) - this.fps) * 0.05;
     this.fx.update(dtMs);
+    const ek = 1 - Math.exp(-CONFIG.prismTurnRate * dtMs / 1000);
+    for (const a of this.prismAngle.values()) a.cur += (a.to - a.cur) * ek;
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
     // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
@@ -265,6 +271,7 @@ export class Game {
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
       targetReceived: (x, y) => got[key(x, y)] ?? 0,
+      prismAngle: (x, y) => this.prismAngle.get(key(x, y))?.cur ?? -QUARTER,
       time: this.now / 1000,
     });
     drawImpacts(ctx, l, this.hits, this.plan, front, style);
@@ -343,6 +350,23 @@ export class Game {
   }
 
   // Segmentos do trace esticados até encostar nos obstáculos; guarda onde a luz bate.
+  // Ponta do prisma aponta de onde vem a luz; sem luz chegando, fica como está. Gira pelo caminho mais curto.
+  private aimPrisms(instant: boolean): void {
+    for (const c of this.level.cells) {
+      if (c.t !== 'prism') continue;
+      const k = key(c.x, c.y);
+      const inc = this.result.segments.find((s) => s.x2 === c.x && s.y2 === c.y);
+      const cur = this.prismAngle.get(k)?.cur ?? -QUARTER;
+      if (!inc) {
+        this.prismAngle.set(k, { cur, to: this.prismAngle.get(k)?.to ?? cur });
+        continue;
+      }
+      let to = Math.atan2(inc.y1 - inc.y2, inc.x1 - inc.x2);
+      to = cur + ((((to - cur) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+      this.prismAngle.set(k, { cur: instant ? to : cur, to });
+    }
+  }
+
   private beamSegments(): Segment[] {
     const E = CONFIG.emitter.body;
     const W = CONFIG.piece.wallSize / 2;

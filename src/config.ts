@@ -126,6 +126,7 @@ export const CONFIG = {
   // a próxima fase abre um pouco depois do replay terminar.
   // Vitória: depois de uma pausa, um pulso de luz caminha por cada feixe, do lançador até o fim:
   // as ondas engordam só num trecho estreito em volta dele, com um ponto de luz andando junto.
+  prismTurnRate: 12, // giro do prisma até a nova direção da luz (1/s, suavização exponencial)
   winPulse: { pauseMs: 300, speed: 11, width: 0.55, swell: 2.4, glow: 0.42, ms: [700, 1800], holdMs: 450 },
 
   audio: {
