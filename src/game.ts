@@ -53,6 +53,8 @@ export class Game {
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
   private wonAt: number | null = null;
+  private replayAt = Infinity; // quando os feixes renascem na vitória
+  private nextAt = Infinity; // quando abre a próxima fase
   private fps = 60;
   private readonly levels: Level[];
   readonly done = new Set<number>();
@@ -82,6 +84,8 @@ export class Game {
     this.beamAt = this.now;
     this.loadedAt = this.now;
     this.wonAt = null;
+    this.replayAt = Infinity;
+    this.nextAt = Infinity;
     this.fx.clear();
     this.persist();
   }
@@ -158,6 +162,21 @@ export class Game {
     this.fx.update(dtMs);
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
+    // Vitória: replay dos feixes desde os lançadores; alvos ficam acesos durante o replay.
+    if (this.wonAt !== null) {
+      if (this.now >= this.replayAt) {
+        this.replayAt = Infinity;
+        this.plan = planBeams([], this.beamSegments());
+        this.fades = [];
+        this.beamAt = this.now;
+        const W = CONFIG.winReplay;
+        this.beamMs = Math.min(W.ms[1], Math.max(W.ms[0], (this.plan.to / W.speed) * 1000));
+        this.nextAt = this.now + this.beamMs + W.holdMs;
+      }
+      if (this.now >= this.nextAt) this.load(this.index + 1);
+      return;
+    }
+
     // Cada alvo reage no instante em que a luz chega nele (ou deixa de chegar).
     const front = this.front();
     const got = arrived(this.plan, front);
@@ -181,7 +200,6 @@ export class Game {
       if (this.result.solved && this.wonAt === null) this.win();
     }
 
-    if (this.wonAt !== null && this.now - this.wonAt > CONFIG.winDelayMs) this.load(this.index + 1);
   }
 
   render(ctx: CanvasRenderingContext2D): void {
@@ -255,6 +273,7 @@ export class Game {
     this.persist();
     this.onWin?.();
     this.wonAt = this.now;
+    this.replayAt = this.now + CONFIG.winReplay.pauseMs;
     this.synth.chord((this.index + 1) % 5 === 0);
     this.fx.flash();
     this.fx.burst(

@@ -46,11 +46,11 @@ export const CONFIG = {
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
-    speed: 30, // ao abrir a fase
-    turnSpeed: 15, // ao girar uma peça: mais devagar, vira transição
-    growMs: [160, 650], // duração mínima e máxima de um crescimento
+    speed: 18, // ao abrir a fase
+    turnSpeed: 9, // ao girar uma peça: mais devagar, vira transição
+    growMs: [260, 1100], // duração mínima e máxima de um crescimento
     impact: { radius: 0.2, alpha: 0.55 }, // clarão onde a luz bate em parede/lançador
-    retractSpeed: 16, // trecho que deixou de existir é recolhido a partir do ponto que mudou
+    retractSpeed: 10, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
     // Onde se cruzam somam (R+G+B = branco). Amplitude some perto de cantos e pontas: as ondas se juntam ali.
@@ -70,14 +70,14 @@ export const CONFIG = {
       // sobre um brilho amarelo (dá para ver as duas cores e o resultado). Rosa: azul saturado
       // e grosso, miolo rosa fraco — com 'lighter' muita camada clara vira branco e o azul some.
       comp: {
-        3: { 1: { color: '#ff4436', width: 1.3, alpha: 1 }, 2: { color: '#4dff5e', width: 1.3, alpha: 1 } },
+        3: { 1: { color: '#ff3b3b', width: 1.4, alpha: 1 }, 2: { color: '#3dff5a', width: 1.4, alpha: 1 } },
         5: { 1: { color: '#ff2f6e' }, 4: { color: '#3f5cff', width: 1.7, alpha: 1 } },
       } as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
       // Misturas (2+ componentes): miolo liso + brilho na cor da mistura entre as ondas.
       mixCore: { width: 0.05, alpha: 0.6 },
       mixGlow: { width: 0.2, alpha: 0.12 },
       mix: {
-        3: { core: { width: 0.045, alpha: 0.5 }, glow: { width: 0.26, alpha: 0.18 } },
+        3: { core: { width: 0.03, alpha: 0.22 }, glow: { width: 0.24, alpha: 0.1 } }, // só um tom amarelado
         5: { core: { width: 0.035, alpha: 0.3 }, glow: { width: 0.2, alpha: 0.07 } },
       } as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
@@ -119,6 +119,9 @@ export const CONFIG = {
   particles: { min: 60, max: 100, speed: [80, 320], lifeMs: [500, 1100], size: [1.5, 3.5], drag: 2.2 },
   flash: { alpha: 0.16, ms: 260 },
   winDelayMs: 1400,
+  // Vitória: depois de uma pausa, todos os feixes renascem dos lançadores até o fim do caminho;
+  // a próxima fase abre um pouco depois do replay terminar.
+  winReplay: { pauseMs: 350, speed: 12, ms: [700, 1800], holdMs: 650 },
 
   audio: {
     volume: 0.22,
