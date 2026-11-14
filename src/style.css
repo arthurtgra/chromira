@@ -211,7 +211,7 @@ button {
 .big {
   width: min(190px, 100%);
   padding: 14px 20px;
-  border-radius: 999px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.85);
   background: rgba(255, 255, 255, 0.06);
   font-size: 17px;
@@ -230,11 +230,26 @@ button {
 .big.ghost {
   border-color: var(--line);
   background: transparent;
+  padding: 11px 20px;
+  font-size: 14px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+#play {
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 14px 20px 12px;
+}
+#play .play-main {
+  font-size: 22px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 #play-sub {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--dim);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 /* fases */
@@ -453,11 +468,6 @@ body:not([data-screen='game']) #fb {
 #dev-panel[hidden] {
   display: none;
 }
-#mini .dev-item {
-  font-size: 11px;
-  padding: 12px 14px;
-  color: var(--dim);
-}
 #dev-panel {
   display: flex;
   flex-direction: column;
@@ -497,23 +507,3 @@ body:not([data-screen='game']) #fb {
   font-size: 12px;
 }
 
-/* Home: Levels pequeno no canto inferior direito. */
-#home .corner {
-  position: absolute;
-  right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
-  padding: 9px 16px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: transparent;
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 300;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  transition: transform 0.12s, background 0.2s;
-}
-#home .corner:active {
-  transform: scale(0.95);
-  background: rgba(255, 255, 255, 0.08);
-}

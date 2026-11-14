@@ -151,8 +151,9 @@ export function setupFeedback(game: Game, fb: Feedback): { refresh: () => void }
   toast.hidden = true;
   document.body.append(bar, toast);
 
-  // Item "Copy feedback" no mini menu.
+  // "Copy feedback" fica dentro do painel Developer.
   const copy = document.createElement('button');
+  copy.type = 'button';
   copy.textContent = 'Copy feedback';
   copy.addEventListener('click', async () => {
     game.synth.uiTap();
@@ -167,7 +168,8 @@ export function setupFeedback(game: Game, fb: Feedback): { refresh: () => void }
     toast.hidden = false;
     setTimeout(() => (toast.hidden = true), ok ? 1400 : 8000);
   });
-  document.querySelector('#mini-panel')!.append(copy);
+  const dev = document.querySelector<HTMLFormElement>('#dev-panel')!;
+  dev.insertBefore(copy, dev.querySelector('button[type=submit]'));
 
   function refresh(): void {
     const v = fb.vote(game.current);
