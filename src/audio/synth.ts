@@ -16,7 +16,14 @@ export class Synth {
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
     }
-    if (this.ctx.state === 'suspended') void this.ctx.resume();
+    if (this.ctx.state !== 'running') {
+      void this.ctx.resume().catch(() => {});
+      // iOS só libera o áudio depois de tocar algo dentro do gesto.
+      const src = this.ctx.createBufferSource();
+      src.buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+      src.connect(this.ctx.destination);
+      src.start();
+    }
   }
 
   private ready(): AudioContext | null {

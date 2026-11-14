@@ -46,6 +46,11 @@ renderMute();
 
 onTap(canvas, (x, y) => game.tap(x, y));
 
+// Em tela de toque, pointerdown não conta como gesto para liberar áudio; pointerup/touchend contam.
+for (const ev of ['pointerup', 'touchend', 'click', 'keydown'] as const) {
+  window.addEventListener(ev, () => game.synth.unlock(), { capture: true, passive: true });
+}
+
 let last = performance.now();
 function frame(t: number): void {
   game.update(Math.min(100, t - last));
