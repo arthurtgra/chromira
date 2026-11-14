@@ -593,15 +593,35 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         const r = (p.mirrorLen * c) / 2;
         const ux = Math.cos(a) * r;
         const uy = Math.sin(a) * r;
-        ctx.globalAlpha = 0.25;
-        ctx.lineWidth = p.stroke * 4;
-        ctx.beginPath();
-        ctx.moveTo(x - ux, y - uy);
-        ctx.lineTo(x + ux, y + uy);
-        ctx.stroke();
+        // Barra espelhada: halo suave, corpo com degradê metálico na espessura (face clara, verso escuro)
+        // e um filete brilhante ao longo da face.
+        const t = p.mirrorThick * c;
+        const nx = -Math.sin(a);
+        const ny = Math.cos(a);
+        const line = (k: number, ext = 1): void => {
+          ctx.beginPath();
+          ctx.moveTo(x - ux * ext + nx * k, y - uy * ext + ny * k);
+          ctx.lineTo(x + ux * ext + nx * k, y + uy * ext + ny * k);
+          ctx.stroke();
+        };
+        ctx.globalAlpha = 0.18;
+        ctx.lineWidth = t * 2.6;
+        line(0);
+        const metal = ctx.createLinearGradient(x - nx * t / 2, y - ny * t / 2, x + nx * t / 2, y + ny * t / 2);
+        metal.addColorStop(0, '#ffffff');
+        metal.addColorStop(0.45, '#d4dbea');
+        metal.addColorStop(1, '#6a7388');
         ctx.globalAlpha = 1;
+        ctx.strokeStyle = metal;
+        ctx.lineWidth = t;
+        line(0);
+        ctx.strokeStyle = '#ffffff';
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 1;
+        line(-t * 0.28, 0.82);
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = p.color;
         ctx.lineWidth = p.stroke;
-        ctx.stroke();
         break;
       }
       case 'dichroic': {

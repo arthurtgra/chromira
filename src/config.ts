@@ -33,7 +33,7 @@ export const CONFIG = {
     7: '#f4f6ff',
   } satisfies Record<Color, string>,
 
-  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
+  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, mirrorThick: 0.075, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
 
   // Lançador de luz, medidas em fração da célula.
   emitter: {
