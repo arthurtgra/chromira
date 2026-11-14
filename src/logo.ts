@@ -6,7 +6,8 @@
 // inferior esquerdo, k = altura em "faixas" (cada faixa = √3/2 unidade). Cada viga mostra duas faces,
 // então cada lado tem três linhas paralelas: k = 0 (fora), 1 (meio), 2 (dentro).
 
-export type Seg = { color: string; a: [number, number]; b: [number, number] };
+// back: a linha nasce por baixo da viga anterior (as três primeiras de cada viga).
+export type Seg = { color: string; a: [number, number]; b: [number, number]; back: boolean };
 
 export const LOGO_COLORS = { r: '#ff3358', g: '#29f58a', b: '#4c7dff' } as const;
 
@@ -39,7 +40,7 @@ export function penroseSegments(): { segs: Seg[]; h: number } {
     [LOGO_COLORS.r, (4 * Math.PI) / 3],
   ];
   for (const [color, t] of turns) {
-    for (const [a, b] of BEAM) raw.push({ color, a: rot(toXY(a), t), b: rot(toXY(b), t) });
+    BEAM.forEach(([a, b], i) => raw.push({ color, a: rot(toXY(a), t), b: rot(toXY(b), t), back: i < 3 }));
   }
   // y para baixo (tela) e normalizado para largura 1.
   const pts = raw.flatMap((s) => [s.a, s.b]);
@@ -49,7 +50,45 @@ export function penroseSegments(): { segs: Seg[]; h: number } {
   const maxY = Math.max(...pts.map((p) => p[1]));
   const w = maxX - minX;
   const map = ([x, y]: [number, number]): [number, number] => [(x - minX) / w, (maxY - y) / w];
-  return { segs: raw.map((s) => ({ color: s.color, a: map(s.a), b: map(s.b) })), h: (maxY - minY) / w };
+  const segs = raw.map((s) => ({ ...s, a: map(s.a), b: map(s.b) }));
+  return { segs: [...segs, ...patches(segs)], h: (maxY - minY) / w };
+}
+
+// Onde uma linha termina encostada numa linha de outra cor, a ponta arredondada passa por cima dela.
+// Ordem de desenho não resolve (as junções formam um ciclo — é a figura impossível), então cada junção
+// ganha um remendo: um trechinho da linha que passa por cima, redesenhado no fim, cobrindo a ponta.
+const PATCH = 0.035; // meio comprimento do remendo, na escala normalizada (maior que a espessura do traço)
+const EPS = 1e-6;
+
+function patches(segs: Seg[]): Seg[] {
+  const out: Seg[] = [];
+  const near = (p: [number, number], q: [number, number]): boolean => Math.hypot(p[0] - q[0], p[1] - q[1]) < EPS;
+  for (const a of segs) {
+    for (const p of [a.a, a.b]) {
+      for (const b of segs) {
+        if (b.color === a.color) continue;
+        const dx = b.b[0] - b.a[0];
+        const dy = b.b[1] - b.a[1];
+        const len = Math.hypot(dx, dy);
+        const t = ((p[0] - b.a[0]) * dx + (p[1] - b.a[1]) * dy) / (len * len);
+        const dist = Math.abs((p[0] - b.a[0]) * dy - (p[1] - b.a[1]) * dx) / len;
+        if (dist > EPS || t < -EPS || t > 1 + EPS) continue;
+        // Junção de pontas (p é ponta das duas): cobre quem não nasce por baixo.
+        const atEnd = near(p, b.a) || near(p, b.b);
+        if (atEnd && !(a.back && !b.back)) continue;
+        const h = PATCH / len;
+        const t0 = Math.max(0, t - h);
+        const t1 = Math.min(1, t + h);
+        out.push({
+          color: b.color,
+          a: [b.a[0] + dx * t0, b.a[1] + dy * t0],
+          b: [b.a[0] + dx * t1, b.a[1] + dy * t1],
+          back: false,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 export function logoSvg(size = 100, stroke = 2.4): string {
@@ -58,10 +97,9 @@ export function logoSvg(size = 100, stroke = 2.4): string {
   const f = (n: number): number => Math.round((n * size + pad) * 100) / 100;
   const W = size + pad * 2;
   const Hh = Math.round((h * size + pad * 2) * 100) / 100;
-  const byColor = new Map<string, string>();
-  for (const s of segs) byColor.set(s.color, (byColor.get(s.color) ?? '') + `M${f(s.a[0])} ${f(s.a[1])}L${f(s.b[0])} ${f(s.b[1])}`);
-  const paths = [...byColor]
-    .map(([c, d]) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${stroke}" stroke-linecap="round"/>`)
+  // Em ordem: linhas e depois os remendos por cima.
+  const paths = segs
+    .map((s) => `<path d="M${f(s.a[0])} ${f(s.a[1])}L${f(s.b[0])} ${f(s.b[1])}" stroke="${s.color}"/>`)
     .join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}">${paths}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}"><g fill="none" stroke-width="${stroke}" stroke-linecap="round">${paths}</g></svg>`;
 }
