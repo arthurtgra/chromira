@@ -93,7 +93,7 @@ function patches(segs: Seg[]): Seg[] {
 
 export function logoSvg(size = 100, stroke = 2.4): string {
   const { segs, h } = penroseSegments();
-  const pad = stroke * 3; // folga para o brilho não ser cortado
+  const pad = stroke;
   const f = (n: number): number => Math.round((n * size + pad) * 100) / 100;
   const W = size + pad * 2;
   const Hh = Math.round((h * size + pad * 2) * 100) / 100;
@@ -101,9 +101,5 @@ export function logoSvg(size = 100, stroke = 2.4): string {
   const paths = segs
     .map((s) => `<path d="M${f(s.a[0])} ${f(s.a[1])}L${f(s.b[0])} ${f(s.b[1])}" stroke="${s.color}"/>`)
     .join('');
-  // Brilho neon: cada traço ganha um halo desfocado na própria cor.
-  const glow =
-    '<filter id="glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2" result="b"/>' +
-    '<feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}"><defs>${glow}</defs><g fill="none" stroke-width="${stroke}" stroke-linecap="round" filter="url(#glow)">${paths}</g></svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}"><g fill="none" stroke-width="${stroke}" stroke-linecap="round">${paths}</g></svg>`;
 }
