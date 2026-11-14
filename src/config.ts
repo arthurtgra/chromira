@@ -3,15 +3,17 @@ import type { Color } from './core/types.ts';
 
 export const CONFIG = {
     // Fundo: [centro, borda] da vinheta, tons neutros. Muda a cada fase, com transição suave.
+  // Um tom por bloco de 10 fases (1-10, 11-20...), escuros mas bem distintos entre si.
   backgrounds: [
     ['#1c1c22', '#0a0a0d'], // grafite
-    ['#1a1f24', '#090b0d'], // ardósia
-    ['#221f1c', '#0c0b0a'], // pedra quente
-    ['#1d211e', '#0a0c0b'], // sálvia
-    ['#201c22', '#0c0a0d'], // malva
-    ['#1b1e26', '#090a0e'], // cinza azulado
-    ['#24201d', '#0d0b0a'], // taupe
-    ['#1e1e1e', '#0b0b0b'], // neutro
+    ['#14202e', '#070b10'], // azul-noite
+    ['#122522', '#060d0c'], // verde-petróleo
+    ['#231a2e', '#0c0910'], // violeta
+    ['#2a1a1f', '#0f090b'], // vinho
+    ['#1a2416', '#090c07'], // musgo
+    ['#2a2216', '#0e0b07'], // âmbar queimado
+    ['#162028', '#070a0d'], // ardósia azul
+    ['#281a28', '#0e090e'], // ameixa
   ],
   backgroundFadeMs: 900,
   gridDotAlpha: 0.1,
@@ -129,7 +131,7 @@ export const CONFIG = {
   // Vitória: depois de uma pausa, um pulso de luz caminha por cada feixe, do lançador até o fim:
   // as ondas engordam só num trecho estreito em volta dele, com um ponto de luz andando junto.
   // Trilho (fases 71+): cápsula por baixo da peça arrastável.
-  rail: { width: 0.2, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1, dot: 'rgba(255,255,255,0.5)', dotR: 0.035 },
+  rail: { width: 0.2, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1, dot: 'rgba(255,255,255,0.8)', dotR: 0.06 },
   slideRate: 22, // deslize da peça até a célula do trilho (1/s, suavização exponencial)
   dragSlop: 8, // px de movimento antes de virar arrasto (menos que isso é toque)
   prismTurnRate: 12, // giro do prisma até a nova direção da luz (1/s, suavização exponencial)

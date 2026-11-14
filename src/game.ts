@@ -337,7 +337,7 @@ export class Game {
 
   // Cor de fundo atual: transição suave da fase anterior para a desta.
   private background(): readonly [string, string] {
-    const to = CONFIG.backgrounds[this.index % CONFIG.backgrounds.length]!;
+    const to = CONFIG.backgrounds[Math.floor(this.index / 10) % CONFIG.backgrounds.length]!;
     const t = clamp01((this.now - this.bgAt) / CONFIG.backgroundFadeMs);
     if (!this.bgFrom || t >= 1) return to;
     const from = this.bgFrom;
