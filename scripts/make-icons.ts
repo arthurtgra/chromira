@@ -1,14 +1,24 @@
-// Gera public/icon-192.png e public/icon-512.png sem dependências (PNG escrito à mão).
+// Gera public/icon-192.png, public/icon-512.png e public/logo.svg a partir do logo (triângulo de Penrose RGB).
+// PNG escrito à mão, sem dependências: polígonos rasterizados com 4x4 amostras por pixel.
 import { writeFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
+import { logoSvg, penrose } from '../src/logo.ts';
 
-const BG = [11, 11, 18];
-const BEAMS: [number, number, number, number][] = [
-  // cor RGB + ângulo do feixe que sai do centro
-  [255, 42, 58, -Math.PI / 2],
-  [42, 255, 90, 0],
-  [58, 106, 255, Math.PI / 2],
-];
+const BG: [number, number, number] = [22, 22, 27];
+const SCALE = 0.62; // largura do logo em fração do ícone (cabe na zona segura do ícone "maskable")
+const SS = 4;
+
+const hex = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+
+function inside(pts: [number, number][], x: number, y: number): boolean {
+  let hit = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, yi] = pts[i]!;
+    const [xj, yj] = pts[j]!;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
 
 function chunk(type: string, data: Buffer): Buffer {
   const len = Buffer.alloc(4);
@@ -20,37 +30,28 @@ function chunk(type: string, data: Buffer): Buffer {
 }
 
 function icon(size: number): Buffer {
+  const { polys, h } = penrose();
+  const w = size * SCALE;
+  const ox = (size - w) / 2;
+  const oy = (size - w * h) / 2;
+  // Polígonos em pixels; o último pintado ganha (mesma ordem do SVG).
+  const shapes = polys.map((p) => ({ rgb: hex(p.fill), pts: p.pts.map(([x, y]) => [ox + x * w, oy + y * w] as [number, number]) }));
   const raw = Buffer.alloc((size * 3 + 1) * size);
-  const c = size / 2;
-  const width = size * 0.035;
   for (let y = 0; y < size; y++) {
     raw[y * (size * 3 + 1)] = 0;
     for (let x = 0; x < size; x++) {
-      const px = [...BG];
-      const dx = x + 0.5 - c;
-      const dy = y + 0.5 - c;
-      // feixe branco entrando pela esquerda
-      const glow = (d: number): number => Math.exp(-((d / width) ** 2)) + 0.25 * Math.exp(-((d / (width * 4)) ** 2));
-      if (dx < 0) for (let k = 0; k < 3; k++) px[k] += 255 * glow(Math.abs(dy));
-      for (const [r, g, b, a] of BEAMS) {
-        const along = dx * Math.cos(a) + dy * Math.sin(a);
-        if (along < 0) continue;
-        const perp = Math.abs(-dx * Math.sin(a) + dy * Math.cos(a));
-        const f = glow(perp);
-        px[0] += r * f;
-        px[1] += g * f;
-        px[2] += b * f;
+      const acc = [0, 0, 0];
+      for (let sy = 0; sy < SS; sy++) {
+        for (let sx = 0; sx < SS; sx++) {
+          const px = x + (sx + 0.5) / SS;
+          const py = y + (sy + 0.5) / SS;
+          let c = BG;
+          for (const s of shapes) if (inside(s.pts, px, py)) c = s.rgb;
+          for (let k = 0; k < 3; k++) acc[k]! += c[k]!;
+        }
       }
-      // prisma: triângulo de contorno branco
-      const s = size * 0.16;
-      const inTri = (sc: number): boolean => {
-        const ty = dy + s * sc * 0.25;
-        return ty <= s * sc * 0.75 && ty >= -s * sc * 0.75 && Math.abs(dx) <= ((s * sc * 0.75 - ty) / (1.5 * s * sc)) * s * sc * 0.87 * 2 * 0.5 * 2;
-      };
-      if (inTri(1) && !inTri(0.8)) for (let k = 0; k < 3; k++) px[k] = 255;
-      else if (inTri(0.8)) for (let k = 0; k < 3; k++) px[k] = BG[k]!;
       const o = y * (size * 3 + 1) + 1 + x * 3;
-      for (let k = 0; k < 3; k++) raw[o + k] = Math.min(255, Math.round(px[k]!));
+      for (let k = 0; k < 3; k++) raw[o + k] = Math.round(acc[k]! / (SS * SS));
     }
   }
   const ihdr = Buffer.alloc(13);
@@ -66,5 +67,7 @@ function icon(size: number): Buffer {
   ]);
 }
 
-for (const size of [192, 512]) writeFileSync(new URL(`../public/icon-${size}.png`, import.meta.url), icon(size));
-process.stdout.write('ícones escritos em public/\n');
+const out = (f: string): URL => new URL(`../public/${f}`, import.meta.url);
+for (const size of [192, 512]) writeFileSync(out(`icon-${size}.png`), icon(size));
+writeFileSync(out('logo.svg'), logoSvg() + '\n');
+process.stdout.write('ícones e logo.svg escritos em public/\n');

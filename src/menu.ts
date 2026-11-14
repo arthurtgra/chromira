@@ -1,4 +1,5 @@
 import type { Game } from './game.ts';
+import { logoSvg } from './logo.ts';
 
 type Screen = 'home' | 'levels' | null;
 
@@ -12,6 +13,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
   const menuBtn = $<HTMLButtonElement>('#menu-btn');
   const grid = $<HTMLElement>('#grid');
   let screen: Screen = null;
+  $('#logo').innerHTML = logoSvg();
   let back: Screen = null;
 
   const setMini = (open: boolean): void => {
