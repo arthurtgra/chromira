@@ -216,10 +216,33 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       ctx.lineTo(x - sz * 0.87 + ox, y + sz * 0.5 + oy);
       ctx.closePath();
     };
-    const spin = st.time * TAU * P.aberrationHz;
+    // Anel: espectro parado, borda ondulando e respirando (movimento sem girar as cores).
+    const cr = P.ring * l.cell * (1 + 0.04 * Math.sin(st.time * TAU * P.ringPulseHz));
+    const ringG = ctx.createConicGradient(-Math.PI / 2, x, y);
+    for (let i = 0; i <= 6; i++) ringG.addColorStop(i / 6, `hsl(${i * 60}, 100%, 62%)`);
+    const ringPath = (): void => {
+      ctx.beginPath();
+      for (let i = 0; i <= 96; i++) {
+        const a = (i / 96) * TAU;
+        const rr = cr * (1 + P.ringWobble * (Math.sin(a * 4 + st.time * TAU * P.ringWaveHz) + 0.5 * Math.sin(a * 7 - st.time * 2.1)));
+        if (i === 0) ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+        else ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      ctx.closePath();
+    };
+    ctx.strokeStyle = ringG;
+    ringPath();
+    ctx.globalAlpha = k * (0.22 + 0.1 * Math.sin(st.time * 3.3));
+    ctx.lineWidth = P.ringGlow * l.cell;
+    ctx.stroke();
+    ctx.globalAlpha = k * 0.8;
+    ctx.lineWidth = P.ringWidth;
+    ctx.stroke();
+
+    // Triângulo em três cópias R/G/B afastadas e paradas: aberração cromática.
     const off = P.aberration * (1 + st.rainbow);
     COMPONENTS.forEach((c, i) => {
-      const a = spin + (i * TAU) / 3;
+      const a = -Math.PI / 2 + (i * TAU) / 3;
       tri(Math.cos(a) * off, Math.sin(a) * off);
       ctx.fillStyle = CONFIG.colors[c];
       ctx.globalAlpha = k * 0.22;
@@ -287,89 +310,43 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
   ctx.lineWidth = CONFIG.piece.stroke;
 }
 
-// Lançador: corpo escuro arredondado com cano na direção do disparo. Dentro, núcleo de energia pulsando
-// (cores componentes girando se for mistura) e anel de arcos girando; lente acesa na boca do cano.
-// O corpo é opaco: o feixe nasce visivelmente da lente, não do meio da peça.
+// Lançador: corpo escuro arredondado, liso, e uma lente acesa na face de saída. A luz nasce da lente.
 function drawEmitter(ctx: Ctx, x: number, y: number, c: number, dir: Dir, color: Color, time: number): void {
   const E = CONFIG.emitter;
   const col = CONFIG.colors[color];
   const [dx, dy] = DELTA[dir];
-  const ang = Math.atan2(dy, dx);
-  const body = E.body * c;
+  const b = E.body * c;
   const pulse = 0.5 + 0.5 * Math.sin(time * TAU * E.pulseHz);
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.rotate(Math.atan2(dy, dx));
 
-  const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, E.halo * c);
+  const halo = ctx.createRadialGradient(b, 0, 0, b, 0, E.halo * c);
   halo.addColorStop(0, col);
   halo.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = 0.12 + 0.08 * pulse;
+  ctx.globalAlpha = 0.18 + 0.1 * pulse;
   ctx.fillStyle = halo;
   ctx.beginPath();
-  ctx.arc(0, 0, E.halo * c, 0, TAU);
+  ctx.arc(b, 0, E.halo * c, 0, TAU);
   ctx.fill();
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = 1;
 
-  ctx.rotate(ang);
-  const len = E.barrel * c;
-  const w0 = body * 0.55;
-  const w1 = body * 0.38;
+  ctx.globalAlpha = 1;
   ctx.fillStyle = E.fill;
   ctx.strokeStyle = 'rgba(255,255,255,0.85)';
   ctx.lineWidth = CONFIG.piece.stroke;
   ctx.beginPath();
-  ctx.moveTo(body * 0.6, -w0);
-  ctx.lineTo(len, -w1);
-  ctx.lineTo(len, w1);
-  ctx.lineTo(body * 0.6, w0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.roundRect(-body, -body, body * 2, body * 2, body * 0.45);
+  ctx.roundRect(-b, -b, b * 2, b * 2, b * E.radius);
   ctx.fill();
   ctx.stroke();
 
-  ctx.strokeStyle = col;
-  ctx.lineWidth = CONFIG.piece.stroke * 2;
-  ctx.globalAlpha = 0.75 + 0.25 * pulse;
+  const t = E.lens * c;
+  ctx.fillStyle = col;
   ctx.beginPath();
-  ctx.moveTo(len, -w1 * 0.9);
-  ctx.lineTo(len, w1 * 0.9);
-  ctx.stroke();
-  ctx.rotate(-ang);
-
-  const comps = COMPONENTS.filter((k) => (color & k) !== 0);
-  const core = E.core * c * (0.9 + 0.12 * pulse);
-  ctx.globalAlpha = 1;
-  if (comps.length > 1) {
-    const g = ctx.createConicGradient(time * TAU * E.spinHz, 0, 0);
-    [...comps, comps[0]!].forEach((k, i, all) => g.addColorStop(i / (all.length - 1), CONFIG.colors[k]));
-    ctx.fillStyle = g;
-  } else ctx.fillStyle = col;
-  ctx.beginPath();
-  ctx.arc(0, 0, core, 0, TAU);
+  ctx.roundRect(b - t / 2, -b * 0.7, t, b * 1.4, t / 2);
   ctx.fill();
-  const hot = ctx.createRadialGradient(0, 0, 0, 0, 0, core);
-  hot.addColorStop(0, 'rgba(255,255,255,0.85)');
-  hot.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = hot;
-  ctx.fill();
-
-  ctx.strokeStyle = col;
-  ctx.lineWidth = 1.5;
-  ctx.globalAlpha = 0.8;
-  const ring = E.ring * c;
-  const spin = -time * TAU * E.spinHz;
-  for (let i = 0; i < 3; i++) {
-    const a0 = spin + (i * TAU) / 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, ring, a0, a0 + TAU / 6);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 

@@ -30,14 +30,12 @@ export const CONFIG = {
 
   // Lançador de luz, medidas em fração da célula.
   emitter: {
-    body: 0.2, // meia largura do corpo
-    barrel: 0.36, // ponta do cano (lente), a partir do centro
-    core: 0.1,
-    ring: 0.15,
-    halo: 0.6,
+    body: 0.22, // meia largura do corpo
+    radius: 0.35, // arredondamento, fração do corpo
+    lens: 0.07, // espessura da lente na face de saída
+    halo: 0.45, // brilho só em volta da lente, em células
     fill: '#0e0c1a',
-    pulseHz: 0.8,
-    spinHz: 0.35,
+    pulseHz: 0.6,
   },
 
   beam: {
@@ -87,8 +85,13 @@ export const CONFIG = {
       rayLen: 1.25, // em células
       rayWidth: 0.075, // meia abertura de cada cunha, radianos
       flickerHz: 0.9,
-      aberration: 3, // px de afastamento das cópias R/G/B do triângulo
-      aberrationHz: 0.5,
+      aberration: 3, // px de afastamento das cópias R/G/B do triângulo (paradas)
+      ring: 0.62, // raio do anel, em células
+      ringWidth: 3, // px, linha nítida
+      ringGlow: 0.2, // largura do brilho do anel, em células
+      ringPulseHz: 0.6, // respiração do raio
+      ringWaveHz: 0.5, // ondulação correndo pela borda
+      ringWobble: 0.022,
     },
   },
 
@@ -134,14 +137,19 @@ export const CONFIG = {
 
   layout: { pad: 16, top: 116, bottom: 28 },
   hud: {
-    fontPx: 56,
-    font: '800 56px system-ui, -apple-system, "Segoe UI", sans-serif',
-    y: 50,
+    family: '"SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif',
+    labelPx: 10,
+    labelY: 22,
+    labelSpacing: 5, // px entre letras de "FASE"
+    numberPx: 58,
+    numberWeight: 250,
+    y: 56,
     appearMs: 650,
-    winScale: 0.22,
-    breathe: 0.03,
-    pipY: 92,
-    pipSize: 5,
-    pipGap: 18,
+    winScale: 0.16,
+    breathe: 0.015,
+    barY: 96,
+    barW: 14,
+    barH: 3,
+    barGap: 5,
   },
 } as const;

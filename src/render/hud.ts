@@ -11,71 +11,84 @@ export interface HudState {
   accent: string; // cor dominante da fase
 }
 
-const easeOutBack = (t: number): number => 1 + 2.7 * (t - 1) ** 3 + 1.7 * (t - 1) ** 2;
+const easeOutCubic = (t: number): number => 1 - (1 - t) ** 3;
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 
+// Rótulo "FASE" espaçado, número fino grande com degradê branco → cor da fase, filete e barrinhas de dificuldade.
 export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): void {
   const H = CONFIG.hud;
-  const k = clamp01(s.appear / H.appearMs);
-  const scale =
-    (k < 1 ? 0.4 + 0.6 * easeOutBack(k) : 1) * (1 + H.winScale * s.win) * (1 + H.breathe * Math.sin(s.time * 2));
+  const k = easeOutCubic(clamp01(s.appear / H.appearMs));
   const x = l.w / 2;
-  const y = H.y;
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
 
+  // FASE
+  ctx.font = `600 ${H.labelPx}px ${H.family}`;
+  ctx.fillStyle = '#ffffff';
+  ctx.globalAlpha = 0.4 * k;
+  const label = 'FASE';
+  const widths = [...label].map((ch) => ctx.measureText(ch).width);
+  const lw = widths.reduce((a, b) => a + b, 0) + H.labelSpacing * (label.length - 1);
+  let lx = x - lw / 2;
+  [...label].forEach((ch, i) => {
+    ctx.fillText(ch, lx + widths[i]! / 2, H.labelY);
+    lx += widths[i]! + H.labelSpacing;
+  });
+
+  // Número: sobe e aparece; pulso na vitória.
+  const scale = (1 + H.winScale * s.win) * (1 + H.breathe * Math.sin(s.time * 2));
+  const y = H.y + 10 * (1 - k);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  ctx.globalAlpha = 0.25 + 0.75 * k;
-  ctx.font = H.font;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.font = `${H.numberWeight} ${H.numberPx}px ${H.family}`;
   const text = String(s.level);
-  const w = ctx.measureText(text).width;
-
-  let fill: string | CanvasGradient = '#ffffff';
+  const half = H.numberPx / 2;
+  let fill: CanvasGradient;
   if (s.rainbow > 0) {
-    const g = ctx.createLinearGradient(-w / 2 - 20, 0, w / 2 + 20, 0);
-    const shift = (s.time * 60) % 360;
-    for (let i = 0; i <= 6; i++) {
-      const light = 100 - 32 * s.rainbow;
-      g.addColorStop(i / 6, `hsl(${(shift + i * 50) % 360}, ${Math.round(100 * s.rainbow)}%, ${light}%)`);
+    const w = ctx.measureText(text).width;
+    fill = ctx.createLinearGradient(-w / 2, -half, w / 2, half);
+    const shift = (s.time * 40) % 360;
+    for (let i = 0; i <= 4; i++) {
+      fill.addColorStop(i / 4, `hsl(${(shift + i * 70) % 360}, ${Math.round(85 * s.rainbow)}%, ${92 - 14 * s.rainbow}%)`);
     }
-    fill = g;
+  } else {
+    fill = ctx.createLinearGradient(0, -half, 0, half);
+    fill.addColorStop(0, '#ffffff');
+    fill.addColorStop(1, s.accent);
   }
+  ctx.globalAlpha = k;
   ctx.shadowColor = s.accent;
-  ctx.shadowBlur = 14 + 26 * s.win;
+  ctx.shadowBlur = 18 + 30 * s.win;
   ctx.fillStyle = fill;
   ctx.fillText(text, 0, 0);
-  ctx.shadowBlur = 0;
   ctx.restore();
 
-  // Marcadores de dificuldade: losangos cheios até o nível, coloridos pelo espectro.
-  ctx.save();
+  // Filete: linha fina que abre do centro, sumindo nas pontas.
+  const lineY = (H.y + H.barY) / 2 + 6;
+  const half2 = 34 * k;
+  const g = ctx.createLinearGradient(x - half2, 0, x + half2, 0);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.5, s.accent);
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.globalAlpha = 0.6;
+  ctx.fillStyle = g;
+  ctx.fillRect(x - half2, lineY, half2 * 2, 1);
+
+  // Dificuldade: 5 barrinhas; cheias até o nível, em tons do espectro.
   const n = 5;
-  const total = (n - 1) * H.pipGap;
+  const total = n * H.barW + (n - 1) * H.barGap;
   for (let i = 0; i < n; i++) {
-    const px = x - total / 2 + i * H.pipGap;
-    const appearI = clamp01((s.appear - 250 - i * 70) / 200);
-    const r = H.pipSize * (0.4 + 0.6 * appearI);
+    const a = clamp01((s.appear - 200 - i * 60) / 220);
     const on = i < s.difficulty;
-    const hue = i * 65;
-    ctx.globalAlpha = on ? 0.95 * appearI : 0.25 * appearI;
+    const bx = x - total / 2 + i * (H.barW + H.barGap);
+    const w = H.barW * a;
+    ctx.globalAlpha = on ? 0.95 : 0.16;
+    ctx.fillStyle = on ? `hsl(${i * 60}, 90%, 64%)` : '#ffffff';
     ctx.beginPath();
-    ctx.moveTo(px, H.pipY - r);
-    ctx.lineTo(px + r, H.pipY);
-    ctx.lineTo(px, H.pipY + r);
-    ctx.lineTo(px - r, H.pipY);
-    ctx.closePath();
-    if (on) {
-      ctx.fillStyle = `hsl(${hue}, 95%, 62%)`;
-      ctx.shadowColor = ctx.fillStyle;
-      ctx.shadowBlur = 8;
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
+    ctx.roundRect(bx + (H.barW - w) / 2, H.barY - H.barH / 2, w, H.barH, H.barH / 2);
+    ctx.fill();
   }
   ctx.restore();
 }
