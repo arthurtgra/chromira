@@ -1,9 +1,17 @@
 import { Synth } from './audio/synth.ts';
 import { CONFIG } from './config.ts';
 import { key, pieceStates, pieces, startRots, trace } from './core/trace.ts';
-import type { Cell, Level, Rots, TraceResult } from './core/types.ts';
+import type { Cell, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { drawBackground, drawBeams, drawDebug, drawPieces, drawPrismFans, type BeamStyle } from './render/draw.ts';
+import { planBeams, visibleSegments, type BeamPlan } from './render/beams.ts';
+import {
+  drawBackground,
+  drawBeams,
+  drawDebug,
+  drawPieces,
+  drawPrismFans,
+  type BeamStyle,
+} from './render/draw.ts';
 import { Fx } from './render/fx.ts';
 import { drawHud } from './render/hud.ts';
 import { computeLayout, cx, cy, type Layout } from './render/layout.ts';
@@ -35,6 +43,8 @@ export class Game {
   private now = 0;
   private loadedAt = 0;
   private beamAt = 0;
+  private plan: BeamPlan = planBeams([], []);
+  private fades: { seg: Segment; at: number }[] = [];
   private pending = false;
   private pendingDown = false;
   private litAt = new Map<string, number>();
@@ -60,6 +70,8 @@ export class Game {
     this.litAt = new Map(this.litKeys(this.result).map((k) => [k, -Infinity]));
     this.pending = false;
     this.pendingDown = false;
+    this.plan = planBeams([], this.result.segments);
+    this.fades = [];
     this.beamAt = this.now;
     this.loadedAt = this.now;
     this.wonAt = null;
@@ -96,7 +108,10 @@ export class Game {
     }
     navigator.vibrate?.(CONFIG.vibrateMs);
 
+    const before = visibleSegments(this.plan, this.front());
     this.result = trace(this.level, this.rots);
+    this.plan = planBeams(before, this.result.segments);
+    for (const seg of this.plan.fading) this.fades.push({ seg, at: this.now });
     const lit = new Set(this.litKeys(this.result));
     for (const k of [...this.litAt.keys()]) {
       if (lit.has(k)) continue;
@@ -111,9 +126,10 @@ export class Game {
     this.now += dtMs;
     this.fps += (1000 / Math.max(1, dtMs) - this.fps) * 0.05;
     this.fx.update(dtMs);
+    this.fades = this.fades.filter((f) => this.now - f.at < CONFIG.beam.fadeMs);
 
     // Efeitos de alvo só disparam quando o feixe termina de ser desenhado.
-    if (this.pending && this.beamT() >= 1) {
+    if (this.pending && this.front() >= this.plan.to) {
       this.pending = false;
       this.shown = this.result;
       if (this.pendingDown) this.synth.down();
@@ -143,8 +159,10 @@ export class Game {
       rainbow: this.rainbow(),
       time: this.now / 1000,
     };
+    const front = this.front();
+    const fading = this.fades.map((f) => ({ seg: f.seg, k: clamp01((this.now - f.at) / CONFIG.beam.fadeMs) }));
     drawPrismFans(ctx, l, this.level.cells, this.result.segments, style);
-    drawBeams(ctx, l, this.result.segments, style);
+    drawBeams(ctx, l, this.plan, front, fading, style);
     drawPieces(ctx, l, this.level.cells, {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
       filterColor: (i) => {
@@ -193,8 +211,14 @@ export class Game {
     );
   }
 
+  // Distância da fonte já alcançada pela frente de luz, em células.
+  private front(): number {
+    return this.plan.from + ((this.now - this.beamAt) / 1000) * CONFIG.beam.speed;
+  }
+
   private beamT(): number {
-    return clamp01((this.now - this.beamAt) / CONFIG.beam.drawMs);
+    const { from, to } = this.plan;
+    return to > from ? clamp01((this.front() - from) / (to - from)) : 1;
   }
 
   private animValue(a: Anim, ms: number): number {

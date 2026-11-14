@@ -35,7 +35,10 @@ export const CONFIG = {
       { width: 0.13, alpha: 0.32 },
       { width: 0.035, alpha: 1 },
     ],
-    drawMs: 150,
+    speed: 36, // células por segundo: só o trecho que mudou cresce, o resto fica aceso
+    fadeMs: 220, // trecho que deixou de existir apaga neste tempo
+    // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
+    chroma: { band: 0.5, speed: 1.1, hueHz: 0.12, alpha: 0.3, width: 0.09, sat: 95, light: 62 },
     winWidthMul: 1.8,
     winGrowMs: 300,
   },

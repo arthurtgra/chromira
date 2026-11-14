@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { DELTA, FILTER_COLORS } from '../core/trace.ts';
-import type { Cell, Segment } from '../core/types.ts';
+import type { Cell, Color, Segment } from '../core/types.ts';
+import { cut, visibleLength, visibleSegments, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -22,55 +23,103 @@ export function drawBackground(ctx: Ctx, l: Layout, colors: readonly [string, st
   }
 }
 
-const segLen = (s: Segment): number => Math.abs(s.x2 - s.x1) + Math.abs(s.y2 - s.y1);
+interface Run {
+  pts: [number, number][];
+  color: Color;
+  d0: number;
+}
 
-function visibleSegments(segments: Segment[], t: number): Segment[] {
-  const total = segments.reduce((a, s) => a + segLen(s), 0);
-  let budget = total * Math.min(1, Math.max(0, t));
-  const out: Segment[] = [];
-  for (const s of segments) {
-    if (budget <= 0) break;
-    const len = segLen(s);
-    if (len <= budget) out.push(s);
-    else {
-      const f = budget / len;
-      out.push({ ...s, x2: s.x1 + (s.x2 - s.x1) * f, y2: s.y1 + (s.y2 - s.y1) * f });
+// Junta segmentos encadeados da mesma cor numa polilinha: cantos sem emenda.
+function buildRuns(plan: BeamPlan, front: number): Run[] {
+  const runs: Run[] = [];
+  let open = false;
+  for (const p of plan.pieces) {
+    const v = visibleLength(p, front);
+    if (v <= 0) {
+      open = false;
+      continue;
     }
-    budget -= len;
+    const s = cut(p, 0, v);
+    const last = runs.at(-1);
+    const tail = last?.pts.at(-1);
+    if (open && last && tail && last.color === s.color && tail[0] === s.x1 && tail[1] === s.y1) last.pts.push([s.x2, s.y2]);
+    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: p.d0 });
+    open = v >= p.len;
   }
-  return out;
+  return runs;
+}
+
+function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
+  ctx.beginPath();
+  r.pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(cx(l, x), cy(l, y)) : ctx.lineTo(cx(l, x), cy(l, y))));
+  ctx.stroke();
 }
 
 export interface BeamStyle {
-  t: number; // fração desenhada, 0..1
+  t: number; // fração da animação de crescimento, 0..1
   widthMul: number;
   rainbow: number; // 0..1
   time: number; // segundos
 }
 
-// Desenha os segmentos até a fração t do comprimento total; feixes brancos ganham franjas de difração.
-export function drawBeams(ctx: Ctx, l: Layout, segments: Segment[], st: BeamStyle): void {
-  const visible = visibleSegments(segments, st.t);
+export interface FadingBeam {
+  seg: Segment;
+  k: number; // 0..1, quanto já apagou
+}
+
+// Três camadas por polilinha, faixas cromáticas correndo no sentido da luz e franjas de difração nos brancos.
+export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fading: FadingBeam[], st: BeamStyle): void {
+  const B = CONFIG.beam;
+  const runs = buildRuns(plan, front);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  for (const layer of CONFIG.beam.layers) {
-    ctx.globalAlpha = layer.alpha;
-    ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
-    for (const s of visible) {
-      ctx.strokeStyle = CONFIG.colors[s.color];
+  ctx.lineJoin = 'round';
+
+  for (const f of fading) {
+    for (const layer of B.layers) {
+      ctx.globalAlpha = layer.alpha * (1 - f.k) ** 2;
+      ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
+      ctx.strokeStyle = CONFIG.colors[f.seg.color];
       ctx.beginPath();
-      ctx.moveTo(cx(l, s.x1), cy(l, s.y1));
-      ctx.lineTo(cx(l, s.x2), cy(l, s.y2));
+      ctx.moveTo(cx(l, f.seg.x1), cy(l, f.seg.y1));
+      ctx.lineTo(cx(l, f.seg.x2), cy(l, f.seg.y2));
       ctx.stroke();
     }
   }
+
+  for (const layer of B.layers) {
+    ctx.globalAlpha = layer.alpha;
+    ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
+    for (const r of runs) {
+      ctx.strokeStyle = CONFIG.colors[r.color];
+      strokeRun(ctx, l, r);
+    }
+  }
+
+  // Três passadas tracejadas defasadas, cada uma num matiz a 120°: viram faixas de arco-íris que andam.
+  const C = B.chroma;
+  const band = C.band * l.cell;
+  ctx.lineCap = 'butt';
+  ctx.setLineDash([band, band * 2]);
+  ctx.lineWidth = Math.max(1, C.width * l.cell * st.widthMul);
+  ctx.globalAlpha = C.alpha;
+  const hue = st.time * 360 * C.hueHz;
+  for (let k = 0; k < 3; k++) {
+    for (const r of runs) {
+      ctx.strokeStyle = `hsl(${(hue + k * 120 + r.d0 * 25) % 360}, ${C.sat}%, ${C.light}%)`;
+      ctx.lineDashOffset = (r.d0 * l.cell - st.time * C.speed * l.cell) - k * band;
+      strokeRun(ctx, l, r);
+    }
+  }
+  ctx.setLineDash([]);
+  ctx.lineCap = 'round';
 
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
     const n = R.fringes;
     ctx.lineWidth = Math.max(1, 0.025 * l.cell * st.widthMul);
-    for (const s of visible) {
+    for (const s of visibleSegments(plan, front)) {
       if (s.color !== 7) continue;
       const vertical = s.x1 === s.x2;
       for (let i = 0; i < n; i++) {
