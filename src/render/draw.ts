@@ -475,27 +475,14 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         break;
       }
       case 'wall': {
-        // Bloco sólido: placa arredondada um pouco mais clara que o fundo, com luz no topo e sombra embaixo.
+        // Bloco: placa lisa e escura com contorno fino, no mesmo estilo do lançador (sem degradê nem sombra).
         const s = p.wallSize * c;
-        const r = s * 0.18;
-        const g = ctx.createLinearGradient(x, y - s / 2, x, y + s / 2);
-        g.addColorStop(0, 'rgba(255,255,255,0.10)');
-        g.addColorStop(1, 'rgba(255,255,255,0.03)');
-        ctx.fillStyle = 'rgba(0,0,0,0.35)';
+        ctx.fillStyle = CONFIG.emitter.fill;
+        ctx.strokeStyle = 'rgba(255,255,255,0.42)';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(x - s / 2, y - s / 2 + 3, s, s, r);
+        ctx.roundRect(x - s / 2, y - s / 2, s, s, s * 0.16);
         ctx.fill();
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.roundRect(x - s / 2, y - s / 2, s, s, r);
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-        ctx.beginPath();
-        ctx.moveTo(x - s / 2 + r, y - s / 2 + 0.5);
-        ctx.lineTo(x + s / 2 - r, y - s / 2 + 0.5);
         ctx.stroke();
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.stroke;

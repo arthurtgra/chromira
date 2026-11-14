@@ -39,7 +39,7 @@ export class Game {
   private level!: Level;
   private rots: Rots = [];
   private result!: TraceResult;
-  private hits: { x: number; y: number; color: Color }[] = []; // pontos onde a luz bate num obstáculo
+  private hits: { x: number; y: number; dx: number; dy: number; color: Color }[] = []; // onde a luz bate num obstáculo
   private pieceCells: Cell[] = [];
   private anims: Anim[] = [];
   private now = 0;
@@ -161,6 +161,20 @@ export class Game {
     this.fps += (1000 / Math.max(1, dtMs) - this.fps) * 0.05;
     this.fx.update(dtMs);
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
+
+    // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
+    const reached = arrived(this.plan, this.front());
+    for (const h of this.hits) {
+      if (reached[`${h.x},${h.y}`] === undefined) continue;
+      let n = (CONFIG.beam.sparks.perSec * dtMs) / 1000;
+      while (n > 0) {
+        if (n >= 1 || Math.random() < n) {
+          // Cor do feixe clareada: faísca lê como luz quente, não some no brilho do feixe.
+          this.fx.spark(cx(this.layout, h.x), cy(this.layout, h.y), -h.dx, -h.dy, mix(CONFIG.colors[h.color], '#ffffff', 0.45));
+        }
+        n -= 1;
+      }
+    }
 
     // Vitória: replay dos feixes desde os lançadores; alvos ficam acesos durante o replay.
     if (this.wonAt !== null) {
@@ -316,7 +330,9 @@ export class Game {
     const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
       c.t === 'wall' ? W : c.t === 'emitter' ? E : 0.5,
     );
-    this.hits = segs.flatMap((s, i) => (hits[i] ? [{ x: s.x2, y: s.y2, color: s.color }] : []));
+    this.hits = segs.flatMap((s, i) =>
+      hits[i] ? [{ x: s.x2, y: s.y2, dx: Math.sign(s.x2 - s.x1), dy: Math.sign(s.y2 - s.y1), color: s.color }] : [],
+    );
     return segs;
   }
 }

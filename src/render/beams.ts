@@ -94,7 +94,8 @@ export function extendToObstacles(
 }
 
 // Trecho aceso até o fim: a frente passou dele ou ele já estava aceso antes do toque.
-export const reachedEnd = (p: BeamPiece, front: number): boolean => visibleLength(p, front) >= p.len;
+// Tolerância: trechos esticados até obstáculos têm comprimento fracionário (0.6 vira 0.5999…).
+export const reachedEnd = (p: BeamPiece, front: number): boolean => visibleLength(p, front) >= p.len - 1e-6;
 
 // OR das cores que já chegaram em cada ponto final.
 export function arrived(plan: BeamPlan, front: number): Record<string, number> {

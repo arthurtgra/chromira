@@ -23,6 +23,7 @@ const rand = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
 
 export class Fx {
   private particles: Particle[] = [];
+  private sparks: Particle[] = [];
   private pulses: Pulse[] = [];
   private flashAge = Infinity;
 
@@ -52,12 +53,22 @@ export class Fx {
     }
   }
 
+  // Faísca de colisão: sai na direção (dx, dy) ± spread radianos.
+  spark(x: number, y: number, dx: number, dy: number, color: string): void {
+    const S = CONFIG.beam.sparks;
+    const a = Math.atan2(dy, dx) + (Math.random() - 0.5) * 2 * S.spread;
+    const v = rand(S.speed[0], S.speed[1]);
+    const max = rand(S.lifeMs[0], S.lifeMs[1]);
+    this.sparks.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: max, max, size: S.len, color });
+  }
+
   flash(): void {
     this.flashAge = 0;
   }
 
   clear(): void {
     this.particles = [];
+    this.sparks = [];
     this.pulses = [];
     this.flashAge = Infinity;
   }
@@ -73,6 +84,15 @@ export class Fx {
       p.life -= dtMs;
     }
     this.particles = this.particles.filter((p) => p.life > 0);
+    const sd = Math.exp(-CONFIG.beam.sparks.drag * dt);
+    for (const p of this.sparks) {
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vx *= sd;
+      p.vy *= sd;
+      p.life -= dtMs;
+    }
+    this.sparks = this.sparks.filter((p) => p.life > 0);
     for (const p of this.pulses) p.age += dtMs;
     this.pulses = this.pulses.filter((p) => p.age < CONFIG.pulse.ms);
     this.flashAge += dtMs;
@@ -94,6 +114,19 @@ export class Fx {
       ctx.globalAlpha = p.life / p.max;
       ctx.fillStyle = p.color;
       ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.lineCap = 'round';
+    ctx.lineWidth = CONFIG.beam.sparks.width;
+    for (const p of this.sparks) {
+      const k = p.life / p.max;
+      const v = Math.hypot(p.vx, p.vy) || 1;
+      const l = p.size * (0.4 + 0.6 * k);
+      ctx.globalAlpha = k;
+      ctx.strokeStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - (p.vx / v) * l, p.y - (p.vy / v) * l);
+      ctx.stroke();
     }
     if (this.flashAge < CONFIG.flash.ms) {
       ctx.globalAlpha = CONFIG.flash.alpha * (1 - this.flashAge / CONFIG.flash.ms);

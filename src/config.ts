@@ -49,7 +49,9 @@ export const CONFIG = {
     speed: 18, // ao abrir a fase
     turnSpeed: 9, // ao girar uma peça: mais devagar, vira transição
     growMs: [260, 1100], // duração mínima e máxima de um crescimento
-    impact: { radius: 0.2, alpha: 0.55 }, // clarão onde a luz bate em parede/lançador
+    impact: { radius: 0.14, alpha: 0.6 }, // clarão onde a luz bate em parede/lançador
+    // Faíscas na colisão: traços curtos na cor do feixe, ricocheteando para trás em leque.
+    sparks: { perSec: 30, spread: 1.45, speed: [90, 230], lifeMs: [200, 450], len: 8, width: 1.6, drag: 4.5 },
     retractSpeed: 10, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.

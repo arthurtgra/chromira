@@ -45,4 +45,11 @@ describe('planBeams', () => {
     expect(p.from).toBe(1);
     expect(arrived(p, p.from)['5,2']).toBe(2);
   });
+
+  it('trecho fracionário (até a parede) chega mesmo com erro de ponto flutuante', () => {
+    const m: Segment = { x1: 0, y1: 0, x2: 0, y2: 2, color: 2 };
+    const w: Segment = { x1: 0, y1: 2, x2: 0, y2: 1.4, color: 2 };
+    const p = planBeams([], [m, w]);
+    expect(arrived(p, p.to)['0,1.4']).toBe(2);
+  });
 });
