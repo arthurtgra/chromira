@@ -174,8 +174,8 @@ const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
 // Prisma aceso: só degradês radiais, sem contornos. Um brilho branco/da cor que entra no centro e,
 // para cada cor que sai, um lóbulo dessa cor deslocado para o lado exato por onde ela sai
 // (vermelho vira à esquerda, verde segue, azul vira à direita — igual ao trace). Pulsa devagar.
+// segments = trechos já visíveis: o brilho aparece quando a luz chega ao prisma, sem depender do resto da animação.
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
-  if (st.t < 1) return;
   const P = CONFIG.rainbow.prism;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);

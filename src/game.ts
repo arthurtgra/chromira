@@ -179,7 +179,7 @@ export class Game {
       const r = Math.max(0, this.retracted(f));
       return { seg: cut(f.seg, r, len), d0: r, alpha: 1 - 0.5 * clamp01(r / len) };
     });
-    drawPrismGlow(ctx, l, this.level.cells, this.result.segments, style);
+    drawPrismGlow(ctx, l, this.level.cells, visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
     drawPieces(ctx, l, this.level.cells, {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
