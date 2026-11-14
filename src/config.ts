@@ -43,8 +43,7 @@ export const CONFIG = {
   beam: {
     // Desenhado três vezes com 'lighter': largo/fraco, médio, fino/forte. Larguras em fração da célula.
     layers: [
-      { width: 0.34, alpha: 0.1 },
-      { width: 0.13, alpha: 0.32 },
+      { width: 0.3, alpha: 0.035 }, // névoa bem fraca; o brilho de verdade vem das auras das ondas
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
     speed: 36, // células por segundo: só o trecho que mudou cresce, o resto fica aceso
@@ -60,6 +59,14 @@ export const CONFIG = {
       alpha: 0.95,
       taper: 0.38, // células até a amplitude cheia, a partir de cada canto
       step: 0.05, // resolução da curva, em células
+      // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
+      glowWidth: 0.15,
+      glowAlpha: 0.13,
+      driftAmp: 2.1, // multiplica amp
+      driftLength: 1.7, // multiplica length
+      driftSpeed: -0.45, // multiplica speed (negativo: anda contra o feixe)
+      driftWidth: 0.11,
+      driftAlpha: 0.09,
     },
     winWidthMul: 1.8,
     winGrowMs: 300,
@@ -72,15 +79,16 @@ export const CONFIG = {
     hues: [30, 60, 180, 275],
     alpha: 0.55,
     ampMul: 1.35, // amplitude das ondas extras relativa às RGB, no arco-íris total
-    // Prisma aceso: miolo e bordas em espectro, coroa colorida e raios vazando para fora.
+    // Prisma aceso: decomposição visível. Leque de dispersão no lado de saída, do vermelho (esquerda do feixe)
+    // ao azul (direita), só nas faixas das cores que entram; triângulo com aberração cromática RGB.
     prism: {
-      alpha: [0.75, 1], // [sem arco-íris, arco-íris total]
-      spinHz: 0.15,
-      rays: 12,
-      rayLen: 0.75, // em células, além da borda
-      rayWidth: 0.09, // meia abertura da cunha, radianos
-      flickerHz: 0.7,
-      corona: 0.62, // raio da coroa, em células
+      alpha: [0.8, 1], // [sem arco-íris, arco-íris total]
+      rays: 27,
+      rayLen: 1.25, // em células
+      rayWidth: 0.075, // meia abertura de cada cunha, radianos
+      flickerHz: 0.9,
+      aberration: 3, // px de afastamento das cópias R/G/B do triângulo
+      aberrationHz: 0.5,
     },
   },
 

@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { DELTA, FILTER_COLORS } from '../core/trace.ts';
+import { DELTA, FILTER_COLORS, LEFT } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
 import { cut, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
@@ -55,11 +55,11 @@ function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
   ctx.stroke();
 }
 
-function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1): void {
+function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1, lenMul = 1, speedMul = 1): void {
   const W = CONFIG.beam.waves;
   const amp = W.amp * ampMul * l.cell * st.widthMul;
-  const k = TAU / W.length;
-  const wt = st.time * TAU * W.speed;
+  const k = TAU / (W.length * lenMul);
+  const wt = st.time * TAU * W.speed * speedMul;
   let s = r.d0;
   ctx.beginPath();
   for (let i = 1; i < r.pts.length; i++) {
@@ -107,7 +107,7 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
   for (const f of fading) {
     for (const layer of B.layers) {
       ctx.globalAlpha = layer.alpha * (1 - f.k) ** 2;
-      ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
+      ctx.lineWidth = Math.max(1, layer.width * l.cell);
       ctx.strokeStyle = CONFIG.colors[f.seg.color];
       ctx.beginPath();
       ctx.moveTo(cx(l, f.seg.x1), cy(l, f.seg.y1));
@@ -118,7 +118,7 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 
   for (const layer of B.layers) {
     ctx.globalAlpha = layer.alpha;
-    ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
+    ctx.lineWidth = Math.max(1, layer.width * l.cell);
     for (const r of runs) {
       ctx.strokeStyle = CONFIG.colors[r.color];
       strokeRun(ctx, l, r);
@@ -126,9 +126,8 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
   }
 
   // Ondas: uma por componente de cor (R, G, B), fases a 120°. Cor pura vira trança de duas ondas em oposição.
+  // Cada onda tem aura larga que a acompanha e uma deriva lenta mais aberta: o brilho se mexe junto.
   const W = B.waves;
-  ctx.lineWidth = Math.max(1, W.width * l.cell * st.widthMul);
-  ctx.globalAlpha = W.alpha;
   for (const r of runs) {
     const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
     const waves =
@@ -137,13 +136,21 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
         : comps.map((c) => ({ color: CONFIG.colors[c], ph: (COMPONENTS.indexOf(c) * TAU) / 3 }));
     for (const w of waves) {
       ctx.strokeStyle = w.color;
+      ctx.lineWidth = W.driftWidth * l.cell;
+      ctx.globalAlpha = W.driftAlpha;
+      strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp, W.driftLength, W.driftSpeed);
+      ctx.lineWidth = W.glowWidth * l.cell;
+      ctx.globalAlpha = W.glowAlpha;
+      strokeWave(ctx, l, r, w.ph, st);
+      ctx.lineWidth = Math.max(1, W.width * l.cell);
+      ctx.globalAlpha = W.alpha;
       strokeWave(ctx, l, r, w.ph, st);
     }
   }
 
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
-    ctx.lineWidth = Math.max(1, W.width * 0.7 * l.cell * st.widthMul);
+    ctx.lineWidth = Math.max(1, W.width * 0.7 * l.cell);
     ctx.globalAlpha = R.alpha * st.rainbow;
     const ampMul = 1 + (R.ampMul - 1) * st.rainbow;
     for (const r of runs) {
@@ -157,45 +164,42 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
   ctx.restore();
 }
 
-// Prisma aceso: espectro girando no miolo, bordas com contorno de arco-íris, coroa colorida
-// e raios de espectro vazando para fora em leque, cintilando.
+const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
+const dirAngle = (d: Dir): number => Math.atan2(DELTA[d][1], DELTA[d][0]);
+
+// Prisma aceso: mostra a decomposição. Leque de dispersão no lado de saída, do vermelho (vira à esquerda)
+// passando pelo verde (segue) até o azul (vira à direita), só nas faixas das cores que entram.
+// Triângulo em três cópias R/G/B levemente afastadas girando: aberração cromática.
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   if (st.t < 1) return;
-  const R = CONFIG.rainbow;
-  const P = R.prism;
+  const P = CONFIG.rainbow.prism;
   const sz = CONFIG.piece.prismSize * l.cell;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  ctx.lineJoin = 'round';
   for (const p of cells) {
     if (p.t !== 'prism') continue;
     const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y);
     if (!inc) continue;
+    const dir = DIRS.find((d) => DELTA[d][0] === Math.sign(inc.x2 - inc.x1) && DELTA[d][1] === Math.sign(inc.y2 - inc.y1))!;
     const x = cx(l, p.x);
     const y = cy(l, p.y);
-    const spin = st.time * TAU * P.spinHz;
-    const tri = (): void => {
-      ctx.beginPath();
-      ctx.moveTo(x, y - sz);
-      ctx.lineTo(x + sz * 0.87, y + sz * 0.5);
-      ctx.lineTo(x - sz * 0.87, y + sz * 0.5);
-      ctx.closePath();
-    };
-    const spectrum = (rot: number): CanvasGradient => {
-      const g = ctx.createConicGradient(rot, x, y);
-      for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
-      return g;
-    };
+    const aRed = dirAngle(LEFT[dir]);
+    let sweep = dirAngle(dir) - aRed;
+    sweep = Math.atan2(Math.sin(sweep), Math.cos(sweep)) * 2; // ±π, passando pela frente
 
-    // Raios: cunhas finas de cor saindo do prisma, comprimento ondulando.
-    const r0 = sz * 0.55;
+    const r0 = sz * 0.5;
     for (let i = 0; i < P.rays; i++) {
-      const a = spin * 0.5 + (i * TAU) / P.rays;
-      const len = P.rayLen * l.cell * (0.55 + 0.45 * Math.sin(st.time * P.flickerHz * TAU + i * 1.7));
+      const t = i / (P.rays - 1);
+      const comp = t < 1 / 3 ? 1 : t < 2 / 3 ? 2 : 4;
+      if ((inc.color & comp) === 0) continue;
+      const a = aRed + t * sweep;
+      const len = P.rayLen * l.cell * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(st.time * P.flickerHz * TAU + i * 0.83)));
       const g = ctx.createRadialGradient(x, y, r0, x, y, r0 + len);
-      g.addColorStop(0, `hsla(${(i * 360) / P.rays}, 100%, 62%, 1)`);
+      g.addColorStop(0, `hsla(${t * 240}, 100%, 60%, 1)`);
       g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalAlpha = k * 0.55;
+      ctx.globalAlpha = k * 0.75;
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.moveTo(x + Math.cos(a - P.rayWidth) * r0, y + Math.sin(a - P.rayWidth) * r0);
@@ -205,31 +209,26 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       ctx.fill();
     }
 
-    // Coroa: anel de espectro girando ao contrário, largo e fraco + fino e forte.
-    const cr = P.corona * l.cell * (0.95 + 0.05 * Math.sin(st.time * 2));
-    ctx.strokeStyle = spectrum(-spin);
-    ctx.globalAlpha = k * 0.25;
-    ctx.lineWidth = l.cell * 0.12;
-    ctx.beginPath();
-    ctx.arc(x, y, cr, 0, TAU);
-    ctx.stroke();
-    ctx.globalAlpha = k * 0.6;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Miolo e bordas do triângulo em espectro.
-    ctx.fillStyle = spectrum(spin);
-    ctx.globalAlpha = k * 0.7;
-    tri();
-    ctx.fill();
-    ctx.strokeStyle = spectrum(spin + Math.PI);
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = k * 0.5;
-    ctx.lineWidth = l.cell * 0.09;
-    ctx.stroke();
-    ctx.globalAlpha = k;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+    const tri = (ox: number, oy: number): void => {
+      ctx.beginPath();
+      ctx.moveTo(x + ox, y - sz + oy);
+      ctx.lineTo(x + sz * 0.87 + ox, y + sz * 0.5 + oy);
+      ctx.lineTo(x - sz * 0.87 + ox, y + sz * 0.5 + oy);
+      ctx.closePath();
+    };
+    const spin = st.time * TAU * P.aberrationHz;
+    const off = P.aberration * (1 + st.rainbow);
+    COMPONENTS.forEach((c, i) => {
+      const a = spin + (i * TAU) / 3;
+      tri(Math.cos(a) * off, Math.sin(a) * off);
+      ctx.fillStyle = CONFIG.colors[c];
+      ctx.globalAlpha = k * 0.22;
+      ctx.fill();
+      ctx.strokeStyle = CONFIG.colors[c];
+      ctx.globalAlpha = k * 0.9;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
   }
   ctx.restore();
 }
