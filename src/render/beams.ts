@@ -1,4 +1,4 @@
-import type { Segment } from '../core/types.ts';
+import type { Cell, Segment } from '../core/types.ts';
 
 // Plano de animação do feixe: cada segmento sabe a que distância da fonte começa (d0)
 // e quanto dele já estava aceso antes do toque (known). A frente de luz parte de `from`
@@ -66,4 +66,40 @@ export function visibleSegments(plan: BeamPlan, front: number): Segment[] {
     const v = visibleLength(p, front);
     return v > 0 ? [cut(p, 0, v)] : [];
   });
+}
+
+// O trace corta o feixe na borda da célula do obstáculo (±0.5). Para a luz encostar no obstáculo de verdade,
+// estica até a face dele: parede e corpo do lançador são menores que a célula. hit = bateu em algo.
+export function extendToObstacles(
+  segs: Segment[],
+  cells: Cell[],
+  half: (c: Cell) => number,
+): { segs: Segment[]; hits: boolean[] } {
+  const at = new Map(cells.map((c) => [pkey(c.x, c.y), c]));
+  const hits: boolean[] = [];
+  const out = segs.map((s) => {
+    if (Number.isInteger(s.x2) && Number.isInteger(s.y2)) {
+      hits.push(false);
+      return s;
+    }
+    const dx = Math.sign(s.x2 - s.x1);
+    const dy = Math.sign(s.y2 - s.y1);
+    const c = at.get(pkey(s.x2 + dx * 0.5, s.y2 + dy * 0.5));
+    hits.push(c !== undefined);
+    if (!c) return s;
+    const ext = 0.5 - half(c);
+    return { ...s, x2: s.x2 + dx * ext, y2: s.y2 + dy * ext };
+  });
+  return { segs: out, hits };
+}
+
+// OR das cores que já chegaram (a frente de luz passou do fim do trecho) em cada ponto final.
+export function arrived(plan: BeamPlan, front: number): Record<string, number> {
+  const got: Record<string, number> = {};
+  for (const p of plan.pieces) {
+    if (front < p.d0 + p.len) continue;
+    const k = pkey(p.x2, p.y2);
+    got[k] = (got[k] ?? 0) | p.color;
+  }
+  return got;
 }

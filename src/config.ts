@@ -49,6 +49,7 @@ export const CONFIG = {
     speed: 30, // ao abrir a fase
     turnSpeed: 15, // ao girar uma peça: mais devagar, vira transição
     growMs: [160, 650], // duração mínima e máxima de um crescimento
+    impact: { radius: 0.2, alpha: 0.55 }, // clarão onde a luz bate em parede/lançador
     retractSpeed: 16, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.

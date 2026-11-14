@@ -169,6 +169,38 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
   }
 }
 
+// Colisão: onde a luz bate num obstáculo (parede, lançador), clarão pequeno e macio na cor do feixe,
+// tremulando. Só aparece depois que a frente de luz chegou lá.
+export function drawImpacts(
+  ctx: Ctx,
+  l: Layout,
+  hits: { x: number; y: number; color: Color }[],
+  plan: BeamPlan,
+  front: number,
+  st: BeamStyle,
+): void {
+  const I = CONFIG.beam.impact;
+  const reached = new Set(plan.pieces.filter((p) => front >= p.d0 + p.len).map((p) => `${p.x2},${p.y2}`));
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const h of hits) {
+    if (!reached.has(`${h.x},${h.y}`)) continue;
+    const x = cx(l, h.x);
+    const y = cy(l, h.y);
+    const r = I.radius * l.cell * (0.8 + 0.2 * Math.sin(st.time * 13 + h.x * 3.1 + h.y * 1.7));
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)');
+    g.addColorStop(0.25, CONFIG.colors[h.color]);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = I.alpha;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
 
 // Prisma aceso: só degradês radiais, sem contornos. Um brilho branco/da cor que entra no centro e,

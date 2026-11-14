@@ -1,14 +1,15 @@
 import { Synth } from './audio/synth.ts';
 import { CONFIG } from './config.ts';
 import { key, pieceStates, pieces, startRots, trace } from './core/trace.ts';
-import type { Cell, Level, Rots, Segment, TraceResult } from './core/types.ts';
+import type { Cell, Color, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { cut, planBeams, segLen, visibleSegments, type BeamPlan } from './render/beams.ts';
+import { arrived, cut, extendToObstacles, planBeams, segLen, visibleSegments, type BeamPlan } from './render/beams.ts';
 import {
   drawBackground,
   drawBeams,
   drawDebug,
   drawPieces,
+  drawImpacts,
   drawPrismGlow,
   mix,
   type BeamStyle,
@@ -38,7 +39,7 @@ export class Game {
   private level!: Level;
   private rots: Rots = [];
   private result!: TraceResult;
-  private shown!: TraceResult; // o que os alvos exibem; alcança result quando o feixe termina de desenhar
+  private hits: { x: number; y: number; color: Color }[] = []; // pontos onde a luz bate num obstáculo
   private pieceCells: Cell[] = [];
   private anims: Anim[] = [];
   private now = 0;
@@ -49,8 +50,7 @@ export class Game {
   private plan: BeamPlan = planBeams([], []);
   private fades: { seg: Segment; at: number; off: number }[] = [];
   private beamMs = 1;
-  private pending = false;
-  private pendingDown = false;
+  private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
   private wonAt: number | null = null;
   private fps = 60;
@@ -72,11 +72,9 @@ export class Game {
       return { from: v, to: v, at: -Infinity };
     });
     this.result = trace(this.level, this.rots);
-    this.shown = this.result;
-    this.litAt = new Map(this.litKeys(this.result).map((k) => [k, -Infinity]));
-    this.pending = false;
-    this.pendingDown = false;
-    this.plan = planBeams([], this.result.segments);
+    this.litAt = new Map();
+    this.quiet = true;
+    this.plan = planBeams([], this.beamSegments());
     this.fades = [];
     this.timeBeam(CONFIG.beam.speed);
     this.beamAt = this.now;
@@ -117,7 +115,8 @@ export class Game {
 
     const before = visibleSegments(this.plan, this.front());
     this.result = trace(this.level, this.rots);
-    this.plan = planBeams(before, this.result.segments);
+    this.plan = planBeams(before, this.beamSegments());
+    this.quiet = false;
     // Recolhe o que sumiu a partir do ponto que mudou: trechos encadeados recolhem em sequência.
     let off = 0;
     let prev: Segment | null = null;
@@ -127,13 +126,6 @@ export class Game {
       prev = seg;
     }
     this.timeBeam(CONFIG.beam.turnSpeed);
-    const lit = new Set(this.litKeys(this.result));
-    for (const k of [...this.litAt.keys()]) {
-      if (lit.has(k)) continue;
-      this.litAt.delete(k);
-      this.pendingDown = true;
-    }
-    this.pending = true;
     this.beamAt = this.now;
   }
 
@@ -143,21 +135,27 @@ export class Game {
     this.fx.update(dtMs);
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
-    // Efeitos de alvo só disparam quando o feixe termina de ser desenhado.
-    if (this.pending && this.front() >= this.plan.to) {
-      this.pending = false;
-      this.shown = this.result;
-      if (this.pendingDown) this.synth.down();
-      this.pendingDown = false;
-      for (const k of this.litKeys(this.result)) {
-        if (this.litAt.has(k)) continue;
+    // Cada alvo reage no instante em que a luz chega nele (ou deixa de chegar).
+    const front = this.front();
+    const got = arrived(this.plan, front);
+    let down = false;
+    for (const t of this.level.cells) {
+      if (t.t !== 'target') continue;
+      const k = key(t.x, t.y);
+      const lit = got[k] === t.color;
+      if (lit && !this.litAt.has(k)) {
         this.litAt.set(k, this.now);
-        const [x, y] = k.split(',').map(Number) as [number, number];
-        const t = this.level.cells.find((c) => c.x === x && c.y === y);
-        if (t?.t === 'target') this.fx.pulse(cx(this.layout, x), cy(this.layout, y), CONFIG.colors[t.color], this.layout.cell);
-        this.synth.note(this.litAt.size - 1);
+        this.fx.pulse(cx(this.layout, t.x), cy(this.layout, t.y), CONFIG.colors[t.color], this.layout.cell);
+        if (!this.quiet) this.synth.note(this.litAt.size - 1);
+      } else if (!lit && this.litAt.has(k)) {
+        this.litAt.delete(k);
+        down = true;
       }
-      if (this.result.solved) this.win();
+    }
+    if (down && !this.quiet) this.synth.down();
+    if (front >= this.plan.to) {
+      this.quiet = false;
+      if (this.result.solved && this.wonAt === null) this.win();
     }
 
     if (this.wonAt !== null && this.now - this.wonAt > CONFIG.winDelayMs) this.load(this.index + 1);
@@ -181,6 +179,7 @@ export class Game {
     });
     drawPrismGlow(ctx, l, this.level.cells, visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
+    const got = arrived(this.plan, front);
     drawPieces(ctx, l, this.level.cells, {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
       filterColor: (i) => {
@@ -191,9 +190,10 @@ export class Game {
         const at = this.litAt.get(key(x, y));
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
-      targetReceived: (x, y) => this.shown.received[key(x, y)] ?? 0,
+      targetReceived: (x, y) => got[key(x, y)] ?? 0,
       time: this.now / 1000,
     });
+    drawImpacts(ctx, l, this.hits, this.plan, front, style);
     this.fx.draw(ctx, l.w, l.h);
     drawHud(ctx, l, {
       level: this.index + 1,
@@ -264,9 +264,14 @@ export class Game {
     return a.from + (a.to - a.from) * easeOut(clamp01((this.now - a.at) / ms));
   }
 
-  private litKeys(r: TraceResult): string[] {
-    return this.level.cells.flatMap((c) =>
-      c.t === 'target' && r.received[key(c.x, c.y)] === c.color ? [key(c.x, c.y)] : [],
+  // Segmentos do trace esticados até encostar nos obstáculos; guarda onde a luz bate.
+  private beamSegments(): Segment[] {
+    const E = CONFIG.emitter.body;
+    const W = CONFIG.piece.wallSize / 2;
+    const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
+      c.t === 'wall' ? W : c.t === 'emitter' ? E : 0.5,
     );
+    this.hits = segs.flatMap((s, i) => (hits[i] ? [{ x: s.x2, y: s.y2, color: s.color }] : []));
+    return segs;
   }
 }
