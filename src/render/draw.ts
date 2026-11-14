@@ -268,7 +268,6 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
   const col = CONFIG.colors[need];
   const wrong = (got & ~need) !== 0;
   const jx = wrong ? Math.sin(time * 38) * r * 0.05 : 0;
-  const comps = COMPONENTS.filter((c) => (need & c) !== 0);
   ctx.lineWidth = CONFIG.piece.stroke * 1.5;
 
   // Aceso: brilho macio na cor do alvo, para ele ler "amarelo" (ou rosa, ciano...) de longe.
@@ -294,19 +293,6 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
     ctx.arc(x + jx, y, r, 0, TAU);
     ctx.stroke();
     ctx.setLineDash([]);
-  } else if (comps.length > 1) {
-    // Cor misturada: anel em arcos das cores que a formam (vermelho + verde no amarelo).
-    // Ao acender, os arcos se fundem na cor final e as falhas fecham.
-    const n = comps.length * 2;
-    const gap = 0.32 * (1 - fill);
-    for (let i = 0; i < n; i++) {
-      const c = comps[i % comps.length]!;
-      const a0 = -Math.PI / 2 + (i * TAU) / n + gap / 2;
-      ctx.strokeStyle = mix(CONFIG.colors[c], col, fill);
-      ctx.beginPath();
-      ctx.arc(x, y, r, a0, a0 + TAU / n - gap);
-      ctx.stroke();
-    }
   } else {
     ctx.strokeStyle = col;
     ctx.beginPath();

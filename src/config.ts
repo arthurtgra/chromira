@@ -20,7 +20,7 @@ export const CONFIG = {
   colors: {
     1: '#ff3358',
     2: '#29f58a',
-    3: '#ffd93d',
+    3: '#ffe23d', // amarelo limão: lê amarelo, não laranja
     4: '#4c7dff',
     5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
@@ -66,18 +66,18 @@ export const CONFIG = {
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
       // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
       tint: {} as Partial<Record<Color, number>>,
-      // Tons das ondas componentes dentro de cada mistura. Amarelo: laranja + lima puxados para o amarelo,
-      // com miolo amarelo forte (o feixe lê amarelo, as cores de dentro aparecem de leve). Rosa: azul saturado
+      // Tons das ondas componentes dentro de cada mistura. Amarelo: vermelho e verde nítidos e mais grossos
+      // sobre um brilho amarelo (dá para ver as duas cores e o resultado). Rosa: azul saturado
       // e grosso, miolo rosa fraco — com 'lighter' muita camada clara vira branco e o azul some.
       comp: {
-        3: { 1: { color: '#ff9a2e', alpha: 0.85 }, 2: { color: '#c8f03a', alpha: 0.85 } },
+        3: { 1: { color: '#ff4436', width: 1.3, alpha: 1 }, 2: { color: '#4dff5e', width: 1.3, alpha: 1 } },
         5: { 1: { color: '#ff2f6e' }, 4: { color: '#3f5cff', width: 1.7, alpha: 1 } },
       } as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
       // Misturas (2+ componentes): miolo liso + brilho na cor da mistura entre as ondas.
       mixCore: { width: 0.05, alpha: 0.6 },
       mixGlow: { width: 0.2, alpha: 0.12 },
       mix: {
-        3: { core: { width: 0.075, alpha: 0.85 }, glow: { width: 0.24, alpha: 0.2 } },
+        3: { core: { width: 0.045, alpha: 0.5 }, glow: { width: 0.26, alpha: 0.18 } },
         5: { core: { width: 0.035, alpha: 0.3 }, glow: { width: 0.2, alpha: 0.07 } },
       } as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
