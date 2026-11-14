@@ -169,11 +169,10 @@ const dirAngle = (d: Dir): number => Math.atan2(DELTA[d][1], DELTA[d][0]);
 
 // Prisma aceso: mostra a decomposição. Leque de dispersão no lado de saída, do vermelho (vira à esquerda)
 // passando pelo verde (segue) até o azul (vira à direita), só nas faixas das cores que entram.
-// Triângulo em três cópias R/G/B levemente afastadas girando: aberração cromática.
+// Anel de espectro macio pulsando em volta; o triângulo fica só o contorno branco, parado.
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   if (st.t < 1) return;
   const P = CONFIG.rainbow.prism;
-  const sz = CONFIG.piece.prismSize * l.cell;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -220,7 +219,7 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     }
 
     // Anel: espectro parado, sem borda dura; só brilho largo e macio que pulsa.
-    const cr = P.ring * l.cell * (1 + 0.035 * pulse);
+    const cr = P.ring * l.cell * (1 + 0.02 * pulse);
     const ringG = ctx.createConicGradient(-Math.PI / 2, x, y);
     for (let i = 0; i <= 6; i++) ringG.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
     ctx.strokeStyle = ringG;
@@ -232,26 +231,6 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       ctx.stroke();
     }
 
-    const tri = (ox: number, oy: number): void => {
-      ctx.beginPath();
-      ctx.moveTo(x + ox, y - sz + oy);
-      ctx.lineTo(x + sz * 0.87 + ox, y + sz * 0.5 + oy);
-      ctx.lineTo(x - sz * 0.87 + ox, y + sz * 0.5 + oy);
-      ctx.closePath();
-    };
-    // Triângulo em três cópias R/G/B afastadas e paradas: aberração cromática.
-    const off = P.aberration * (1 + st.rainbow);
-    COMPONENTS.forEach((c, i) => {
-      const a = -Math.PI / 2 + (i * TAU) / 3;
-      tri(Math.cos(a) * off, Math.sin(a) * off);
-      ctx.fillStyle = CONFIG.colors[c];
-      ctx.globalAlpha = k * 0.22;
-      ctx.fill();
-      ctx.strokeStyle = CONFIG.colors[c];
-      ctx.globalAlpha = k * 0.9;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    });
   }
   ctx.restore();
 }
