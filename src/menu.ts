@@ -3,19 +3,6 @@ import { logoSvg } from './logo.ts';
 
 type Screen = 'home' | 'levels' | null;
 
-// Capítulos da tela de fases: [primeira fase (1-based), nome]. Seguem as faixas do gen-levels.
-const CHAPTERS: [number, string][] = [
-  [1, 'First light'],
-  [12, 'Mixing'],
-  [24, 'Filters'],
-  [33, 'Prisms'],
-  [41, 'Blends'],
-  [51, 'Splitters'],
-  [61, 'Everything'],
-  [71, 'Rails'],
-  [81, 'Dichroic'],
-];
-
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
 // Menus em HTML por cima do canvas: o jogo continua desenhando atrás, desfocado.
@@ -73,21 +60,7 @@ export function setupMenu(game: Game, startOnHome: boolean, mark?: (i: number) =
         });
         return b;
     });
-    const items: HTMLElement[] = [];
-    for (const [ci, [from, name]] of CHAPTERS.entries()) {
-      const to = Math.min(game.count, (CHAPTERS[ci + 1]?.[0] ?? game.count + 1) - 1);
-      if (from > game.count) break;
-      let done = 0;
-      for (let i = from - 1; i < to; i++) if (game.done.has(i)) done++;
-      const h = document.createElement('div');
-      h.className = 'chapter';
-      h.innerHTML = `<span class="ch-name"></span><span class="ch-line"></span><span class="ch-count"></span>`;
-      h.querySelector('.ch-name')!.textContent = name;
-      h.querySelector('.ch-count')!.textContent = `${done}/${to - from + 1}`;
-      if (done === to - from + 1) h.classList.add('complete');
-      items.push(h, ...tiles.slice(from - 1, to));
-    }
-    grid.replaceChildren(...items);
+    grid.replaceChildren(...tiles);
     grid.querySelector('.current')?.scrollIntoView({ block: 'center' });
   }
 
