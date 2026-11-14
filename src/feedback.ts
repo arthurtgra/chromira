@@ -1,5 +1,5 @@
 // Feedback de playtest: joinha / dislike / cortar por fase, guardado no aparelho e copiado como texto.
-// Liga com ?feedback=1 na URL (fica lembrado), desliga com ?feedback=0.
+// Liga/desliga pelo menu Developer (com senha); o estado fica guardado no aparelho.
 import type { Game } from './game.ts';
 
 export type Vote = 'up' | 'down' | 'cut';
@@ -25,14 +25,68 @@ function write(s: Store): void {
   }
 }
 
-export function feedbackEnabled(params: URLSearchParams): boolean {
+export function feedbackEnabled(): boolean {
   try {
-    const p = params.get('feedback');
-    if (p !== null) localStorage.setItem(FLAG, p === '0' ? '0' : '1');
     return localStorage.getItem(FLAG) === '1';
   } catch {
-    return params.get('feedback') === '1';
+    return false;
   }
+}
+
+// Só o hash fica no código. Não é segurança de verdade (o site é público), só tira a barra do caminho dos jogadores.
+const PASS_HASH = '03d009d326a38acb16e1aa4e7392018bc0e7fe31421c5de569d2bdcf989bd097';
+
+async function checkPassword(p: string): Promise<boolean> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`chromira:${p}`));
+  const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return hex === PASS_HASH;
+}
+
+// Item "Developer" no mini menu: painel com senha para ligar/desligar o feedback de playtest.
+export function setupDev(game: Game): void {
+  const on = feedbackEnabled();
+  const menu = document.querySelector<HTMLElement>('#mini-panel')!;
+  const panel = document.querySelector<HTMLFormElement>('#dev-panel')!;
+  const state = panel.querySelector<HTMLElement>('.dev-state')!;
+  const input = panel.querySelector<HTMLInputElement>('input')!;
+  const submit = panel.querySelector<HTMLButtonElement>('button[type=submit]')!;
+  const msg = panel.querySelector<HTMLElement>('.dev-msg')!;
+  state.textContent = `Playtest feedback: ${on ? 'ON' : 'OFF'}`;
+  submit.textContent = on ? 'Turn off' : 'Turn on';
+
+  const dev = document.createElement('button');
+  dev.className = 'dev-item';
+  dev.textContent = 'Developer';
+  dev.addEventListener('click', () => {
+    game.synth.uiTap();
+    menu.hidden = true;
+    panel.hidden = false;
+    input.value = '';
+    msg.textContent = '';
+    input.focus();
+  });
+  menu.append(dev);
+  panel.querySelector<HTMLButtonElement>('.dev-back')!.addEventListener('click', () => {
+    game.synth.uiTap();
+    panel.hidden = true;
+    menu.hidden = false;
+  });
+
+  panel.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!(await checkPassword(input.value))) {
+      msg.textContent = 'Wrong password';
+      input.select();
+      return;
+    }
+    try {
+      localStorage.setItem(FLAG, on ? '0' : '1');
+    } catch {
+      msg.textContent = 'Storage blocked';
+      return;
+    }
+    location.reload();
+  });
 }
 
 export class Feedback {

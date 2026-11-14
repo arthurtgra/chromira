@@ -3,7 +3,7 @@ import { Game } from './game.ts';
 import { onTap } from './input.ts';
 import { CONFIG } from './config.ts';
 import levelsJson from './levels/levels.json';
-import { Feedback, feedbackEnabled, setupFeedback } from './feedback.ts';
+import { Feedback, feedbackEnabled, setupDev, setupFeedback } from './feedback.ts';
 import { setupMenu } from './menu.ts';
 import { loadSave } from './save.ts';
 import './style.css';
@@ -21,10 +21,11 @@ game.synth.muted = save.muted;
 for (const d of save.done) game.done.add(d);
 const urlLevel = Number(params.get('level'));
 const fromUrl = Number.isInteger(urlLevel) && urlLevel > 0;
-const fb = feedbackEnabled(params) ? new Feedback() : null;
+const fb = feedbackEnabled() ? new Feedback() : null;
 if (fb) (CONFIG.layout as { bottom: number }).bottom = 80; // espaço para a barra de feedback no canto inferior
 game.load(fromUrl ? urlLevel - 1 : save.level);
 setupMenu(game, !fromUrl, fb ? (i) => fb.vote(i) : undefined);
+setupDev(game);
 if (fb) {
   const { refresh } = setupFeedback(game, fb);
   game.onLoad = refresh;

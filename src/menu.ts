@@ -18,6 +18,10 @@ export function setupMenu(game: Game, startOnHome: boolean, mark?: (i: number) =
 
   const setMini = (open: boolean): void => {
     mini.hidden = !open;
+    if (open) {
+      $('#mini-panel').hidden = false;
+      $('#dev-panel').hidden = true;
+    }
     menuBtn.setAttribute('aria-expanded', String(open));
   };
 
@@ -85,7 +89,7 @@ export function setupMenu(game: Game, startOnHome: boolean, mark?: (i: number) =
     'pointerdown',
     (e) => {
       const t = e.target as Node;
-      if (mini.hidden || $('#mini-panel').contains(t) || menuBtn.contains(t)) return;
+      if (mini.hidden || (t as Element).closest?.('.panel') || menuBtn.contains(t)) return;
       setMini(false);
       e.stopPropagation();
       e.preventDefault();
