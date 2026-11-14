@@ -35,12 +35,7 @@ export const CONFIG = {
       { width: 0.13, alpha: 0.32 },
       { width: 0.035, alpha: 1 },
     ],
-    speed: 36, // células por segundo da frente de luz
-    fadeMs: 220, // trecho que deixou de existir apaga neste tempo
-    head: 0.3, // brilho na ponta que avança, fração da célula
-    flow: { dash: 0.14, gap: 0.62, speed: 2.6, alpha: 0.5, width: 0.06 }, // pulsos correndo no feixe
-    glint: { radius: 0.42, hz: 0.9, spin: 0.7 }, // reflexo em espelhos e filtros
-    impact: 0.26, // clarão onde o feixe bate em parede/borda
+    drawMs: 150,
     winWidthMul: 1.8,
     winGrowMs: 300,
   },
