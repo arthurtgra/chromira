@@ -10,6 +10,7 @@ import {
   drawDebug,
   drawPieces,
   drawPrismGlow,
+  mix,
   type BeamStyle,
 } from './render/draw.ts';
 import { Fx } from './render/fx.ts';
@@ -43,6 +44,8 @@ export class Game {
   private now = 0;
   private loadedAt = 0;
   private beamAt = 0;
+  private bgFrom: readonly [string, string] | null = null;
+  private bgAt = 0;
   private plan: BeamPlan = planBeams([], []);
   private fades: { seg: Segment; at: number }[] = [];
   private pending = false;
@@ -57,6 +60,8 @@ export class Game {
   }
 
   load(index: number): void {
+    if (this.level) this.bgFrom = this.background();
+    this.bgAt = this.now;
     this.index = ((index % this.levels.length) + this.levels.length) % this.levels.length;
     this.level = this.levels[this.index]!;
     this.rots = startRots(this.level);
@@ -150,8 +155,7 @@ export class Game {
 
   render(ctx: CanvasRenderingContext2D): void {
     const l = this.layout;
-    const bg = CONFIG.backgrounds[Math.floor(this.index / 5) % CONFIG.backgrounds.length]!;
-    drawBackground(ctx, l, bg, this.level.w, this.level.h);
+    drawBackground(ctx, l, this.background(), this.level.w, this.level.h);
     const grow = this.wonAt === null ? 0 : easeOut(clamp01((this.now - this.wonAt) / CONFIG.beam.winGrowMs));
     const style: BeamStyle = {
       t: this.beamT(),
@@ -187,6 +191,15 @@ export class Game {
       accent: this.accent(),
     });
     if (this.debug) drawDebug(ctx, l, this.level.w, this.level.h, this.fps);
+  }
+
+  // Cor de fundo atual: transição suave da fase anterior para a desta.
+  private background(): readonly [string, string] {
+    const to = CONFIG.backgrounds[this.index % CONFIG.backgrounds.length]!;
+    const t = clamp01((this.now - this.bgAt) / CONFIG.backgroundFadeMs);
+    if (!this.bgFrom || t >= 1) return to;
+    const from = this.bgFrom;
+    return [mix(from[0], to[0], t), mix(from[1], to[1], t)];
   }
 
   private rainbow(): number {

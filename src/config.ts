@@ -2,17 +2,18 @@
 import type { Color } from './core/types.ts';
 
 export const CONFIG = {
-  // Fundo: [centro, borda] da vinheta; muda um tom a cada 5 fases.
+    // Fundo: [centro, borda] da vinheta, tons neutros. Muda a cada fase, com transição suave.
   backgrounds: [
-    ['#141428', '#07070D'],
-    ['#10203A', '#06080F'],
-    ['#22123A', '#09060F'],
-    ['#0E2A2A', '#050B0B'],
-    ['#2A1A10', '#0B0705'],
-    ['#1E1040', '#07050F'],
-    ['#2A0F2A', '#0B050B'],
-    ['#0F1F40', '#05070F'],
+    ['#1c1c22', '#0a0a0d'], // grafite
+    ['#1a1f24', '#090b0d'], // ardósia
+    ['#221f1c', '#0c0b0a'], // pedra quente
+    ['#1d211e', '#0a0c0b'], // sálvia
+    ['#201c22', '#0c0a0d'], // malva
+    ['#1b1e26', '#090a0e'], // cinza azulado
+    ['#24201d', '#0d0b0a'], // taupe
+    ['#1e1e1e', '#0b0b0b'], // neutro
   ],
+  backgroundFadeMs: 900,
   gridDotAlpha: 0.1,
   gridDotRadius: 1.5,
 
@@ -26,7 +27,7 @@ export const CONFIG = {
     7: '#f4f6ff',
   } satisfies Record<Color, string>,
 
-  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, wallSize: 0.56, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
+  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
 
   // Lançador de luz, medidas em fração da célula.
   emitter: {
@@ -132,16 +133,14 @@ export const CONFIG = {
   layout: { pad: 16, top: 116, bottom: 28 },
   hud: {
     family: '"SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif',
-    labelPx: 10,
-    labelY: 22,
-    labelSpacing: 5, // px entre letras de "FASE"
     numberPx: 58,
     numberWeight: 250,
-    y: 56,
+    y: 50,
     appearMs: 650,
     winScale: 0.16,
     breathe: 0.015,
-    barY: 96,
+    glow: { w: 70, h: 26, dy: 4, rest: 0.1, flare: 0.45, win: 0.4, decayMs: 1100 }, // halo elíptico atrás do número
+    barY: 92,
     barW: 14,
     barH: 3,
     barGap: 5,

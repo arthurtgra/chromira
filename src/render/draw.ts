@@ -303,10 +303,10 @@ function drawEmitter(ctx: Ctx, x: number, y: number, c: number, dir: Dir, color:
   ctx.restore();
 }
 
-function mix(a: string, b: string, k: number): string {
+export function mix(a: string, b: string, k: number): string {
   const p = (h: string, i: number): number => parseInt(h.slice(1 + i * 2, 3 + i * 2), 16);
   const c = [0, 1, 2].map((i) => Math.round(p(a, i) + (p(b, i) - p(a, i)) * k));
-  return `rgb(${c[0]},${c[1]},${c[2]})`;
+  return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`; // hex: pode ser misturado de novo
 }
 
 export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView): void {
@@ -363,14 +363,30 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         break;
       }
       case 'wall': {
+        // Bloco sólido: placa arredondada um pouco mais clara que o fundo, com luz no topo e sombra embaixo.
         const s = p.wallSize * c;
-        ctx.globalAlpha = 0.45;
-        ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+        const r = s * 0.18;
+        const g = ctx.createLinearGradient(x, y - s / 2, x, y + s / 2);
+        g.addColorStop(0, 'rgba(255,255,255,0.10)');
+        g.addColorStop(1, 'rgba(255,255,255,0.03)');
+        ctx.fillStyle = 'rgba(0,0,0,0.35)';
         ctx.beginPath();
-        ctx.moveTo(x - s / 2, y + s / 2);
-        ctx.lineTo(x + s / 2, y - s / 2);
+        ctx.roundRect(x - s / 2, y - s / 2 + 3, s, s, r);
+        ctx.fill();
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.roundRect(x - s / 2, y - s / 2, s, s, r);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 1;
         ctx.stroke();
-        ctx.globalAlpha = 1;
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.beginPath();
+        ctx.moveTo(x - s / 2 + r, y - s / 2 + 0.5);
+        ctx.lineTo(x + s / 2 - r, y - s / 2 + 0.5);
+        ctx.stroke();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
         break;
       }
       case 'target': {

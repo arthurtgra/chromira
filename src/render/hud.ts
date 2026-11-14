@@ -14,7 +14,7 @@ export interface HudState {
 const easeOutCubic = (t: number): number => 1 - (1 - t) ** 3;
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 
-// Rótulo "FASE" espaçado, número fino grande com degradê branco → cor da fase, filete e barrinhas de dificuldade.
+// Número fino grande com degradê branco → cor da fase sobre halo macio, e barrinhas de dificuldade.
 export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): void {
   const H = CONFIG.hud;
   const k = easeOutCubic(clamp01(s.appear / H.appearMs));
@@ -23,18 +23,23 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // FASE
-  ctx.font = `600 ${H.labelPx}px ${H.family}`;
-  ctx.fillStyle = '#ffffff';
-  ctx.globalAlpha = 0.4 * k;
-  const label = 'FASE';
-  const widths = [...label].map((ch) => ctx.measureText(ch).width);
-  const lw = widths.reduce((a, b) => a + b, 0) + H.labelSpacing * (label.length - 1);
-  let lx = x - lw / 2;
-  [...label].forEach((ch, i) => {
-    ctx.fillText(ch, lx + widths[i]! / 2, H.labelY);
-    lx += widths[i]! + H.labelSpacing;
-  });
+  // Halo atrás do número: acende forte quando a fase abre, assenta, e volta a acender na vitória.
+  const G = H.glow;
+  const flare = G.flare * Math.exp(-s.appear / G.decayMs);
+  const ga = G.rest * k + flare + G.win * s.win;
+  ctx.save();
+  ctx.translate(x, H.y + G.dy);
+  ctx.scale(G.w / G.h, 1);
+  const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, G.h);
+  halo.addColorStop(0, s.accent);
+  halo.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = Math.min(1, ga);
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(0, 0, G.h, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
   // Número: sobe e aparece; pulso na vitória.
   const scale = (1 + H.winScale * s.win) * (1 + H.breathe * Math.sin(s.time * 2));
@@ -64,17 +69,6 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
   ctx.fillStyle = fill;
   ctx.fillText(text, 0, 0);
   ctx.restore();
-
-  // Filete: linha fina que abre do centro, sumindo nas pontas.
-  const lineY = (H.y + H.barY) / 2 + 6;
-  const half2 = 34 * k;
-  const g = ctx.createLinearGradient(x - half2, 0, x + half2, 0);
-  g.addColorStop(0, 'rgba(255,255,255,0)');
-  g.addColorStop(0.5, s.accent);
-  g.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.globalAlpha = 0.6;
-  ctx.fillStyle = g;
-  ctx.fillRect(x - half2, lineY, half2 * 2, 1);
 
   // Dificuldade: 5 barrinhas; cheias até o nível, em tons do espectro.
   const n = 5;
