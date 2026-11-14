@@ -2,6 +2,7 @@ import type { Level } from './core/types.ts';
 import { Game } from './game.ts';
 import { onTap } from './input.ts';
 import levelsJson from './levels/levels.json';
+import { setupMenu } from './menu.ts';
 import { loadSave } from './save.ts';
 import './style.css';
 
@@ -15,8 +16,11 @@ const save = loadSave();
 const game = new Game(levels);
 game.debug = params.get('debug') === '1';
 game.synth.muted = save.muted;
+for (const d of save.done) game.done.add(d);
 const urlLevel = Number(params.get('level'));
-game.load(Number.isInteger(urlLevel) && urlLevel > 0 ? urlLevel - 1 : save.level);
+const fromUrl = Number.isInteger(urlLevel) && urlLevel > 0;
+game.load(fromUrl ? urlLevel - 1 : save.level);
+setupMenu(game, !fromUrl);
 
 function resize(): void {
   const dpr = window.devicePixelRatio || 1;

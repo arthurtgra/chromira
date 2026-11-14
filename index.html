@@ -18,6 +18,40 @@
         <path class="off" d="M17 9l5 6M22 9l-5 6" />
       </svg>
     </button>
+    <button id="menu-btn" aria-label="Menu" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M5 7h14M5 12h14M5 17h14" />
+      </svg>
+    </button>
+    <nav id="mini" class="panel" hidden>
+      <button data-go="levels">Fases</button>
+      <button data-go="home">Início</button>
+    </nav>
+
+    <section id="home" class="screen">
+      <div class="home-inner">
+        <div class="logo" aria-hidden="true">
+          <span class="ray r"></span><span class="ray g"></span><span class="ray b"></span>
+          <svg viewBox="0 0 100 90"><path d="M50 6 L94 84 L6 84 Z" /></svg>
+        </div>
+        <h1 class="title">PRISMA</h1>
+        <p class="tagline">guie a luz</p>
+        <button class="big" id="play">Jogar<span id="play-sub"></span></button>
+        <button class="big ghost" data-go="levels">Fases</button>
+      </div>
+    </section>
+
+    <section id="levels" class="screen" hidden>
+      <header>
+        <button class="icon" data-go="back" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
+        </button>
+        <h2>Fases</h2>
+        <span class="progress" id="progress"></span>
+      </header>
+      <div class="grid" id="grid"></div>
+    </section>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

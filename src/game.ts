@@ -55,6 +55,8 @@ export class Game {
   private wonAt: number | null = null;
   private fps = 60;
   private readonly levels: Level[];
+  readonly done = new Set<number>();
+  onWin: (() => void) | null = null;
 
   constructor(levels: Level[]) {
     this.levels = levels;
@@ -81,7 +83,28 @@ export class Game {
     this.loadedAt = this.now;
     this.wonAt = null;
     this.fx.clear();
-    writeSave({ level: this.index, muted: this.synth.muted });
+    this.persist();
+  }
+
+  get current(): number {
+    return this.index;
+  }
+
+  get count(): number {
+    return this.levels.length;
+  }
+
+  // Liberadas: todas até a seguinte à maior concluída (e pelo menos até a atual).
+  get unlocked(): number {
+    return Math.min(this.levels.length - 1, Math.max(this.index, ...[...this.done].map((d) => d + 1)));
+  }
+
+  difficulty(i: number): number {
+    return this.levels[i]?.difficulty ?? 1;
+  }
+
+  private persist(): void {
+    writeSave({ level: this.index, muted: this.synth.muted, done: [...this.done] });
   }
 
   resize(w: number, h: number): void {
@@ -90,7 +113,7 @@ export class Game {
 
   setMuted(m: boolean): void {
     this.synth.muted = m;
-    writeSave({ level: this.index, muted: m });
+    this.persist();
   }
 
   tap(px: number, py: number): void {
@@ -228,6 +251,9 @@ export class Game {
   }
 
   private win(): void {
+    this.done.add(this.index);
+    this.persist();
+    this.onWin?.();
     this.wonAt = this.now;
     this.synth.chord((this.index + 1) % 5 === 0);
     this.fx.flash();
