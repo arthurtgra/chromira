@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Segment } from '../core/types.ts';
-import { planBeams, visibleSegments } from './beams.ts';
+import { arrived, planBeams, visibleSegments } from './beams.ts';
 
 const a: Segment = { x1: 0, y1: 0, x2: 3, y2: 0, color: 7 };
 const up: Segment = { x1: 3, y1: 0, x2: 3, y2: -0.5, color: 7 };
@@ -36,5 +36,13 @@ describe('planBeams', () => {
   it('frente de luz revela por distância', () => {
     const p = planBeams([], [a, down]);
     expect(visibleSegments(p, 4)).toEqual([a, { x1: 3, y1: 0, x2: 3, y2: 1, color: 7 }]);
+  });
+
+  it('trecho que já estava aceso conta como chegado mesmo com a frente atrás dele', () => {
+    // Segundo feixe intacto, mas o primeiro mudou: a frente recomeça antes dele.
+    const b: Segment = { x1: 5, y1: 5, x2: 5, y2: 2, color: 2 };
+    const p = planBeams([a, b], [{ ...a, x2: 1 }, { x1: 1, y1: 0, x2: 1, y2: 4, color: 7 }, b]);
+    expect(p.from).toBe(1);
+    expect(arrived(p, p.from)['5,2']).toBe(2);
   });
 });

@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { DELTA, FILTER_COLORS, LEFT, RIGHT } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
-import { cut, visibleLength, type BeamPlan } from './beams.ts';
+import { cut, reachedEnd, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -180,7 +180,7 @@ export function drawImpacts(
   st: BeamStyle,
 ): void {
   const I = CONFIG.beam.impact;
-  const reached = new Set(plan.pieces.filter((p) => front >= p.d0 + p.len).map((p) => `${p.x2},${p.y2}`));
+  const reached = new Set(plan.pieces.filter((p) => reachedEnd(p, front)).map((p) => `${p.x2},${p.y2}`));
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const h of hits) {

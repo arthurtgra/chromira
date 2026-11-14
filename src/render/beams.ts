@@ -93,11 +93,14 @@ export function extendToObstacles(
   return { segs: out, hits };
 }
 
-// OR das cores que já chegaram (a frente de luz passou do fim do trecho) em cada ponto final.
+// Trecho aceso até o fim: a frente passou dele ou ele já estava aceso antes do toque.
+export const reachedEnd = (p: BeamPiece, front: number): boolean => visibleLength(p, front) >= p.len;
+
+// OR das cores que já chegaram em cada ponto final.
 export function arrived(plan: BeamPlan, front: number): Record<string, number> {
   const got: Record<string, number> = {};
   for (const p of plan.pieces) {
-    if (front < p.d0 + p.len) continue;
+    if (!reachedEnd(p, front)) continue;
     const k = pkey(p.x2, p.y2);
     got[k] = (got[k] ?? 0) | p.color;
   }
