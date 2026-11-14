@@ -32,46 +32,7 @@ const TIERS: Tier[] = [
     seed: 9119,
     options: (k) => ({ mirrors: lerp(6, 9, k), filters: k > 0.5 ? 2 : 1, prism: true, beams: 3, minMoves: lerp(5, 7, k) }),
   },
-  // 41+: alvos de cor combinada — só acendem quando feixes de lançadores diferentes chegam juntos.
-  {
-    count: 10,
-    seed: 9127,
-    options: (k) => ({
-      mirrors: lerp(5, 7, k),
-      beams: 2,
-      merge: k > 0.4 ? 2 : 1,
-      mergeMirrors: k > 0.4 ? 2 : 3,
-      filters: 1,
-      minMoves: lerp(6, 8, k),
-    }),
-  },
-  // 51+: divisor de feixe — reflete e deixa passar ao mesmo tempo; um feixe abastece dois caminhos.
-  {
-    count: 10,
-    seed: 9137,
-    options: (k) => ({
-      mirrors: lerp(6, 8, k),
-      beams: 2,
-      splitters: k > 0.4 ? 2 : 1,
-      merge: 1,
-      mergeMirrors: 2,
-      minMoves: lerp(6, 8, k),
-    }),
-  },
-  // 61+: tudo junto — divisor, espelho, filtro e prisma na mesma fase (um feixe para cada peça especial).
-  {
-    count: 10,
-    seed: 9147,
-    options: (k) => ({
-      mirrors: lerp(6, 7, k),
-      beams: 3,
-      prism: true,
-      filters: 1,
-      splitters: 1,
-      minMoves: lerp(7, 9, k),
-    }),
-  },
-  // 71+: trilho — um espelho ou o prisma desliza de célula em célula; a luz acompanha enquanto arrasta.
+  // 41+: trilho — um espelho ou o prisma desliza de célula em célula; a luz acompanha enquanto arrasta.
   {
     count: 10,
     seed: 20200,
@@ -86,7 +47,20 @@ const TIERS: Tier[] = [
       };
     },
   },
-  // 81+: espelho dicroico — reflete só a sua cor e deixa as outras passarem (separa um feixe misturado).
+  // 51+: divisor de feixe — reflete e deixa passar ao mesmo tempo; um feixe abastece dois caminhos.
+  {
+    count: 10,
+    seed: 9137,
+    options: (k) => ({
+      mirrors: lerp(6, 8, k),
+      beams: 2,
+      splitters: k > 0.4 ? 2 : 1,
+      merge: 1,
+      mergeMirrors: 2,
+      minMoves: lerp(6, 8, k),
+    }),
+  },
+  // 61+: espelho dicroico — reflete só a sua cor e deixa as outras passarem (separa um feixe misturado).
   {
     count: 10,
     seed: 20300,
@@ -95,6 +69,32 @@ const TIERS: Tier[] = [
       beams: 2,
       dichroics: k > 0.5 ? 2 : 1,
       minMoves: lerp(4, 7, k),
+    }),
+  },
+  // 71+: alvos de cor combinada — só acendem quando feixes de lançadores diferentes chegam juntos.
+  {
+    count: 10,
+    seed: 9127,
+    options: (k) => ({
+      mirrors: lerp(5, 7, k),
+      beams: 2,
+      merge: k > 0.4 ? 2 : 1,
+      mergeMirrors: k > 0.4 ? 2 : 3,
+      filters: 1,
+      minMoves: lerp(6, 8, k),
+    }),
+  },
+  // 81+: tudo junto — divisor, espelho, filtro e prisma na mesma fase (um feixe para cada peça especial).
+  {
+    count: 10,
+    seed: 9147,
+    options: (k) => ({
+      mirrors: lerp(6, 7, k),
+      beams: 3,
+      prism: true,
+      filters: 1,
+      splitters: 1,
+      minMoves: lerp(7, 9, k),
     }),
   },
 ];
