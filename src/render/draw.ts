@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { DELTA, FILTER_COLORS, LEFT } from '../core/trace.ts';
+import { DELTA, FILTER_COLORS, LEFT, RIGHT } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
 import { cut, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
@@ -165,18 +165,28 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 }
 
 const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
-const dirAngle = (d: Dir): number => Math.atan2(DELTA[d][1], DELTA[d][0]);
 
-// Prisma aceso: mostra a decomposição. Leque de dispersão no lado de saída, do vermelho (vira à esquerda)
-// passando pelo verde (segue) até o azul (vira à direita), só nas faixas das cores que entram.
-// Anel de espectro macio pulsando em volta; o triângulo fica só o contorno branco, parado.
+// Prisma aceso: só degradês radiais, sem contornos. Um brilho branco/da cor que entra no centro e,
+// para cada cor que sai, um lóbulo dessa cor deslocado para o lado exato por onde ela sai
+// (vermelho vira à esquerda, verde segue, azul vira à direita — igual ao trace). Pulsa devagar.
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   if (st.t < 1) return;
   const P = CONFIG.rainbow.prism;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
+  const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
+  const blob = (x: number, y: number, r: number, color: string, alpha: number): void => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color);
+    g.addColorStop(0.45, color);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
+  };
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineJoin = 'round';
   for (const p of cells) {
     if (p.t !== 'prism') continue;
     const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y);
@@ -184,53 +194,17 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const dir = DIRS.find((d) => DELTA[d][0] === Math.sign(inc.x2 - inc.x1) && DELTA[d][1] === Math.sign(inc.y2 - inc.y1))!;
     const x = cx(l, p.x);
     const y = cy(l, p.y);
-    const aRed = dirAngle(LEFT[dir]);
-    let sweep = dirAngle(dir) - aRed;
-    sweep = Math.atan2(Math.sin(sweep), Math.cos(sweep)) * 2; // ±π, passando pela frente
-
-    // Leque: uma cunha macia de espectro no lado de saída (vermelho → verde → azul), sem raios finos.
-    // Só as faixas das cores que entram; o tamanho pulsa junto com o anel.
-    const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
-    const fanR = P.fan * l.cell * (0.9 + 0.1 * pulse);
-    const bands: [number, number][] = [];
-    COMPONENTS.forEach((c, i) => {
-      if ((inc.color & c) !== 0) bands.push([i / 3, (i + 1) / 3]);
-    });
-    const fanG = ctx.createConicGradient(Math.min(aRed, aRed + sweep), x, y);
-    const flip = sweep < 0;
-    for (let i = 0; i <= 8; i++) {
-      const t = i / 8;
-      fanG.addColorStop((t * Math.abs(sweep)) / TAU, `hsl(${(flip ? 1 - t : t) * 240}, 100%, 60%)`);
+    const exits: [Color, Dir][] = [
+      [1, LEFT[dir]],
+      [2, dir],
+      [4, RIGHT[dir]],
+    ];
+    for (const [c, d] of exits) {
+      if ((inc.color & c) === 0) continue;
+      const off = P.lobeOffset * l.cell;
+      blob(x + DELTA[d][0] * off, y + DELTA[d][1] * off, P.lobe * l.cell, CONFIG.colors[c], k * P.lobeAlpha * (0.8 + 0.2 * pulse));
     }
-    fanG.addColorStop(Math.min(1, Math.abs(sweep) / TAU + 0.001), 'rgba(0,0,0,0)');
-    for (const [t0, t1] of bands) {
-      const a0 = flip ? aRed + t1 * sweep : aRed + t0 * sweep;
-      const a1 = flip ? aRed + t0 * sweep : aRed + t1 * sweep;
-      // Camadas concêntricas somadas: forte perto do prisma, some sem borda.
-      ctx.fillStyle = fanG;
-      ctx.globalAlpha = k * (0.09 + 0.04 * pulse);
-      for (let j = 1; j <= 5; j++) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.arc(x, y, (fanR * j) / 5, a0, a1);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-
-    // Anel: espectro parado, sem borda dura; só brilho largo e macio que pulsa.
-    const cr = P.ring * l.cell * (1 + 0.02 * pulse);
-    const ringG = ctx.createConicGradient(-Math.PI / 2, x, y);
-    for (let i = 0; i <= 6; i++) ringG.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
-    ctx.strokeStyle = ringG;
-    for (const [w, al] of P.ringLayers) {
-      ctx.globalAlpha = k * al * (0.75 + 0.25 * pulse);
-      ctx.lineWidth = w * l.cell;
-      ctx.beginPath();
-      ctx.arc(x, y, cr, 0, TAU);
-      ctx.stroke();
-    }
-
+    blob(x, y, P.core * l.cell * (0.92 + 0.08 * pulse), CONFIG.colors[inc.color], k * P.coreAlpha);
   }
   ctx.restore();
 }

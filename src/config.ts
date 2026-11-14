@@ -77,18 +77,15 @@ export const CONFIG = {
     hues: [30, 60, 180, 275],
     alpha: 0.55,
     ampMul: 1.35, // amplitude das ondas extras relativa às RGB, no arco-íris total
-    // Prisma aceso: decomposição visível. Leque de dispersão no lado de saída, do vermelho (esquerda do feixe)
-    // ao azul (direita), só nas faixas das cores que entram; triângulo com aberração cromática RGB.
+    // Prisma aceso: brilho macio da cor que entra + um lóbulo de cada cor que sai, puxado para o lado dela.
     prism: {
       alpha: [0.8, 1], // [sem arco-íris, arco-íris total]
-      fan: 0.7, // raio do leque de dispersão, em células
       pulseHz: 0.55,
-      ring: 0.4, // raio do anel, em células (cabe na célula com o brilho)
-      ringLayers: [
-        [0.18, 0.14], // [largura em células, alpha]: largo e fraco → estreito e forte, sem linha dura
-        [0.1, 0.22],
-        [0.05, 0.32],
-      ],
+      core: 0.45, // brilho central (cor que entra), raio em células
+      coreAlpha: 0.45,
+      lobe: 0.38, // brilho de cada cor que sai, raio em células
+      lobeOffset: 0.2, // deslocamento do lóbulo para o lado de saída, em células
+      lobeAlpha: 0.75,
     },
   },
 
