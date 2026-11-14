@@ -189,24 +189,47 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     let sweep = dirAngle(dir) - aRed;
     sweep = Math.atan2(Math.sin(sweep), Math.cos(sweep)) * 2; // ±π, passando pela frente
 
-    const r0 = sz * 0.5;
-    for (let i = 0; i < P.rays; i++) {
-      const t = i / (P.rays - 1);
-      const comp = t < 1 / 3 ? 1 : t < 2 / 3 ? 2 : 4;
-      if ((inc.color & comp) === 0) continue;
-      const a = aRed + t * sweep;
-      const len = P.rayLen * l.cell * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(st.time * P.flickerHz * TAU + i * 0.83)));
-      const g = ctx.createRadialGradient(x, y, r0, x, y, r0 + len);
-      g.addColorStop(0, `hsla(${t * 240}, 100%, 60%, 1)`);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.globalAlpha = k * 0.75;
-      ctx.fillStyle = g;
+    // Leque: uma cunha macia de espectro no lado de saída (vermelho → verde → azul), sem raios finos.
+    // Só as faixas das cores que entram; o tamanho pulsa junto com o anel.
+    const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
+    const fanR = P.fan * l.cell * (0.9 + 0.1 * pulse);
+    const bands: [number, number][] = [];
+    COMPONENTS.forEach((c, i) => {
+      if ((inc.color & c) !== 0) bands.push([i / 3, (i + 1) / 3]);
+    });
+    const fanG = ctx.createConicGradient(Math.min(aRed, aRed + sweep), x, y);
+    const flip = sweep < 0;
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      fanG.addColorStop((t * Math.abs(sweep)) / TAU, `hsl(${(flip ? 1 - t : t) * 240}, 100%, 60%)`);
+    }
+    fanG.addColorStop(Math.min(1, Math.abs(sweep) / TAU + 0.001), 'rgba(0,0,0,0)');
+    for (const [t0, t1] of bands) {
+      const a0 = flip ? aRed + t1 * sweep : aRed + t0 * sweep;
+      const a1 = flip ? aRed + t0 * sweep : aRed + t1 * sweep;
+      // Camadas concêntricas somadas: forte perto do prisma, some sem borda.
+      ctx.fillStyle = fanG;
+      ctx.globalAlpha = k * (0.09 + 0.04 * pulse);
+      for (let j = 1; j <= 5; j++) {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.arc(x, y, (fanR * j) / 5, a0, a1);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    // Anel: espectro parado, sem borda dura; só brilho largo e macio que pulsa.
+    const cr = P.ring * l.cell * (1 + 0.035 * pulse);
+    const ringG = ctx.createConicGradient(-Math.PI / 2, x, y);
+    for (let i = 0; i <= 6; i++) ringG.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
+    ctx.strokeStyle = ringG;
+    for (const [w, al] of P.ringLayers) {
+      ctx.globalAlpha = k * al * (0.75 + 0.25 * pulse);
+      ctx.lineWidth = w * l.cell;
       ctx.beginPath();
-      ctx.moveTo(x + Math.cos(a - P.rayWidth) * r0, y + Math.sin(a - P.rayWidth) * r0);
-      ctx.lineTo(x + Math.cos(a) * (r0 + len), y + Math.sin(a) * (r0 + len));
-      ctx.lineTo(x + Math.cos(a + P.rayWidth) * r0, y + Math.sin(a + P.rayWidth) * r0);
-      ctx.closePath();
-      ctx.fill();
+      ctx.arc(x, y, cr, 0, TAU);
+      ctx.stroke();
     }
 
     const tri = (ox: number, oy: number): void => {
@@ -216,29 +239,6 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       ctx.lineTo(x - sz * 0.87 + ox, y + sz * 0.5 + oy);
       ctx.closePath();
     };
-    // Anel: espectro parado, borda ondulando e respirando (movimento sem girar as cores).
-    const cr = P.ring * l.cell * (1 + 0.04 * Math.sin(st.time * TAU * P.ringPulseHz));
-    const ringG = ctx.createConicGradient(-Math.PI / 2, x, y);
-    for (let i = 0; i <= 6; i++) ringG.addColorStop(i / 6, `hsl(${i * 60}, 100%, 62%)`);
-    const ringPath = (): void => {
-      ctx.beginPath();
-      for (let i = 0; i <= 96; i++) {
-        const a = (i / 96) * TAU;
-        const rr = cr * (1 + P.ringWobble * (Math.sin(a * 4 + st.time * TAU * P.ringWaveHz) + 0.5 * Math.sin(a * 7 - st.time * 2.1)));
-        if (i === 0) ctx.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-        else ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-      }
-      ctx.closePath();
-    };
-    ctx.strokeStyle = ringG;
-    ringPath();
-    ctx.globalAlpha = k * (0.22 + 0.1 * Math.sin(st.time * 3.3));
-    ctx.lineWidth = P.ringGlow * l.cell;
-    ctx.stroke();
-    ctx.globalAlpha = k * 0.8;
-    ctx.lineWidth = P.ringWidth;
-    ctx.stroke();
-
     // Triângulo em três cópias R/G/B afastadas e paradas: aberração cromática.
     const off = P.aberration * (1 + st.rainbow);
     COMPONENTS.forEach((c, i) => {

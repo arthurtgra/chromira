@@ -81,17 +81,15 @@ export const CONFIG = {
     // ao azul (direita), só nas faixas das cores que entram; triângulo com aberração cromática RGB.
     prism: {
       alpha: [0.8, 1], // [sem arco-íris, arco-íris total]
-      rays: 27,
-      rayLen: 1.25, // em células
-      rayWidth: 0.075, // meia abertura de cada cunha, radianos
-      flickerHz: 0.9,
+      fan: 1.0, // raio do leque de dispersão, em células
+      pulseHz: 0.55,
       aberration: 3, // px de afastamento das cópias R/G/B do triângulo (paradas)
-      ring: 0.62, // raio do anel, em células
-      ringWidth: 3, // px, linha nítida
-      ringGlow: 0.2, // largura do brilho do anel, em células
-      ringPulseHz: 0.6, // respiração do raio
-      ringWaveHz: 0.5, // ondulação correndo pela borda
-      ringWobble: 0.022,
+      ring: 0.6, // raio do anel, em células
+      ringLayers: [
+        [0.3, 0.12], // [largura em células, alpha]: largo e fraco → estreito e forte, sem linha dura
+        [0.17, 0.2],
+        [0.08, 0.3],
+      ],
     },
   },
 
