@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { DELTA, FILTER_COLORS } from '../core/trace.ts';
 import type { Cell, Color, Segment } from '../core/types.ts';
-import { cut, visibleLength, visibleSegments, type BeamPlan } from './beams.ts';
+import { cut, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -55,9 +55,9 @@ function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
   ctx.stroke();
 }
 
-function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle): void {
+function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1): void {
   const W = CONFIG.beam.waves;
-  const amp = W.amp * l.cell * st.widthMul;
+  const amp = W.amp * ampMul * l.cell * st.widthMul;
   const k = TAU / W.length;
   const wt = st.time * TAU * W.speed;
   let s = r.d0;
@@ -143,50 +143,50 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
-    const n = R.fringes;
-    ctx.lineWidth = Math.max(1, 0.025 * l.cell * st.widthMul);
-    for (const s of visibleSegments(plan, front)) {
-      if (s.color !== 7) continue;
-      const vertical = s.x1 === s.x2;
-      for (let i = 0; i < n; i++) {
-        const side = i / (n - 1) - 0.5; // -0.5..0.5
-        const wave = 0.65 + 0.35 * Math.sin(st.time * TAU * R.shimmerHz + i * 0.9 + s.x1 + s.y1);
-        const off = side * 2 * R.spread * l.cell * wave * st.rainbow * st.widthMul;
-        ctx.globalAlpha = R.alpha * st.rainbow * (0.6 + 0.4 * wave);
-        ctx.strokeStyle = `hsl(${(i / (n - 1)) * 280}, 100%, 62%)`;
-        ctx.beginPath();
-        ctx.moveTo(cx(l, s.x1) + (vertical ? off : 0), cy(l, s.y1) + (vertical ? 0 : off));
-        ctx.lineTo(cx(l, s.x2) + (vertical ? off : 0), cy(l, s.y2) + (vertical ? 0 : off));
-        ctx.stroke();
-      }
+    ctx.lineWidth = Math.max(1, W.width * 0.7 * l.cell * st.widthMul);
+    ctx.globalAlpha = R.alpha * st.rainbow;
+    const ampMul = 1 + (R.ampMul - 1) * st.rainbow;
+    for (const r of runs) {
+      if (r.color !== 7) continue;
+      R.hues.forEach((h, i) => {
+        ctx.strokeStyle = `hsl(${h}, 100%, 62%)`;
+        strokeWave(ctx, l, r, ((i + 0.5) * TAU) / R.hues.length, st, ampMul);
+      });
     }
   }
   ctx.restore();
 }
 
-// Leque de espectro no prisma, aberto na direção do feixe que entra.
-export function drawPrismFans(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
+// Prisma aceso: espectro girando dentro do triângulo e halo na cor do feixe que entra.
+export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   if (st.t < 1) return;
   const R = CONFIG.rainbow;
+  const sz = CONFIG.piece.prismSize * l.cell;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const p of cells) {
     if (p.t !== 'prism') continue;
-    const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y && (s.color & (s.color - 1)) !== 0);
+    const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y);
     if (!inc) continue;
-    const ang = Math.atan2(Math.sign(inc.y2 - inc.y1), Math.sign(inc.x2 - inc.x1));
     const x = cx(l, p.x);
     const y = cy(l, p.y);
-    const rad = R.fanRadius * l.cell * (0.9 + 0.1 * Math.sin(st.time * TAU * R.shimmerHz));
-    const g = ctx.createConicGradient(ang - Math.PI / 2, x, y);
-    for (let i = 0; i <= 6; i++) g.addColorStop((i / 6) * 0.5, `hsla(${i * 45}, 100%, 60%, 1)`);
-    g.addColorStop(0.5001, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = R.fanAlpha[0] + (R.fanAlpha[1] - R.fanAlpha[0]) * st.rainbow;
+    const halo = ctx.createRadialGradient(x, y, 0, x, y, R.prismHalo * l.cell);
+    halo.addColorStop(0, CONFIG.colors[inc.color]);
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(x, y, R.prismHalo * l.cell, 0, TAU);
+    ctx.fill();
+
+    const g = ctx.createConicGradient(st.time * TAU * R.prismSpinHz, x, y + sz * 0.15);
+    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
+    ctx.globalAlpha = R.prismAlpha[0] + (R.prismAlpha[1] - R.prismAlpha[0]) * st.rainbow;
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.arc(x, y, rad, ang - Math.PI / 2, ang + Math.PI / 2);
+    ctx.moveTo(x, y - sz);
+    ctx.lineTo(x + sz * 0.87, y + sz * 0.5);
+    ctx.lineTo(x - sz * 0.87, y + sz * 0.5);
     ctx.closePath();
     ctx.fill();
   }
@@ -198,50 +198,53 @@ export interface PieceView {
   filterColor: (i: number) => { from: number; to: number; k: number }; // índices em FILTER_COLORS
   targetFill: (x: number, y: number) => number; // 0..1
   targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
+  time: number; // segundos
 }
 
 const COMPONENTS = [1, 2, 4] as const;
 
-// Disco interno com a mistura que chega + marcadores R/G/B no anel: cheio = chegou, oco = falta, riscado = sobra.
-function drawTargetHints(ctx: Ctx, x: number, y: number, r: number, need: number, got: number): void {
+// Alvo: anel na cor exigida. Mistura que chega aparece como disco no meio.
+// Faltando cor: disco pequeno e calmo. Cor errada (sobra componente): disco + X e anel tracejado tremendo.
+function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got: number, fill: number, time: number): void {
+  const col = CONFIG.colors[need];
+  const wrong = (got & ~need) !== 0;
+  const jx = wrong ? Math.sin(time * 38) * r * 0.05 : 0;
+  ctx.strokeStyle = col;
+  ctx.lineWidth = CONFIG.piece.stroke * 1.5;
+  if (wrong) {
+    ctx.setLineDash([r * 0.42, r * 0.28]);
+    ctx.lineDashOffset = time * r * 2;
+  }
+  ctx.beginPath();
+  ctx.arc(x + jx, y, r, 0, TAU);
+  ctx.stroke();
+  ctx.setLineDash([]);
   if (got !== 0 && got !== need) {
-    ctx.globalAlpha = 0.45;
-    ctx.fillStyle = CONFIG.colors[got as keyof typeof CONFIG.colors];
+    ctx.globalAlpha = wrong ? 0.7 : 0.45;
+    ctx.fillStyle = CONFIG.colors[got as Color];
     ctx.beginPath();
-    ctx.arc(x, y, r * 0.42, 0, TAU);
+    ctx.arc(x + jx, y, r * (wrong ? 0.55 : 0.4), 0, TAU);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  if (wrong) {
+    const d = r * 0.32;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = CONFIG.piece.stroke * 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x + jx - d, y - d);
+    ctx.lineTo(x + jx + d, y + d);
+    ctx.moveTo(x + jx + d, y - d);
+    ctx.lineTo(x + jx - d, y + d);
+    ctx.stroke();
+  }
+  if (fill > 0) {
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, r * fill * 0.8, 0, TAU);
     ctx.fill();
   }
-  const dot = Math.max(3.5, r * 0.22);
-  COMPONENTS.forEach((comp, i) => {
-    const needs = (need & comp) !== 0;
-    const has = (got & comp) !== 0;
-    if (!needs && !has) return;
-    const a = -Math.PI / 2 + (i * TAU) / 3;
-    const px = x + Math.cos(a) * r;
-    const py = y + Math.sin(a) * r;
-    const col = CONFIG.colors[comp];
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#07070d';
-    ctx.beginPath();
-    ctx.arc(px, py, dot + 1.5, 0, TAU);
-    ctx.fill();
-    ctx.strokeStyle = col;
-    ctx.fillStyle = col;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(px, py, dot, 0, TAU);
-    if (has) ctx.fill();
-    else ctx.stroke();
-    if (has && !needs) {
-      ctx.strokeStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(px - dot * 1.4, py + dot * 1.4);
-      ctx.lineTo(px + dot * 1.4, py - dot * 1.4);
-      ctx.stroke();
-    }
-  });
   ctx.lineWidth = CONFIG.piece.stroke;
-  ctx.globalAlpha = 1;
 }
 
 function mix(a: string, b: string, k: number): string {
@@ -315,22 +318,7 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         break;
       }
       case 'target': {
-        const r = p.ringRadius * c;
-        const fill = view.targetFill(cell.x, cell.y);
-        const col = CONFIG.colors[cell.color];
-        ctx.strokeStyle = col;
-        ctx.lineWidth = p.stroke * 1.5;
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, TAU);
-        ctx.stroke();
-        ctx.lineWidth = p.stroke;
-        drawTargetHints(ctx, x, y, r, cell.color, view.targetReceived(cell.x, cell.y));
-        if (fill > 0) {
-          ctx.fillStyle = col;
-          ctx.beginPath();
-          ctx.arc(x, y, r * fill * 0.8, 0, TAU);
-          ctx.fill();
-        }
+        drawTarget(ctx, x, y, p.ringRadius * c, cell.color, view.targetReceived(cell.x, cell.y), view.targetFill(cell.x, cell.y), view.time);
         ctx.strokeStyle = p.color;
         break;
       }

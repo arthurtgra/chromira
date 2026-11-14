@@ -56,12 +56,14 @@ export const CONFIG = {
   // Difração em arco-íris: liga a partir deste número de marcadores de dificuldade.
   rainbow: {
     fromDifficulty: 3,
-    fringes: 7, // franjas coloridas em volta do feixe branco
-    spread: 0.16, // afastamento máximo das franjas, fração da célula
-    alpha: 0.7,
-    shimmerHz: 0.6,
-    fanRadius: 1.25, // leque do prisma, em células
-    fanAlpha: [0.12, 0.38], // [sem arco-íris, arco-íris total]
+    // Feixes brancos ganham ondas extras de espectro (laranja, amarelo, ciano, violeta) entre as RGB.
+    hues: [30, 60, 180, 275],
+    alpha: 0.55,
+    ampMul: 1.35, // amplitude das ondas extras relativa às RGB, no arco-íris total
+    // Prisma aceso: miolo com espectro girando + halo da cor que entra.
+    prismAlpha: [0.3, 0.6], // [sem arco-íris, arco-íris total]
+    prismSpinHz: 0.15,
+    prismHalo: 0.7, // raio do halo, em células
   },
 
   mirrorSpinMs: 80,

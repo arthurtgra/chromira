@@ -9,7 +9,7 @@ import {
   drawBeams,
   drawDebug,
   drawPieces,
-  drawPrismFans,
+  drawPrismGlow,
   type BeamStyle,
 } from './render/draw.ts';
 import { Fx } from './render/fx.ts';
@@ -161,7 +161,7 @@ export class Game {
     };
     const front = this.front();
     const fading = this.fades.map((f) => ({ seg: f.seg, k: clamp01((this.now - f.at) / CONFIG.beam.fadeMs) }));
-    drawPrismFans(ctx, l, this.level.cells, this.result.segments, style);
+    drawPrismGlow(ctx, l, this.level.cells, this.result.segments, style);
     drawBeams(ctx, l, this.plan, front, fading, style);
     drawPieces(ctx, l, this.level.cells, {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
@@ -174,6 +174,7 @@ export class Game {
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
       targetReceived: (x, y) => this.shown.received[key(x, y)] ?? 0,
+      time: this.now / 1000,
     });
     this.fx.draw(ctx, l.w, l.h);
     drawHud(ctx, l, {
