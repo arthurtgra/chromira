@@ -67,7 +67,7 @@ export class Game {
     this.rots = startRots(this.level);
     this.pieceCells = pieces(this.level);
     this.anims = this.rots.map((r, i) => {
-      const v = this.pieceCells[i]!.t === 'mirror' ? (r === 0 ? -QUARTER / 2 : QUARTER / 2) : r;
+      const v = this.pieceCells[i]!.t === 'filter' ? r : r === 0 ? -QUARTER / 2 : QUARTER / 2;
       return { from: v, to: v, at: -Infinity };
     });
     this.result = trace(this.level, this.rots);
@@ -104,7 +104,7 @@ export class Game {
 
     this.rots[i] = (this.rots[i]! + 1) % pieceStates(cell);
     const a = this.anims[i]!;
-    if (cell.t === 'mirror') {
+    if (cell.t !== 'filter') {
       this.anims[i] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
       this.synth.turn();
     } else {

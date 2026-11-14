@@ -341,6 +341,36 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.stroke();
         break;
       }
+      case 'splitter': {
+        // Vidro: placa translúcida entre dois filetes finos, mais curta que o espelho. Lê como "meio espelho".
+        const a = view.mirrorAngle(pi++);
+        const r = (p.mirrorLen * c) / 2;
+        const ux = Math.cos(a) * r;
+        const uy = Math.sin(a) * r;
+        const t = p.splitterGap * c;
+        const nx = -Math.sin(a) * t;
+        const ny = Math.cos(a) * t;
+        ctx.globalAlpha = 0.16;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.moveTo(x - ux + nx, y - uy + ny);
+        ctx.lineTo(x + ux + nx, y + uy + ny);
+        ctx.lineTo(x + ux - nx, y + uy - ny);
+        ctx.lineTo(x - ux - nx, y - uy - ny);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 1.2;
+        for (const sgn of [1, -1]) {
+          ctx.beginPath();
+          ctx.moveTo(x - ux + nx * sgn, y - uy + ny * sgn);
+          ctx.lineTo(x + ux + nx * sgn, y + uy + ny * sgn);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
       case 'filter': {
         const f = view.filterColor(pi++);
         const col = mix(

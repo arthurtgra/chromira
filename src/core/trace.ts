@@ -11,6 +11,7 @@ export const DELTA: Record<Dir, readonly [number, number]> = {
 };
 const SLASH: Record<Dir, Dir> = { E: 'N', W: 'S', N: 'E', S: 'W' };
 const BACKSLASH: Record<Dir, Dir> = { E: 'S', W: 'N', N: 'W', S: 'E' };
+export const OPP: Record<Dir, Dir> = { E: 'W', W: 'E', N: 'S', S: 'N' };
 export const LEFT: Record<Dir, Dir> = { E: 'N', N: 'W', W: 'S', S: 'E' };
 export const RIGHT: Record<Dir, Dir> = { E: 'S', S: 'W', W: 'N', N: 'E' };
 export const FILTER_COLORS: readonly Color[] = [1, 2, 4];
@@ -21,7 +22,7 @@ export function reflect(dir: Dir, rot: number): Dir {
   return rot === 0 ? SLASH[dir] : BACKSLASH[dir];
 }
 
-export const isPiece = (c: Cell): boolean => c.t === 'mirror' || c.t === 'filter';
+export const isPiece = (c: Cell): boolean => c.t === 'mirror' || c.t === 'filter' || c.t === 'splitter';
 export const pieceStates = (c: Cell): number => (c.t === 'filter' ? 3 : 2);
 
 export function pieces(level: Level): Cell[] {
@@ -93,6 +94,12 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
       switch (c.t) {
         case 'mirror':
           push(x, y);
+          dir = reflect(dir, rots[pieceIdx.get(k)!] ?? 0);
+          break;
+        case 'splitter':
+          // Metade segue reto (novo feixe na fila), metade reflete como espelho.
+          push(x, y);
+          queue.push({ x, y, dir, color });
           dir = reflect(dir, rots[pieceIdx.get(k)!] ?? 0);
           break;
         case 'filter': {

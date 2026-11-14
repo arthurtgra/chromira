@@ -18,6 +18,30 @@ const TIERS: Tier[] = [
     count: 8,
     options: (k) => ({ mirrors: lerp(6, 9, k), filters: k > 0.5 ? 2 : 1, prism: true, beams: 3, minMoves: lerp(5, 7, k) }),
   },
+  // 41+: alvos de cor combinada — só acendem quando feixes de lançadores diferentes chegam juntos.
+  {
+    count: 10,
+    options: (k) => ({
+      mirrors: lerp(5, 7, k),
+      beams: 2,
+      merge: k > 0.4 ? 2 : 1,
+      mergeMirrors: k > 0.4 ? 2 : 3,
+      filters: 1,
+      minMoves: lerp(6, 8, k),
+    }),
+  },
+  // 51+: divisor de feixe — reflete e deixa passar ao mesmo tempo; um feixe abastece dois caminhos.
+  {
+    count: 10,
+    options: (k) => ({
+      mirrors: lerp(6, 8, k),
+      beams: 2,
+      splitters: k > 0.4 ? 2 : 1,
+      merge: 1,
+      mergeMirrors: 2,
+      minMoves: lerp(6, 8, k),
+    }),
+  },
 ];
 const SEED_BASE = 9100;
 

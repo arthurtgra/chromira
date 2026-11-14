@@ -5,6 +5,7 @@ export type Cell =
   | { x: number; y: number; t: 'emitter'; dir: Dir; color: Color }
   | { x: number; y: number; t: 'mirror' } // estado fica em rots
   | { x: number; y: number; t: 'filter' } // estado fica em rots
+  | { x: number; y: number; t: 'splitter' } // vidro semi-espelhado: reflete e deixa passar; estado em rots
   | { x: number; y: number; t: 'wall' }
   | { x: number; y: number; t: 'target'; color: Color }
   | { x: number; y: number; t: 'prism' };
@@ -20,8 +21,8 @@ export interface Level {
   difficulty?: number;
 }
 
-// rots[i] = estado da i-ésima peça móvel (espelho ou filtro) em level.cells.
-// espelho: 0 = '/', 1 = '\'. filtro: 0 = vermelho, 1 = verde, 2 = azul.
+// rots[i] = estado da i-ésima peça móvel (espelho, divisor ou filtro) em level.cells.
+// espelho e divisor: 0 = '/', 1 = '\'. filtro: 0 = vermelho, 1 = verde, 2 = azul.
 export type Rots = number[];
 
 export interface Segment {

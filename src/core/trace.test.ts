@@ -186,4 +186,37 @@ describe('trace', () => {
     );
     expect(r.segments.map((s) => s.color).sort()).toEqual([1, 4, 5]);
   });
+
+  it('splitter reflects and lets the beam through at the same time', () => {
+    const lv = level([
+      { x: 0, y: 3, t: 'emitter', dir: 'E', color: 2 },
+      { x: 2, y: 3, t: 'splitter' },
+      { x: 2, y: 0, t: 'target', color: 2 },
+      { x: 5, y: 3, t: 'target', color: 2 },
+    ]);
+    expect(trace(lv, [0]).solved).toBe(true);
+    expect(trace(lv, [1]).solved).toBe(false);
+  });
+
+  it('two beams merge on a combined-color target', () => {
+    const lv = level([
+      { x: 0, y: 3, t: 'emitter', dir: 'E', color: 1 },
+      { x: 3, y: 0, t: 'emitter', dir: 'S', color: 2 },
+      { x: 3, y: 3, t: 'target', color: 3 },
+    ]);
+    const r = trace(lv, []);
+    expect(r.received['3,3']).toBe(3);
+    expect(r.solved).toBe(true);
+  });
+
+  it('splitter loops terminate', () => {
+    const lv = level([
+      { x: 0, y: 0, t: 'emitter', dir: 'E', color: 7 },
+      { x: 2, y: 0, t: 'splitter' },
+      { x: 2, y: 2, t: 'splitter' },
+      { x: 4, y: 2, t: 'splitter' },
+      { x: 4, y: 0, t: 'splitter' },
+    ]);
+    expect(() => trace(lv, [1, 0, 1, 0])).not.toThrow();
+  });
 });

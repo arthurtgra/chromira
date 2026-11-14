@@ -3,9 +3,11 @@
 Puzzle de luz para celular: toque nos espelhos para girá-los e nos filtros para trocar a cor que passa,
 até cada alvo receber a cor certa.
 
-Peças: emissor, espelho (2 estados), filtro (vermelho/verde/azul, 3 estados), prisma, parede, alvo.
-40 fases: 1–10 apresentam espelho, cor e prisma; 11–13 o filtro; depois três faixas geradas
-(espelhos → filtro + prisma → tudo), cada uma ordenada pela nota de `difficultyScore`.
+Peças: emissor, espelho (2 estados), divisor de feixe (2 estados: reflete e deixa passar ao mesmo tempo),
+filtro (vermelho/verde/azul, 3 estados), prisma, parede, alvo (pode exigir cor combinada).
+60 fases: 1–10 apresentam espelho, cor e prisma; 11–13 o filtro; depois cinco faixas geradas
+(espelhos → filtro + prisma → tudo → 41–50 alvos de cor combinada, alimentados por lançadores
+diferentes → 51–60 divisor de feixe), cada uma ordenada pela nota de `difficultyScore`.
 Os marcadores no topo (1–5) mostram a dificuldade; a partir de 3, os feixes brancos ganham difração em arco-íris.
 TypeScript + Vite + Canvas 2D, sem engine. Som sintetizado (Web Audio). PWA instalável e offline.
 

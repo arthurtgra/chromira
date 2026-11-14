@@ -1,5 +1,5 @@
-import { countSolutions } from './solver.ts';
-import { DELTA, FILTER_COLORS, LEFT, RIGHT, key, reflect, trace } from './trace.ts';
+import { MAX_SPACE, countSolutions, searchSpace } from './solver.ts';
+import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, reflect, trace } from './trace.ts';
 import type { Cell, Color, Dir, Level, Rots } from './types.ts';
 
 const W = 6;
@@ -8,12 +8,16 @@ const MAX_ATTEMPTS = 20000;
 const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
 const COLORS: Color[] = [7, 1, 2, 4, 3, 5, 6];
 const MULTI: Color[] = [7, 7, 3, 5, 6];
+const MERGED: Color[] = [3, 5, 6, 3, 5, 6, 7];
 
 export interface GenOptions {
   mirrors: number;
   beams?: number;
   filters?: number; // feixes que terminam num alvo de uma cor só, escolhida por um filtro
   prism?: boolean; // o primeiro feixe é branco e passa por um prisma
+  merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
+  mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
+  splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
   minMoves?: number;
 }
 
@@ -43,8 +47,21 @@ interface Draft {
   path: Set<string>;
 }
 
-// Caminha um feixe: espelho em cada curva, prisma opcional, filtro opcional, alvo no fim.
-function walk(d: Draft, x: number, y: number, dir: Dir, color: Color, mirrors: number, prismAt: number, filter: boolean): boolean {
+// Caminha um feixe: espelho em cada curva, prisma opcional, divisor opcional, filtro opcional, alvo no fim.
+// end = 'emitter': caminhada reversa, sai de um alvo e termina num lançador apontado de volta
+// (o caminho da luz é reversível, então a solução dos espelhos é a mesma).
+function walk(
+  d: Draft,
+  x: number,
+  y: number,
+  dir: Dir,
+  color: Color,
+  mirrors: number,
+  prismAt: number,
+  filter: boolean,
+  end: 'target' | 'emitter' = 'target',
+  splitAt = -1,
+): boolean {
   const fresh: string[] = [];
   for (let m = 0; m <= mirrors; m++) {
     const [dx, dy] = DELTA[dir];
@@ -78,6 +95,10 @@ function walk(d: Draft, x: number, y: number, dir: Dir, color: Color, mirrors: n
       }
       return true;
     }
+    if (m === mirrors && end === 'emitter') {
+      d.cells.push({ x, y, t: 'emitter', dir: OPP[dir], color });
+      return true;
+    }
     if (m === mirrors) {
       let target = color;
       if (filter) {
@@ -92,6 +113,14 @@ function walk(d: Draft, x: number, y: number, dir: Dir, color: Color, mirrors: n
       return true;
     }
     const next = d.r() < 0.5 ? LEFT[dir] : RIGHT[dir];
+    if (m === splitAt) {
+      // Divisor: o reflexo segue um ramo, a parte que atravessa segue outro, cada um até seu alvo.
+      d.cells.push({ x, y, t: 'splitter' });
+      d.sol.push(reflect(dir, 0) === next ? 0 : 1);
+      const left = mirrors - m - 1;
+      const k = int(d.r, 0, left);
+      return walk(d, x, y, dir, color, k, -1, false) && walk(d, x, y, next, color, left - k, -1, false);
+    }
     d.cells.push({ x, y, t: 'mirror' });
     d.sol.push(reflect(dir, 0) === next ? 0 : 1);
     dir = next;
@@ -104,6 +133,24 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   const d: Draft = { r, cells: [], sol: [], used: new Set(), path: new Set() };
   let left = o.mirrors;
   let filters = o.filters ?? 0;
+  let splitters = o.splitters ?? 0;
+
+  // Alvos combinados primeiro: cada componente sai do alvo por um lado diferente até seu lançador.
+  for (let i = 0; i < (o.merge ?? 0); i++) {
+    let tx: number;
+    let ty: number;
+    do {
+      tx = int(r, 0, W - 1);
+      ty = int(r, 0, H - 1);
+    } while (d.used.has(key(tx, ty)) || d.path.has(key(tx, ty)));
+    const color = pick(r, MERGED);
+    d.cells.push({ x: tx, y: ty, t: 'target', color });
+    d.used.add(key(tx, ty));
+    const sides = [...DIRS].sort(() => r() - 0.5);
+    for (const [j, comp] of bits(color).entries()) {
+      if (!walk(d, tx, ty, sides[j]!, comp, int(r, 1, o.mergeMirrors ?? 2), -1, false, 'emitter')) return null;
+    }
+  }
   for (let b = 0; b < nBeams; b++) {
     const k = b === nBeams - 1 ? left : Math.max(1, Math.round(o.mirrors / nBeams) + int(r, -1, 1));
     left -= k;
@@ -121,10 +168,13 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     d.cells.push({ x, y, t: 'emitter', dir: pick(r, DIRS), color });
     d.used.add(key(x, y));
     const prismAt = prism ? int(r, 0, Math.min(2, k)) : -1;
+    const split = !prism && !filter && splitters > 0 && k >= 2;
+    if (split) splitters--;
+    const splitAt = split ? int(r, 0, Math.min(2, k - 2)) : -1;
     const cell = d.cells.at(-1) as Extract<Cell, { t: 'emitter' }>;
-    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter)) return null;
+    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter, 'target', splitAt)) return null;
   }
-  if (filters > 0) return null;
+  if (filters > 0 || splitters > 0) return null;
 
   const walls = int(r, 1, 4);
   for (let i = 0; i < walls * 4 && d.cells.filter((c) => c.t === 'wall').length < walls; i++) {
@@ -136,9 +186,9 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   }
 
   // d.sol está na ordem de colocação; a ordem de rots é a de level.cells.
-  const order = d.cells.filter((c) => c.t === 'mirror' || c.t === 'filter');
+  const order = d.cells.filter(isPiece);
   const sol = order.map((_, i) => d.sol[i]!);
-  const states = order.map((c) => (c.t === 'filter' ? 3 : 2));
+  const states = order.map(pieceStates);
   const minMoves = Math.min(o.minMoves ?? 3, sol.length);
   let start: Rots;
   do {
@@ -147,9 +197,9 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
 
   const level: Level = { id, w: W, h: H, cells: d.cells, start };
   if (!trace(level, sol).solved || trace(level, start).solved) return null;
-  if (countSolutions(level, 2).count !== 1) return null;
+  if (searchSpace(level) > MAX_SPACE || countSolutions(level, 2).count !== 1) return null;
   const ends = new Set(trace(level, sol).segments.map((s) => key(s.x2, s.y2)));
-  if (!d.cells.every((c) => c.t !== 'mirror' || ends.has(key(c.x, c.y)))) return null;
+  if (!d.cells.every((c) => (c.t !== 'mirror' && c.t !== 'splitter') || ends.has(key(c.x, c.y)))) return null;
   return level;
 }
 
