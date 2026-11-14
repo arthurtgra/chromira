@@ -71,6 +71,21 @@ const TIERS: Tier[] = [
       minMoves: lerp(7, 9, k),
     }),
   },
+  // 71+: trilho — um espelho ou o prisma desliza de célula em célula; a luz acompanha enquanto arrasta.
+  {
+    count: 10,
+    seed: 20200,
+    options: (k) => {
+      const prism = Math.round(k * 9) % 2 === 1;
+      return {
+        mirrors: lerp(4, 7, k),
+        beams: 2,
+        prism,
+        slider: prism ? ('prism' as const) : ('mirror' as const),
+        minMoves: lerp(3, 6, k),
+      };
+    },
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.

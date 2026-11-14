@@ -1,6 +1,6 @@
 import type { Level } from './core/types.ts';
 import { Game } from './game.ts';
-import { onTap } from './input.ts';
+import { onPointer } from './input.ts';
 import { CONFIG } from './config.ts';
 import levelsJson from './levels/levels.json';
 import { Feedback, feedbackEnabled, setupDev, setupFeedback } from './feedback.ts';
@@ -22,6 +22,7 @@ for (const d of save.done) game.done.add(d);
 const urlLevel = Number(params.get('level'));
 const fromUrl = Number.isInteger(urlLevel) && urlLevel > 0;
 const fb = feedbackEnabled() ? new Feedback() : null;
+game.unlockAll = fb !== null;
 if (fb) (CONFIG.layout as { bottom: number }).bottom = 80; // espaço para a barra de feedback no canto inferior
 game.load(fromUrl ? urlLevel - 1 : save.level);
 setupMenu(game, !fromUrl, fb ? (i) => fb.vote(i) : undefined);
@@ -57,7 +58,11 @@ muteBtn.addEventListener('click', () => {
 });
 renderMute();
 
-onTap(canvas, (x, y) => game.tap(x, y));
+onPointer(canvas, {
+  down: (x, y) => game.press(x, y),
+  move: (x, y) => game.dragTo(x, y),
+  up: () => game.release(),
+});
 
 // Em tela de toque, pointerdown não conta como gesto para liberar áudio; pointerup/touchend contam.
 // Android (tela cheia / app instalado) aceita travar em retrato; nos outros a tela #rotate cobre o jogo.

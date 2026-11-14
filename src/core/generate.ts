@@ -1,5 +1,5 @@
 import { MAX_SPACE, countSolutions, searchSpace } from './solver.ts';
-import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, reflect, trace } from './trace.ts';
+import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, placeCells, posOf, reflect, trace } from './trace.ts';
 import type { Cell, Color, Dir, Level, Rots } from './types.ts';
 
 const W = 6;
@@ -18,6 +18,7 @@ export interface GenOptions {
   merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
   mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
   splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
+  slider?: 'mirror' | 'prism'; // uma peça desse tipo vai para um trilho e precisa ser arrastada
   minMoves?: number;
 }
 
@@ -185,21 +186,52 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     d.cells.push({ x, y, t: 'wall' });
   }
 
-  // d.sol está na ordem de colocação; a ordem de rots é a de level.cells.
+  // Trilho: a peça escolhida ganha 3-4 posições livres em linha passando pela posição da solução.
+  let slider: { cell: Extract<Cell, { t: 'mirror' | 'prism' }>; pos: number } | null = null;
+  if (o.slider) {
+    const cands = d.cells.filter((c): c is Extract<Cell, { t: 'mirror' | 'prism' }> => c.t === o.slider);
+    if (cands.length === 0) return null;
+    const c = pick(r, cands);
+    const axis = r() < 0.5 ? 'x' : 'y';
+    const [dx, dy] = axis === 'x' ? [1, 0] : [0, 1];
+    const free = (x: number, y: number): boolean => inside(x, y) && !d.cells.some((q) => q !== c && q.x === x && q.y === y);
+    let lo = 0;
+    while (free(c.x - (lo + 1) * dx, c.y - (lo + 1) * dy)) lo++;
+    let hi = 0;
+    while (free(c.x + (hi + 1) * dx, c.y + (hi + 1) * dy)) hi++;
+    const len = Math.min(int(r, 3, 4), lo + hi + 1);
+    if (len < 3) return null;
+    const before = int(r, Math.max(0, len - 1 - hi), Math.min(lo, len - 1));
+    c.x -= before * dx;
+    c.y -= before * dy;
+    c.rail = { axis, len };
+    slider = { cell: c, pos: before };
+  }
+
+  // d.sol está na ordem de colocação; a ordem de rots é a de level.cells. Prisma em trilho não está em d.sol.
   const order = d.cells.filter(isPiece);
-  const sol = order.map((_, i) => d.sol[i]!);
+  let si = 0;
+  const sol = order.map((c) => {
+    if (c.t === 'prism') return slider!.pos;
+    const v = d.sol[si++]!;
+    return c === slider?.cell ? v + 2 * slider.pos : v;
+  });
   const states = order.map(pieceStates);
+  const sl = slider ? order.indexOf(slider.cell) : -1;
   const minMoves = Math.min(o.minMoves ?? 3, sol.length);
   let start: Rots;
   do {
     start = sol.map((v, i) => (r() < 0.6 ? (v + int(r, 1, states[i]! - 1)) % states[i]! : v));
-  } while (start.filter((v, i) => v !== sol[i]).length < minMoves);
+  } while (
+    start.filter((v, i) => v !== sol[i]).length < minMoves ||
+    (slider !== null && posOf(slider.cell, start[sl]!) === slider.pos)
+  );
 
   const level: Level = { id, w: W, h: H, cells: d.cells, start };
   if (!trace(level, sol).solved || trace(level, start).solved) return null;
   if (searchSpace(level) > MAX_SPACE || countSolutions(level, 2).count !== 1) return null;
   const ends = new Set(trace(level, sol).segments.map((s) => key(s.x2, s.y2)));
-  if (!d.cells.every((c) => (c.t !== 'mirror' && c.t !== 'splitter') || ends.has(key(c.x, c.y)))) return null;
+  if (!placeCells(level, sol).every((c) => (c.t !== 'mirror' && c.t !== 'splitter') || ends.has(key(c.x, c.y)))) return null;
   return level;
 }
 

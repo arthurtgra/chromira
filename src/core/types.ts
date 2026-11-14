@@ -3,12 +3,19 @@ export type Color = 1 | 2 | 3 | 4 | 5 | 6 | 7; // bitmask R=1 G=2 B=4
 
 export type Cell =
   | { x: number; y: number; t: 'emitter'; dir: Dir; color: Color }
-  | { x: number; y: number; t: 'mirror' } // estado fica em rots
+  | { x: number; y: number; t: 'mirror'; rail?: Rail } // estado fica em rots
   | { x: number; y: number; t: 'filter' } // estado fica em rots
   | { x: number; y: number; t: 'splitter' } // vidro semi-espelhado: reflete e deixa passar; estado em rots
   | { x: number; y: number; t: 'wall' }
   | { x: number; y: number; t: 'target'; color: Color }
-  | { x: number; y: number; t: 'prism' };
+  | { x: number; y: number; t: 'prism'; rail?: Rail };
+
+// Trilho: a peça desliza de célula em célula a partir de (x, y) na direção do eixo, len posições.
+// Estado da peça = rotação + base * posição (base = estados de rotação: espelho 2, prisma 1).
+export interface Rail {
+  axis: 'x' | 'y';
+  len: number;
+}
 
 // start = estado inicial das peças móveis (ausente = todas no estado 0)
 // difficulty = 1..5, calculada pelo script gen-levels

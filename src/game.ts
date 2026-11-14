@@ -1,6 +1,6 @@
 import { Synth } from './audio/synth.ts';
 import { CONFIG } from './config.ts';
-import { key, pieceStates, pieces, startRots, trace } from './core/trace.ts';
+import { baseStates, isPiece, key, pieces, placeCells, posOf, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
 import { arrived, cut, extendToObstacles, planBeams, segLen, visibleSegments, type BeamPlan } from './render/beams.ts';
@@ -11,6 +11,7 @@ import {
   drawPieces,
   drawImpacts,
   drawPrismGlow,
+  drawRails,
   mix,
   type BeamStyle,
 } from './render/draw.ts';
@@ -41,6 +42,8 @@ export class Game {
   private result!: TraceResult;
   private hits: { x: number; y: number; dx: number; dy: number; color: Color }[] = []; // onde a luz bate num obstáculo
   private pieceCells: Cell[] = [];
+  private slide: number[] = []; // posição desenhada de cada peça no trilho (desliza até a célula do estado)
+  private drag: { i: number; px: number; py: number; moved: boolean } | null = null;
   private anims: Anim[] = [];
   private now = 0;
   private loadedAt = 0;
@@ -52,7 +55,7 @@ export class Game {
   private beamMs = 1;
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
-  private prismAngle = new Map<string, { cur: number; to: number }>(); // ponta do prisma virada para a luz que chega
+  private prismAngle = new Map<number, { cur: number; to: number }>(); // por índice em level.cells; // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
   private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
   private pulseAt = Infinity;
@@ -63,6 +66,7 @@ export class Game {
   readonly done = new Set<number>();
   onWin: (() => void) | null = null;
   onLoad: (() => void) | null = null;
+  unlockAll = false; // modo desenvolvedor: todas as fases liberadas
   skip = new Set<number>(); // fases cortadas no playtest: o avanço automático pula
 
   constructor(levels: Level[]) {
@@ -77,9 +81,12 @@ export class Game {
     this.rots = startRots(this.level);
     this.pieceCells = pieces(this.level);
     this.anims = this.rots.map((r, i) => {
-      const v = this.pieceCells[i]!.t === 'filter' ? r : r === 0 ? -QUARTER / 2 : QUARTER / 2;
+      const c = this.pieceCells[i]!;
+      const v = c.t === 'filter' ? rotOf(c, r) : rotOf(c, r) === 0 ? -QUARTER / 2 : QUARTER / 2;
       return { from: v, to: v, at: -Infinity };
     });
+    this.slide = this.rots.map((r, i) => posOf(this.pieceCells[i]!, r));
+    this.drag = null;
     this.result = trace(this.level, this.rots);
     this.prismAngle = new Map();
     this.aimPrisms(true);
@@ -122,6 +129,7 @@ export class Game {
 
   // Liberadas: todas até a seguinte à maior concluída (e pelo menos até a atual).
   get unlocked(): number {
+    if (this.unlockAll) return this.levels.length - 1;
     return Math.min(this.levels.length - 1, Math.max(this.index, ...[...this.done].map((d) => d + 1)));
   }
 
@@ -142,16 +150,49 @@ export class Game {
     this.persist();
   }
 
-  tap(px: number, py: number): void {
+  // Toque/arrasto. Peça sem trilho gira no toque (na hora). Peça em trilho: arrastar desliza de célula em
+  // célula (nunca fica entre duas) e a luz acompanha; toque sem arrastar gira (espelho).
+  press(px: number, py: number): void {
     this.synth.unlock();
     if (this.wonAt !== null) return;
     const c = cellAt(this.layout, px, py, this.level.w, this.level.h);
     if (!c) return;
-    const i = this.pieceCells.findIndex((m) => m.x === c.x && m.y === c.y);
+    const placed = placeCells(this.level, this.rots).filter(isPiece);
+    const i = placed.findIndex((m) => m.x === c.x && m.y === c.y);
     if (i < 0) return;
-    const cell = this.pieceCells[i]!;
+    if (railOf(this.pieceCells[i]!)) this.drag = { i, px, py, moved: false };
+    else this.rotate(i);
+  }
 
-    this.rots[i] = (this.rots[i]! + 1) % pieceStates(cell);
+  dragTo(px: number, py: number): void {
+    const d = this.drag;
+    if (!d || this.wonAt !== null) return;
+    if (!d.moved && Math.hypot(px - d.px, py - d.py) < CONFIG.dragSlop) return;
+    d.moved = true;
+    const cell = this.pieceCells[d.i]!;
+    const rail = railOf(cell)!;
+    const along =
+      rail.axis === 'x' ? (px - cx(this.layout, cell.x)) / this.layout.cell : (py - cy(this.layout, cell.y)) / this.layout.cell;
+    const pos = Math.max(0, Math.min(rail.len - 1, Math.round(along)));
+    const s = this.rots[d.i]!;
+    if (pos === posOf(cell, s)) return;
+    this.rots[d.i] = rotOf(cell, s) + baseStates(cell) * pos;
+    this.synth.turn(true);
+    navigator.vibrate?.(CONFIG.vibrateMs);
+    this.retrace();
+  }
+
+  release(): void {
+    const d = this.drag;
+    this.drag = null;
+    if (d && !d.moved && this.wonAt === null && baseStates(this.pieceCells[d.i]!) > 1) this.rotate(d.i);
+  }
+
+  private rotate(i: number): void {
+    const cell = this.pieceCells[i]!;
+    const s = this.rots[i]!;
+    const r = rotOf(cell, s);
+    this.rots[i] = s - r + ((r + 1) % baseStates(cell));
     const a = this.anims[i]!;
     if (cell.t !== 'filter') {
       this.anims[i] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
@@ -161,7 +202,10 @@ export class Game {
       this.synth.turn(true);
     }
     navigator.vibrate?.(CONFIG.vibrateMs);
+    this.retrace();
+  }
 
+  private retrace(): void {
     const before = visibleSegments(this.plan, this.front());
     this.result = trace(this.level, this.rots);
     this.aimPrisms(false);
@@ -185,6 +229,8 @@ export class Game {
     this.fx.update(dtMs);
     const ek = 1 - Math.exp(-CONFIG.prismTurnRate * dtMs / 1000);
     for (const a of this.prismAngle.values()) a.cur += (a.to - a.cur) * ek;
+    const sk = 1 - Math.exp((-CONFIG.slideRate * dtMs) / 1000);
+    this.slide = this.slide.map((v, i) => v + (posOf(this.pieceCells[i]!, this.rots[i]!) - v) * sk);
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
     // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
@@ -257,10 +303,11 @@ export class Game {
       const r = Math.max(0, this.retracted(f));
       return { seg: cut(f.seg, r, len), d0: r, alpha: 1 - 0.5 * clamp01(r / len) };
     });
-    drawPrismGlow(ctx, l, this.level.cells, visibleSegments(this.plan, front), style);
+    drawPrismGlow(ctx, l, placeCells(this.level, this.rots), visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
     const got = arrived(this.plan, front);
-    drawPieces(ctx, l, this.level.cells, {
+    drawRails(ctx, l, this.level.cells);
+    drawPieces(ctx, l, this.drawnCells(), {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
       filterColor: (i) => {
         const a = this.anims[i]!;
@@ -271,7 +318,7 @@ export class Game {
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
       targetReceived: (x, y) => got[key(x, y)] ?? 0,
-      prismAngle: (x, y) => this.prismAngle.get(key(x, y))?.cur ?? -QUARTER,
+      prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
       time: this.now / 1000,
     });
     drawImpacts(ctx, l, this.hits, this.plan, front, style);
@@ -352,9 +399,8 @@ export class Game {
   // Segmentos do trace esticados até encostar nos obstáculos; guarda onde a luz bate.
   // Ponta do prisma aponta de onde vem a luz; sem luz chegando, fica como está. Gira pelo caminho mais curto.
   private aimPrisms(instant: boolean): void {
-    for (const c of this.level.cells) {
+    for (const [k, c] of placeCells(this.level, this.rots).entries()) {
       if (c.t !== 'prism') continue;
-      const k = key(c.x, c.y);
       const inc = this.result.segments.find((s) => s.x2 === c.x && s.y2 === c.y);
       const cur = this.prismAngle.get(k)?.cur ?? -QUARTER;
       if (!inc) {
@@ -365,6 +411,19 @@ export class Game {
       to = cur + ((((to - cur) % (2 * Math.PI)) + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
       this.prismAngle.set(k, { cur: instant ? to : cur, to });
     }
+  }
+
+  // Células como desenhadas: peças em trilho na posição deslizante (fracionária durante a animação).
+  private drawnCells(): Cell[] {
+    let pi = 0;
+    return this.level.cells.map((c) => {
+      if (!isPiece(c)) return c;
+      const i = pi++;
+      const rail = railOf(c);
+      if (!rail) return c;
+      const p = this.slide[i]!;
+      return { ...c, x: c.x + (rail.axis === 'x' ? p : 0), y: c.y + (rail.axis === 'y' ? p : 0) };
+    });
   }
 
   private beamSegments(): Segment[] {

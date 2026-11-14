@@ -280,9 +280,10 @@ button {
 }
 .lvl {
   aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
   background: transparent;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -295,20 +296,18 @@ button {
 .lvl:active {
   transform: scale(0.92);
 }
-.lvl.open {
-  border-color: rgba(255, 255, 255, 0.55);
-}
 .lvl.done {
-  border-color: var(--c);
-  background: radial-gradient(circle, color-mix(in srgb, var(--c) 28%, transparent), transparent 72%);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 35%, transparent);
+  border-color: var(--g);
+  background: color-mix(in srgb, var(--g) 10%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--g) 30%, transparent);
 }
-.lvl.done::after {
+/* Dificuldade: bolinha colorida embaixo do número. */
+.lvl::after {
   content: '';
   position: absolute;
-  bottom: 14%;
-  width: 5px;
-  height: 5px;
+  bottom: 13%;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--c);
 }
@@ -321,6 +320,9 @@ button {
   border-style: dashed;
   border-color: rgba(255, 255, 255, 0.08);
   pointer-events: none;
+}
+.lvl.locked::after {
+  opacity: 0.3;
 }
 .grid {
   scrollbar-width: none;

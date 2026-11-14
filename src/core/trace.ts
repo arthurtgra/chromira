@@ -1,4 +1,4 @@
-import type { Cell, Color, Dir, Level, Rots, Segment, TraceResult } from './types.ts';
+import type { Cell, Color, Dir, Level, Rail, Rots, Segment, TraceResult } from './types.ts';
 
 export const MAX_STEPS = 200;
 const MAX_BEAMS = 64;
@@ -22,8 +22,27 @@ export function reflect(dir: Dir, rot: number): Dir {
   return rot === 0 ? SLASH[dir] : BACKSLASH[dir];
 }
 
-export const isPiece = (c: Cell): boolean => c.t === 'mirror' || c.t === 'filter' || c.t === 'splitter';
-export const pieceStates = (c: Cell): number => (c.t === 'filter' ? 3 : 2);
+export const isPiece = (c: Cell): boolean =>
+  c.t === 'mirror' || c.t === 'filter' || c.t === 'splitter' || (c.t === 'prism' && c.rail !== undefined);
+// Estados de rotação (sem contar o trilho).
+export const baseStates = (c: Cell): number => (c.t === 'filter' ? 3 : c.t === 'prism' ? 1 : 2);
+export const railOf = (c: Cell): Rail | undefined => (c.t === 'mirror' || c.t === 'prism' ? c.rail : undefined);
+export const pieceStates = (c: Cell): number => baseStates(c) * (railOf(c)?.len ?? 1);
+export const rotOf = (c: Cell, state: number): number => state % baseStates(c);
+export const posOf = (c: Cell, state: number): number => Math.floor(state / baseStates(c));
+
+// Células na posição atual: peças em trilho saem do início do trilho para a posição do estado.
+export function placeCells(level: Level, rots: Rots): Cell[] {
+  let pi = 0;
+  return level.cells.map((c) => {
+    if (!isPiece(c)) return c;
+    const s = rots[pi++] ?? 0;
+    const rail = railOf(c);
+    if (!rail) return c;
+    const p = posOf(c, s);
+    return { ...c, x: c.x + (rail.axis === 'x' ? p : 0), y: c.y + (rail.axis === 'y' ? p : 0) };
+  });
+}
 
 export function pieces(level: Level): Cell[] {
   return level.cells.filter(isPiece);
@@ -50,7 +69,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
   const received: Record<string, number> = {};
   const queue: Beam[] = [];
   let pi = 0;
-  for (const c of level.cells) {
+  for (const c of placeCells(level, rots)) {
     const k = key(c.x, c.y);
     grid.set(k, c);
     if (isPiece(c)) pieceIdx.set(k, pi++);
@@ -94,7 +113,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
       switch (c.t) {
         case 'mirror':
           push(x, y);
-          dir = reflect(dir, rots[pieceIdx.get(k)!] ?? 0);
+          dir = reflect(dir, (rots[pieceIdx.get(k)!] ?? 0) % 2);
           break;
         case 'splitter':
           // Metade segue reto (novo feixe na fila), metade reflete como espelho.

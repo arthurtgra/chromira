@@ -357,7 +357,7 @@ export interface PieceView {
   filterColor: (i: number) => { from: number; to: number; k: number }; // índices em FILTER_COLORS
   targetFill: (x: number, y: number) => number; // 0..1
   targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
-  prismAngle: (x: number, y: number) => number; // direção da ponta (radianos, y para baixo)
+  prismAngle: (ci: number) => number; // ci = índice da célula; direção da ponta (radianos, y para baixo)
   time: number; // segundos
 }
 
@@ -493,6 +493,37 @@ export function mix(a: string, b: string, k: number): string {
   return `#${c.map((v) => v.toString(16).padStart(2, '0')).join('')}`; // hex: pode ser misturado de novo
 }
 
+// Trilho da peça arrastável: cápsula contornada cobrindo as células por onde ela desliza, com um pontinho
+// em cada parada. Desenhado por cima dos feixes (senão some quando a luz passa ao longo dele) e por baixo da peça.
+export function drawRails(ctx: Ctx, l: Layout, cells: Cell[]): void {
+  const R = CONFIG.rail;
+  ctx.save();
+  for (const c of cells) {
+    if ((c.t !== 'mirror' && c.t !== 'prism') || !c.rail) continue;
+    const n = c.rail.len - 1;
+    const [dx, dy] = c.rail.axis === 'x' ? [1, 0] : [0, 1];
+    const h = (R.width * l.cell) / 2;
+    const x0 = cx(l, c.x) - h;
+    const y0 = cy(l, c.y) - h;
+    const w = dx * n * l.cell + 2 * h;
+    const hh = dy * n * l.cell + 2 * h;
+    ctx.beginPath();
+    ctx.roundRect(x0, y0, w, hh, h);
+    ctx.fillStyle = R.fill;
+    ctx.fill();
+    ctx.strokeStyle = R.color;
+    ctx.lineWidth = R.line;
+    ctx.stroke();
+    ctx.fillStyle = R.dot;
+    for (let i = 0; i <= n; i++) {
+      ctx.beginPath();
+      ctx.arc(cx(l, c.x + dx * i), cy(l, c.y + dy * i), R.dotR * l.cell, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView): void {
   const p = CONFIG.piece;
   const c = l.cell;
@@ -502,7 +533,7 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   let pi = 0;
-  for (const cell of cells) {
+  for (const [ci, cell] of cells.entries()) {
     const x = cx(l, cell.x);
     const y = cy(l, cell.y);
     switch (cell.t) {
@@ -602,7 +633,8 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         break;
       case 'prism': {
         const s = p.prismSize * c;
-        const a = view.prismAngle(cell.x, cell.y);
+        if (cell.rail) pi++;
+        const a = view.prismAngle(ci);
         ctx.beginPath();
         for (let k = 0; k < 3; k++) {
           const t = a + (k * 2 * Math.PI) / 3;
