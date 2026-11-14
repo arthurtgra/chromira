@@ -65,6 +65,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
       if (go === 'levels') show('levels');
       else if (go === 'home') show('home');
       else if (go === 'back') show(back);
+      else if (go === 'close') setMini(false);
     });
   }
   $('#play').addEventListener('click', () => {
@@ -76,11 +77,12 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
     game.synth.uiTap();
     setMini(Boolean(mini.hidden));
   });
-  // Toque fora do mini menu fecha (sem girar peça por baixo).
+  // Toque fora do painel fecha o mini menu (sem girar peça por baixo).
   window.addEventListener(
     'pointerdown',
     (e) => {
-      if (mini.hidden || mini.contains(e.target as Node) || menuBtn.contains(e.target as Node)) return;
+      const t = e.target as Node;
+      if (mini.hidden || $('#mini-panel').contains(t) || menuBtn.contains(t)) return;
       setMini(false);
       e.stopPropagation();
       e.preventDefault();
