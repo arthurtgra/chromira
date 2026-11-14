@@ -59,6 +59,9 @@ export const CONFIG = {
       taper: 0.38, // células até a amplitude cheia, a partir de cada canto
       step: 0.05, // resolução da curva, em células
       // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
+      // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
+      // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
+      tint: { 5: 0.6 } as Partial<Record<Color, number>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,
       driftAmp: 2.1, // multiplica amp

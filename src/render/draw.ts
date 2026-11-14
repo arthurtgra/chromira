@@ -133,7 +133,10 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
     const waves =
       comps.length === 1
         ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph }))
-        : comps.map((c) => ({ color: CONFIG.colors[c], ph: (COMPONENTS.indexOf(c) * TAU) / 3 }));
+        : comps.map((c) => ({
+            color: mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
+            ph: (COMPONENTS.indexOf(c) * TAU) / 3,
+          }));
     for (const w of waves) {
       ctx.strokeStyle = w.color;
       ctx.lineWidth = W.driftWidth * l.cell;
