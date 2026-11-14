@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Prisma Game',
-        short_name: 'Prisma Game',
+        name: 'Chromira',
+        short_name: 'Chromira',
         description: 'Light puzzle: turn mirrors and light every target with the right color.',
         lang: 'en',
         start_url: './',
