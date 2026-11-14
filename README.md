@@ -1,4 +1,4 @@
-# Chromira (repo prisma_game)
+# Chromira
 
 Puzzle de luz para celular: toque nos espelhos para girá-los e nos filtros para trocar a cor que passa,
 até cada alvo receber a cor certa.
