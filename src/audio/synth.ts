@@ -8,6 +8,7 @@ export class Synth {
   private ctx: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
   private echo: AudioNode | null = null;
+  private lastTone = -1;
   private bus: AudioNode | null = null; // entrada do master: suaviza e manda para a reverberação
 
   unlock(): void {
@@ -113,7 +114,11 @@ export class Synth {
     if (!ctx || !this.noise || !this.echo) return;
     const T = A.turn;
     const t0 = ctx.currentTime;
-    const base = (filter ? T.filterHz : T.glassHz) * (1 + (Math.random() * 2 - 1) * T.detune);
+    const n = T.glassHz.length;
+    let pick = Math.floor(Math.random() * (this.lastTone < 0 ? n : n - 1));
+    if (this.lastTone >= 0 && pick >= this.lastTone) pick++; // nunca o mesmo tom duas vezes seguidas
+    this.lastTone = pick;
+    const base = T.glassHz[pick]! * (filter ? T.filterMul : 1) * (1 + (Math.random() * 2 - 1) * T.detune);
 
     const out = ctx.createGain();
     out.gain.value = A.volume * T.volume;

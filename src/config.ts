@@ -116,16 +116,17 @@ export const CONFIG = {
     // Girar peça: "tim" de vidro. Parciais inarmônicos de uma taça (agudos morrem antes) + estalo curtíssimo.
     // Frequência fixa com leve variação: nada de melodia, para não soar como piano.
     turn: {
-      glassHz: 1900,
-      filterHz: 1250, // filtro: vidro mais grosso, mais grave
-      detune: 0.025, // ± variação aleatória por toque
+      // Três tons (lá, dó, mi: acorde menor, combinam entre si), sorteados sem repetir o anterior.
+      glassHz: [880, 1046.5, 1318.5],
+      filterMul: 0.75, // filtro: mesmos tons, uma quarta abaixo (vidro mais grosso)
+      detune: 0.006, // ± variação aleatória por toque
       volume: 0.42,
       attackMs: 6, // ataque um pouco mais macio
       partials: [
         [1, 1, 320], // [razão, volume, decaimento ms]
-        [2.32, 0.5, 210],
-        [4.25, 0.26, 130],
-        [6.63, 0.12, 80],
+        [2.32, 0.32, 200], // parciais agudos mais fracos: menos estridente
+        [4.25, 0.12, 120],
+        [6.63, 0.04, 70],
       ],
       tickMs: 8,
       tickVolume: 0.14,
