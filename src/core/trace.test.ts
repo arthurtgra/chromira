@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { reflect, trace } from './trace.ts';
-import type { Cell, Dir, Level } from './types.ts';
+import type { Cell, Dir, Level, Segment } from './types.ts';
 
 const level = (cells: Cell[]): Level => ({ id: 0, w: 6, h: 8, cells });
+const geo = ({ d0: _, ...s }: Segment): Omit<Segment, 'd0'> => s;
 
 describe('reflect', () => {
   const table: [Dir, Dir, Dir][] = [
@@ -26,7 +27,7 @@ describe('trace', () => {
     ]);
     const r = trace(lv, [0]);
     expect(r.solved).toBe(true);
-    expect(r.segments).toEqual([
+    expect(r.segments.map(geo)).toEqual([
       { x1: 0, y1: 3, x2: 3, y2: 3, color: 7 },
       { x1: 3, y1: 3, x2: 3, y2: 0, color: 7 },
     ]);
@@ -40,7 +41,7 @@ describe('trace', () => {
     ]);
     const r = trace(lv, [1]);
     expect(r.solved).toBe(false);
-    expect(r.segments.at(-1)).toEqual({ x1: 3, y1: 3, x2: 3, y2: 7.5, color: 7 });
+    expect(r.segments.at(-1)).toEqual({ x1: 3, y1: 3, x2: 3, y2: 7.5, color: 7, d0: 3 });
   });
 
   it.each<[Dir, 0 | 1, Dir]>([
@@ -73,17 +74,17 @@ describe('trace', () => {
       [],
     );
     expect(r.solved).toBe(false);
-    expect(r.segments).toEqual([{ x1: 0, y1: 0, x2: 2.5, y2: 0, color: 7 }]);
+    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 0, x2: 2.5, y2: 0, color: 7 }]);
   });
 
   it('beam leaves the grid', () => {
     const r = trace(level([{ x: 0, y: 0, t: 'emitter', dir: 'S', color: 2 }]), []);
-    expect(r.segments).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 7.5, color: 2 }]);
+    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 7.5, color: 2 }]);
   });
 
   it('stops after the step limit', () => {
     const r = trace(level([{ x: 0, y: 0, t: 'emitter', dir: 'S', color: 2 }]), [], 3);
-    expect(r.segments).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 3, color: 2 }]);
+    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 3, color: 2 }]);
   });
 
   it('target with wrong color stays unlit', () => {
@@ -160,7 +161,7 @@ describe('trace', () => {
       [2],
     );
     expect(r.received['5,3']).toBe(0);
-    expect(r.segments).toEqual([{ x1: 0, y1: 3, x2: 2, y2: 3, color: 1 }]);
+    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 3, x2: 2, y2: 3, color: 1 }]);
   });
 
   it('filter matching the whole beam lets it through unchanged', () => {

@@ -40,6 +40,7 @@ export interface Segment {
   x2: number;
   y2: number;
   color: Color;
+  d0?: number; // distância do lançador até (x1, y1), pelo caminho da própria luz
 }
 
 export interface TraceResult {

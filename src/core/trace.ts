@@ -65,6 +65,7 @@ interface Beam {
   y: number;
   dir: Dir;
   color: Color;
+  d: number; // distância percorrida desde o lançador até (x, y)
 }
 
 export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): TraceResult {
@@ -78,7 +79,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
     grid.set(k, c);
     if (isPiece(c)) pieceIdx.set(k, pi++);
     else if (c.t === 'target') received[k] = 0;
-    else if (c.t === 'emitter') queue.push({ x: c.x, y: c.y, dir: c.dir, color: c.color });
+    else if (c.t === 'emitter') queue.push({ x: c.x, y: c.y, dir: c.dir, color: c.color, d: 0 });
   }
 
   const segments: Segment[] = [];
@@ -95,10 +96,14 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
     let { x, y, dir, color } = b;
     let sx = x;
     let sy = y;
+    let dist = b.d;
+    let sd = b.d; // distância no início do trecho atual
     const push = (ex: number, ey: number): void => {
-      if (ex !== sx || ey !== sy) segments.push({ x1: sx, y1: sy, x2: ex, y2: ey, color });
+      const ed = dist - Math.abs(x - ex) - Math.abs(y - ey);
+      if (ex !== sx || ey !== sy) segments.push({ x1: sx, y1: sy, x2: ex, y2: ey, color, d0: sd });
       sx = ex;
       sy = ey;
+      sd = ed;
     };
 
     let ended = false;
@@ -106,6 +111,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
       const [dx, dy] = DELTA[dir];
       x += dx;
       y += dy;
+      dist += 1;
       if (x < 0 || y < 0 || x >= level.w || y >= level.h) {
         push(x - dx * 0.5, y - dy * 0.5);
         ended = true;
@@ -125,7 +131,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
           const pass = color & ~c.color;
           if (refl === 0) break;
           push(x, y);
-          if (pass !== 0) queue.push({ x, y, dir, color: pass as Color });
+          if (pass !== 0) queue.push({ x, y, dir, color: pass as Color, d: dist });
           color = refl as Color;
           dir = reflect(dir, (rots[pieceIdx.get(k)!] ?? 0) % 2);
           break;
@@ -133,7 +139,7 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
         case 'splitter':
           // Metade segue reto (novo feixe na fila), metade reflete como espelho.
           push(x, y);
-          queue.push({ x, y, dir, color });
+          queue.push({ x, y, dir, color, d: dist });
           dir = reflect(dir, rots[pieceIdx.get(k)!] ?? 0);
           break;
         case 'filter': {
@@ -151,9 +157,9 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
           break;
         case 'prism':
           push(x, y);
-          if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1 });
-          if (color & 2) queue.push({ x, y, dir, color: 2 });
-          if (color & 4) queue.push({ x, y, dir: RIGHT[dir], color: 4 });
+          if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1, d: dist });
+          if (color & 2) queue.push({ x, y, dir, color: 2, d: dist });
+          if (color & 4) queue.push({ x, y, dir: RIGHT[dir], color: 4, d: dist });
           ended = true;
           break;
         default:

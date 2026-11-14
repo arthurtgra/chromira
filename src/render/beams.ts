@@ -41,7 +41,9 @@ export function planBeams(prev: Segment[], next: Segment[]): BeamPlan {
   let from = Infinity;
   let to = 0;
   const pieces = next.map((s): BeamPiece => {
-    const d0 = reach.get(pkey(s.x1, s.y1)) ?? 0;
+    // Distância vem do trace (caminho real da luz). Sem ela, cai no ponto já alcançado — que pode ser de
+    // outro feixe passando pelo mesmo espelho e faria a luz nascer ali antes de chegar.
+    const d0 = s.d0 ?? reach.get(pkey(s.x1, s.y1)) ?? 0;
     const len = segLen(s);
     const known = covered(s, prev);
     const end = pkey(s.x2, s.y2);
