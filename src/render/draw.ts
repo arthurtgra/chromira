@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT } from '../core/trace.ts';
+import { DELTA, FILTER_COLORS } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
 import { cut, reachedEnd, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
@@ -249,27 +249,21 @@ export function drawImpacts(
 
 const DIRS: Dir[] = ['N', 'E', 'S', 'W'];
 
-// Prisma aceso: só degradês radiais, sem contornos. Um brilho branco/da cor que entra no centro e,
-// para cada cor que sai, um lóbulo dessa cor deslocado para o lado exato por onde ela sai
-// (vermelho vira à esquerda, verde segue, azul vira à direita — igual ao trace). Pulsa devagar.
-// segments = trechos já visíveis: o brilho aparece quando a luz chega ao prisma, sem depender do resto da animação.
+// Prisma aceso: halo contínuo em volta, com as cores girando como num arco-íris — cada cor que sai fica
+// virada para o lado por onde sai (vermelho à esquerda, verde reto, azul à direita, igual ao trace) e as
+// misturas no meio (amarelo, ciano; rosa atrás). Por cima, raiozinhos finos que tremulam. Pulsa devagar.
+// segments = trechos já visíveis: o brilho aparece quando a luz chega ao prisma.
+let haloCanvas: HTMLCanvasElement | null = null;
+
+const rgba = (hex: string, a: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
+
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   const P = CONFIG.rainbow.prism;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
-  const blob = (x: number, y: number, r: number, color: string, alpha: number): void => {
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, color);
-    g.addColorStop(0.45, color);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
-  };
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
   for (const p of cells) {
     if (p.t !== 'prism') continue;
     const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y);
@@ -277,35 +271,85 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const dir = DIRS.find((d) => DELTA[d][0] === Math.sign(inc.x2 - inc.x1) && DELTA[d][1] === Math.sign(inc.y2 - inc.y1))!;
     const x = cx(l, p.x);
     const y = cy(l, p.y);
-    const exits: [Color, Dir][] = [
-      [1, LEFT[dir]],
-      [2, dir],
-      [4, RIGHT[dir]],
+    const R = P.halo * l.cell * (0.94 + 0.06 * pulse);
+    const a0 = Math.atan2(DELTA[dir][1], DELTA[dir][0]);
+    const has = (c: number): boolean => (inc.color & c) === c;
+    // Volta completa a partir da direção reta (verde), no sentido horário da tela.
+    const stops: [number, Color, number][] = [
+      [0, 2, 1],
+      [0.125, 6, P.mixAlpha],
+      [0.25, 4, 1],
+      [0.375, 5, P.mixAlpha],
+      [0.5, 5, P.mixAlpha * 0.6],
+      [0.625, 5, P.mixAlpha],
+      [0.75, 1, 1],
+      [0.875, 3, P.mixAlpha],
+      [1, 2, 1],
     ];
-    for (const [c, d] of exits) {
-      if ((inc.color & c) === 0) continue;
-      const off = P.lobeOffset * l.cell;
-      blob(x + DELTA[d][0] * off, y + DELTA[d][1] * off, P.lobe * l.cell, CONFIG.colors[c], k * P.lobeAlpha * (0.8 + 0.2 * pulse));
+    const at = (t: number): [string, number] => {
+      const [, c, a] = stops.reduce((best, s) => (Math.abs(s[0] - t) < Math.abs(best[0] - t) ? s : best));
+      return [CONFIG.colors[c], has(c) ? a : 0];
+    };
+
+    // Halo: degradê cônico (cores em volta) recortado por um radial (some para fora), num canvas à parte.
+    const size = Math.ceil(R * 2);
+    haloCanvas ??= document.createElement('canvas');
+    if (haloCanvas.width < size) haloCanvas.width = haloCanvas.height = size;
+    const h = haloCanvas.getContext('2d')!;
+    h.clearRect(0, 0, size, size);
+    h.globalCompositeOperation = 'source-over';
+    const cone = h.createConicGradient(a0, R, R);
+    for (const [t, c, a] of stops) cone.addColorStop(t, rgba(CONFIG.colors[c], has(c) ? a : 0));
+    h.fillStyle = cone;
+    h.fillRect(0, 0, size, size);
+    h.globalCompositeOperation = 'destination-in';
+    const fall = h.createRadialGradient(R, R, R * P.haloInner, R, R, R);
+    fall.addColorStop(0, 'rgba(0,0,0,1)');
+    fall.addColorStop(0.35, 'rgba(0,0,0,0.6)');
+    fall.addColorStop(1, 'rgba(0,0,0,0)');
+    h.fillStyle = fall;
+    h.fillRect(0, 0, size, size);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = k * P.haloAlpha;
+    ctx.drawImage(haloCanvas, 0, 0, size, size, x - R, y - R, size, size);
+
+    // Miolo fraco na cor que entra.
+    const g = ctx.createRadialGradient(x, y, 0, x, y, P.core * l.cell);
+    g.addColorStop(0, CONFIG.colors[inc.color]);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = k * P.coreAlpha;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, P.core * l.cell, 0, TAU);
+    ctx.fill();
+
+    // Raiozinhos: traços finos saindo do centro, girando devagar, cada um com seu próprio tremor.
+    ctx.lineCap = 'round';
+    ctx.lineWidth = P.rays.width;
+    for (let i = 0; i < P.rays.count; i++) {
+      const t = (i / P.rays.count + st.time * P.rays.spin) % 1;
+      const [col, a] = at(t);
+      if (a === 0) continue;
+      const flick = 0.5 + 0.5 * Math.sin(st.time * (2.1 + (i % 5) * 0.7) + i * 2.4);
+      const ang = a0 + t * TAU;
+      const r0 = P.rays.from * l.cell;
+      const r1 = r0 + (P.rays.len[0] + (P.rays.len[1] - P.rays.len[0]) * flick) * l.cell;
+      const ux = Math.cos(ang);
+      const uy = Math.sin(ang);
+      const lg = ctx.createLinearGradient(x + ux * r0, y + uy * r0, x + ux * r1, y + uy * r1);
+      lg.addColorStop(0, rgba(col, 0.9 * a));
+      lg.addColorStop(1, rgba(col, 0));
+      ctx.globalAlpha = k * P.rays.alpha * (0.5 + 0.5 * flick);
+      ctx.strokeStyle = lg;
+      ctx.beginPath();
+      ctx.moveTo(x + ux * r0, y + uy * r0);
+      ctx.lineTo(x + ux * r1, y + uy * r1);
+      ctx.stroke();
     }
-    // Entre dois lóbulos vizinhos, um brilho menor da mistura deles: amarelo entre vermelho e verde,
-    // ciano entre verde e azul, rosa atrás (vermelho e azul saem em lados opostos).
-    const back = OPP[dir];
-    const mixes: [Color, Dir, Dir][] = [
-      [3, LEFT[dir], dir],
-      [6, dir, RIGHT[dir]],
-      [5, RIGHT[dir], back],
-      [5, back, LEFT[dir]],
-    ];
-    for (const [c, d1, d2] of mixes) {
-      if ((inc.color & c) !== c) continue;
-      const off = (P.mixOffset * l.cell) / Math.SQRT2;
-      const mx = x + (DELTA[d1][0] + DELTA[d2][0]) * off;
-      const my = y + (DELTA[d1][1] + DELTA[d2][1]) * off;
-      blob(mx, my, P.mix * l.cell, CONFIG.colors[c], k * P.mixAlpha * (0.8 + 0.2 * pulse));
-    }
-    blob(x, y, P.core * l.cell * (0.92 + 0.08 * pulse), CONFIG.colors[inc.color], k * P.coreAlpha);
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 export interface PieceView {

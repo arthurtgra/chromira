@@ -106,14 +106,13 @@ export const CONFIG = {
     prism: {
       alpha: [0.8, 1], // [sem arco-íris, arco-íris total]
       pulseHz: 0.55,
-      core: 0.45, // brilho central (cor que entra), raio em células
-      coreAlpha: 0.1, // fraco: com 'lighter' o miolo branco estourava
-      lobe: 0.38, // brilho de cada cor que sai, raio em células
-      lobeOffset: 0.27, // deslocamento do lóbulo para o lado de saída, em células
-      lobeAlpha: 0.65,
-      mix: 0.26, // brilho da mistura entre dois lóbulos (amarelo, ciano, rosa), raio em células
-      mixOffset: 0.3,
-      mixAlpha: 0.35,
+      core: 0.3, // brilho central (cor que entra), raio em células
+      coreAlpha: 0.12, // fraco: com 'lighter' o miolo branco estourava
+      halo: 0.62, // halo contínuo em volta, raio em células
+      haloInner: 0.12, // fração do raio onde o halo começa a sumir
+      haloAlpha: 0.95,
+      mixAlpha: 0.55, // força das misturas (amarelo, ciano, rosa) relativa às cores puras
+      rays: { count: 18, width: 1.3, from: 0.18, len: [0.22, 0.5], alpha: 0.7, spin: 0.015 },
     },
   },
 
