@@ -1,6 +1,12 @@
 # Prisma Game (prisma_game)
 
-Puzzle de luz para celular: toque nos espelhos para girá-los até cada alvo receber a cor certa.
+Puzzle de luz para celular: toque nos espelhos para girá-los e nos filtros para trocar a cor que passa,
+até cada alvo receber a cor certa.
+
+Peças: emissor, espelho (2 estados), filtro (vermelho/verde/azul, 3 estados), prisma, parede, alvo.
+40 fases: 1–10 apresentam espelho, cor e prisma; 11–13 o filtro; depois três faixas geradas
+(espelhos → filtro + prisma → tudo), cada uma ordenada pela nota de `difficultyScore`.
+Os marcadores no topo (1–5) mostram a dificuldade; a partir de 3, os feixes brancos ganham difração em arco-íris.
 TypeScript + Vite + Canvas 2D, sem engine. Som sintetizado (Web Audio). PWA instalável e offline.
 
 ## Rodar
@@ -11,7 +17,7 @@ npm run dev            # abre em http://localhost:5173 e expõe na rede (celular
 npm test               # Vitest em watch
 npm run build          # tsc + bundle em dist/
 npm run check-levels   # solver em todas as fases; falha se alguma não tiver solução
-npm run gen-levels     # regenera src/levels/levels.json (10 à mão + 20 geradas)
+npm run gen-levels     # regenera src/levels/levels.json (13 à mão + 27 geradas)
 npm run icons          # regenera public/icon-*.png
 ```
 

@@ -139,6 +139,43 @@ describe('trace', () => {
     expect(r.solved).toBe(true);
   });
 
+  it('filter keeps only its color and recolors the beam', () => {
+    const lv = level([
+      { x: 0, y: 3, t: 'emitter', dir: 'E', color: 7 },
+      { x: 2, y: 3, t: 'filter' },
+      { x: 5, y: 3, t: 'target', color: 2 },
+    ]);
+    expect(trace(lv, [0]).received['5,3']).toBe(1);
+    expect(trace(lv, [1]).solved).toBe(true);
+    expect(trace(lv, [1]).segments.map((s) => s.color)).toEqual([7, 2]);
+  });
+
+  it('filter blocks a beam with none of its color', () => {
+    const r = trace(
+      level([
+        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 1 },
+        { x: 2, y: 3, t: 'filter' },
+        { x: 5, y: 3, t: 'target', color: 1 },
+      ]),
+      [2],
+    );
+    expect(r.received['5,3']).toBe(0);
+    expect(r.segments).toEqual([{ x1: 0, y1: 3, x2: 2, y2: 3, color: 1 }]);
+  });
+
+  it('filter matching the whole beam lets it through unchanged', () => {
+    const r = trace(
+      level([
+        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 4 },
+        { x: 2, y: 3, t: 'filter' },
+        { x: 5, y: 3, t: 'target', color: 4 },
+      ]),
+      [2],
+    );
+    expect(r.solved).toBe(true);
+    expect(r.segments).toHaveLength(1);
+  });
+
   it('prism only emits components present in the beam', () => {
     const r = trace(
       level([

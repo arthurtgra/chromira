@@ -33,14 +33,14 @@ export class Synth {
     return this.muted || !this.ctx ? null : this.ctx;
   }
 
-  click(): void {
+  click(hz: number = A.clickFilterHz): void {
     const ctx = this.ready();
     if (!ctx || !this.noise) return;
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.value = A.clickFilterHz;
+    filter.frequency.value = hz;
     const gain = ctx.createGain();
     gain.gain.value = A.volume * 1.5;
     src.connect(filter).connect(gain).connect(ctx.destination);

@@ -1,10 +1,11 @@
 import { Synth } from './audio/synth.ts';
 import { CONFIG } from './config.ts';
-import { key, startRots, trace } from './core/trace.ts';
-import type { Level, Rots, TraceResult } from './core/types.ts';
+import { key, pieceStates, pieces, startRots, trace } from './core/trace.ts';
+import type { Cell, Level, Rots, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { drawBackground, drawBeams, drawDebug, drawHud, drawPieces } from './render/draw.ts';
+import { drawBackground, drawBeams, drawDebug, drawPieces, drawPrismFans, type BeamStyle } from './render/draw.ts';
 import { Fx } from './render/fx.ts';
+import { drawHud } from './render/hud.ts';
 import { computeLayout, cx, cy, type Layout } from './render/layout.ts';
 import { writeSave } from './save.ts';
 
@@ -12,7 +13,8 @@ const QUARTER = Math.PI / 2;
 const easeOut = (t: number): number => 1 - (1 - t) ** 3;
 const clamp01 = (t: number): number => Math.min(1, Math.max(0, t));
 
-interface Spin {
+// Animação de uma peça móvel: espelho gira (ângulo), filtro troca de cor (índice).
+interface Anim {
   from: number;
   to: number;
   at: number;
@@ -27,40 +29,37 @@ export class Game {
   private level!: Level;
   private rots: Rots = [];
   private result!: TraceResult;
-  private mirrorCells: { x: number; y: number }[] = [];
-  private spins: Spin[] = [];
+  private pieceCells: Cell[] = [];
+  private anims: Anim[] = [];
   private now = 0;
+  private loadedAt = 0;
   private beamAt = 0;
   private pending = false;
   private pendingDown = false;
   private litAt = new Map<string, number>();
   private wonAt: number | null = null;
   private fps = 60;
-
   private readonly levels: Level[];
 
   constructor(levels: Level[]) {
     this.levels = levels;
   }
 
-  get levelIndex(): number {
-    return this.index;
-  }
-
   load(index: number): void {
     this.index = ((index % this.levels.length) + this.levels.length) % this.levels.length;
     this.level = this.levels[this.index]!;
     this.rots = startRots(this.level);
-    this.mirrorCells = this.level.cells.filter((c) => c.t === 'mirror');
-    this.spins = this.rots.map((r) => {
-      const a = r === 0 ? -QUARTER / 2 : QUARTER / 2;
-      return { from: a, to: a, at: -Infinity };
+    this.pieceCells = pieces(this.level);
+    this.anims = this.rots.map((r, i) => {
+      const v = this.pieceCells[i]!.t === 'mirror' ? (r === 0 ? -QUARTER / 2 : QUARTER / 2) : r;
+      return { from: v, to: v, at: -Infinity };
     });
     this.result = trace(this.level, this.rots);
     this.litAt = new Map(this.litKeys(this.result).map((k) => [k, -Infinity]));
     this.pending = false;
     this.pendingDown = false;
     this.beamAt = this.now;
+    this.loadedAt = this.now;
     this.wonAt = null;
     this.fx.clear();
     writeSave({ level: this.index, muted: this.synth.muted });
@@ -80,13 +79,19 @@ export class Game {
     if (this.wonAt !== null) return;
     const c = cellAt(this.layout, px, py, this.level.w, this.level.h);
     if (!c) return;
-    const i = this.mirrorCells.findIndex((m) => m.x === c.x && m.y === c.y);
+    const i = this.pieceCells.findIndex((m) => m.x === c.x && m.y === c.y);
     if (i < 0) return;
+    const cell = this.pieceCells[i]!;
 
-    this.rots[i] = this.rots[i] === 0 ? 1 : 0;
-    const s = this.spins[i]!;
-    this.spins[i] = { from: this.spinAngle(s), to: s.to + QUARTER, at: this.now };
-    this.synth.click();
+    this.rots[i] = (this.rots[i]! + 1) % pieceStates(cell);
+    const a = this.anims[i]!;
+    if (cell.t === 'mirror') {
+      this.anims[i] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
+      this.synth.click();
+    } else {
+      this.anims[i] = { from: a.to, to: this.rots[i]!, at: this.now };
+      this.synth.click(CONFIG.audio.filterClickHz);
+    }
     navigator.vibrate?.(CONFIG.vibrateMs);
 
     this.result = trace(this.level, this.rots);
@@ -129,28 +134,58 @@ export class Game {
     const bg = CONFIG.backgrounds[Math.floor(this.index / 5) % CONFIG.backgrounds.length]!;
     drawBackground(ctx, l, bg, this.level.w, this.level.h);
     const grow = this.wonAt === null ? 0 : easeOut(clamp01((this.now - this.wonAt) / CONFIG.beam.winGrowMs));
-    drawBeams(ctx, l, this.result.segments, this.beamT(), 1 + (CONFIG.beam.winWidthMul - 1) * grow);
+    const style: BeamStyle = {
+      t: this.beamT(),
+      widthMul: 1 + (CONFIG.beam.winWidthMul - 1) * grow,
+      rainbow: this.rainbow(),
+      time: this.now / 1000,
+    };
+    drawPrismFans(ctx, l, this.level.cells, this.result.segments, style);
+    drawBeams(ctx, l, this.result.segments, style);
     drawPieces(ctx, l, this.level.cells, {
-      mirrorAngle: (i) => this.spinAngle(this.spins[i]!),
+      mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
+      filterColor: (i) => {
+        const a = this.anims[i]!;
+        return { from: a.from, to: a.to, k: easeOut(clamp01((this.now - a.at) / CONFIG.filterSwapMs)) };
+      },
       targetFill: (x, y) => {
         const at = this.litAt.get(key(x, y));
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
     });
     this.fx.draw(ctx, l.w, l.h);
-    drawHud(ctx, l, this.index + 1);
+    drawHud(ctx, l, {
+      level: this.index + 1,
+      difficulty: this.level.difficulty ?? 1,
+      appear: this.now - this.loadedAt,
+      win: this.wonAt === null ? 0 : Math.sin(Math.PI * clamp01((this.now - this.wonAt) / CONFIG.winDelayMs)),
+      rainbow: this.rainbow(),
+      time: this.now / 1000,
+      accent: this.accent(),
+    });
     if (this.debug) drawDebug(ctx, l, this.level.w, this.level.h, this.fps);
+  }
+
+  private rainbow(): number {
+    const d = this.level.difficulty ?? 1;
+    const from = CONFIG.rainbow.fromDifficulty;
+    return d < from ? 0 : clamp01((d - from + 1) / (5 - from + 1));
+  }
+
+  private accent(): string {
+    const t = this.level.cells.find((c) => c.t === 'target');
+    return t?.t === 'target' ? CONFIG.colors[t.color] : '#ffffff';
   }
 
   private win(): void {
     this.wonAt = this.now;
-    const big = (this.index + 1) % 5 === 0;
-    this.synth.chord(big);
+    this.synth.chord((this.index + 1) % 5 === 0);
     this.fx.flash();
     this.fx.burst(
       this.level.cells.flatMap((c) =>
         c.t === 'target' ? [{ x: cx(this.layout, c.x), y: cy(this.layout, c.y), color: CONFIG.colors[c.color] }] : [],
       ),
+      this.rainbow(),
     );
   }
 
@@ -158,8 +193,8 @@ export class Game {
     return clamp01((this.now - this.beamAt) / CONFIG.beam.drawMs);
   }
 
-  private spinAngle(s: Spin): number {
-    return s.from + (s.to - s.from) * easeOut(clamp01((this.now - s.at) / CONFIG.mirrorSpinMs));
+  private animValue(a: Anim, ms: number): number {
+    return a.from + (a.to - a.from) * easeOut(clamp01((this.now - a.at) / ms));
   }
 
   private litKeys(r: TraceResult): string[] {

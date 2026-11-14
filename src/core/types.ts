@@ -4,21 +4,25 @@ export type Color = 1 | 2 | 3 | 4 | 5 | 6 | 7; // bitmask R=1 G=2 B=4
 export type Cell =
   | { x: number; y: number; t: 'emitter'; dir: Dir; color: Color }
   | { x: number; y: number; t: 'mirror' } // estado fica em rots
+  | { x: number; y: number; t: 'filter' } // estado fica em rots
   | { x: number; y: number; t: 'wall' }
   | { x: number; y: number; t: 'target'; color: Color }
   | { x: number; y: number; t: 'prism' };
 
-// start = estado inicial dos espelhos (ausente = todos '/')
+// start = estado inicial das peças móveis (ausente = todas no estado 0)
+// difficulty = 1..5, calculada pelo script gen-levels
 export interface Level {
   id: number;
   w: 6;
   h: 8;
   cells: Cell[];
   start?: Rots;
+  difficulty?: number;
 }
 
-// rots[i] = estado do i-ésimo espelho em level.cells: 0 = '/', 1 = '\'
-export type Rots = (0 | 1)[];
+// rots[i] = estado da i-ésima peça móvel (espelho ou filtro) em level.cells.
+// espelho: 0 = '/', 1 = '\'. filtro: 0 = vermelho, 1 = verde, 2 = azul.
+export type Rots = number[];
 
 export interface Segment {
   x1: number;

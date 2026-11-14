@@ -30,7 +30,8 @@ export class Fx {
     this.pulses.push({ x, y, age: 0, color, radius: CONFIG.pulse.radius * cell });
   }
 
-  burst(points: { x: number; y: number; color: string }[]): void {
+  // rainbow 0..1: fração das partículas pintadas com cores do espectro.
+  burst(points: { x: number; y: number; color: string }[], rainbow = 0): void {
     const p = CONFIG.particles;
     const n = Math.round(rand(p.min, p.max));
     for (let i = 0; i < n && points.length > 0; i++) {
@@ -46,7 +47,7 @@ export class Fx {
         life: max,
         max,
         size: rand(p.size[0], p.size[1]),
-        color: src.color,
+        color: Math.random() < rainbow ? `hsl(${Math.floor(Math.random() * 300)}, 100%, 62%)` : src.color,
       });
     }
   }

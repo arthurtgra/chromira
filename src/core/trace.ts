@@ -13,11 +13,19 @@ const SLASH: Record<Dir, Dir> = { E: 'N', W: 'S', N: 'E', S: 'W' };
 const BACKSLASH: Record<Dir, Dir> = { E: 'S', W: 'N', N: 'W', S: 'E' };
 export const LEFT: Record<Dir, Dir> = { E: 'N', N: 'W', W: 'S', S: 'E' };
 export const RIGHT: Record<Dir, Dir> = { E: 'S', S: 'W', W: 'N', N: 'E' };
+export const FILTER_COLORS: readonly Color[] = [1, 2, 4];
 
 export const key = (x: number, y: number): string => `${x},${y}`;
 
-export function reflect(dir: Dir, rot: 0 | 1): Dir {
+export function reflect(dir: Dir, rot: number): Dir {
   return rot === 0 ? SLASH[dir] : BACKSLASH[dir];
+}
+
+export const isPiece = (c: Cell): boolean => c.t === 'mirror' || c.t === 'filter';
+export const pieceStates = (c: Cell): number => (c.t === 'filter' ? 3 : 2);
+
+export function pieces(level: Level): Cell[] {
+  return level.cells.filter(isPiece);
 }
 
 export function mirrorCount(level: Level): number {
@@ -25,7 +33,7 @@ export function mirrorCount(level: Level): number {
 }
 
 export function startRots(level: Level): Rots {
-  return level.start ? [...level.start] : new Array<0 | 1>(mirrorCount(level)).fill(0);
+  return level.start ? [...level.start] : new Array<number>(pieces(level).length).fill(0);
 }
 
 interface Beam {
@@ -37,14 +45,14 @@ interface Beam {
 
 export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): TraceResult {
   const grid = new Map<string, Cell>();
-  const mirrorIdx = new Map<string, number>();
+  const pieceIdx = new Map<string, number>();
   const received: Record<string, number> = {};
   const queue: Beam[] = [];
-  let mi = 0;
+  let pi = 0;
   for (const c of level.cells) {
     const k = key(c.x, c.y);
     grid.set(k, c);
-    if (c.t === 'mirror') mirrorIdx.set(k, mi++);
+    if (isPiece(c)) pieceIdx.set(k, pi++);
     else if (c.t === 'target') received[k] = 0;
     else if (c.t === 'emitter') queue.push({ x: c.x, y: c.y, dir: c.dir, color: c.color });
   }
@@ -60,11 +68,11 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
     seen.add(sig);
     beams++;
 
-    let { x, y, dir } = b;
+    let { x, y, dir, color } = b;
     let sx = x;
     let sy = y;
     const push = (ex: number, ey: number): void => {
-      if (ex !== sx || ey !== sy) segments.push({ x1: sx, y1: sy, x2: ex, y2: ey, color: b.color });
+      if (ex !== sx || ey !== sy) segments.push({ x1: sx, y1: sy, x2: ex, y2: ey, color });
       sx = ex;
       sy = ey;
     };
@@ -85,18 +93,26 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
       switch (c.t) {
         case 'mirror':
           push(x, y);
-          dir = reflect(dir, rots[mirrorIdx.get(k)!] ?? 0);
+          dir = reflect(dir, rots[pieceIdx.get(k)!] ?? 0);
           break;
+        case 'filter': {
+          const passed = color & FILTER_COLORS[rots[pieceIdx.get(k)!] ?? 0]!;
+          if (passed === color) break;
+          push(x, y);
+          if (passed === 0) ended = true;
+          else color = passed as Color;
+          break;
+        }
         case 'target':
           push(x, y);
-          received[k] = (received[k] ?? 0) | b.color;
+          received[k] = (received[k] ?? 0) | color;
           ended = true;
           break;
         case 'prism':
           push(x, y);
-          if (b.color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1 });
-          if (b.color & 2) queue.push({ x, y, dir, color: 2 });
-          if (b.color & 4) queue.push({ x, y, dir: RIGHT[dir], color: 4 });
+          if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1 });
+          if (color & 2) queue.push({ x, y, dir, color: 2 });
+          if (color & 4) queue.push({ x, y, dir: RIGHT[dir], color: 4 });
           ended = true;
           break;
         default:

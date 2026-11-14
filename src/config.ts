@@ -2,28 +2,37 @@
 import type { Color } from './core/types.ts';
 
 export const CONFIG = {
-  // Fundo muda um tom a cada 5 fases.
-  backgrounds: ['#0B0B12', '#0B0E14', '#100B14', '#0B1210', '#120F0B', '#0E0B16'],
-  gridDotAlpha: 0.08,
+  // Fundo: [centro, borda] da vinheta; muda um tom a cada 5 fases.
+  backgrounds: [
+    ['#141428', '#07070D'],
+    ['#10203A', '#06080F'],
+    ['#22123A', '#09060F'],
+    ['#0E2A2A', '#050B0B'],
+    ['#2A1A10', '#0B0705'],
+    ['#1E1040', '#07050F'],
+    ['#2A0F2A', '#0B050B'],
+    ['#0F1F40', '#05070F'],
+  ],
+  gridDotAlpha: 0.1,
   gridDotRadius: 1.5,
 
   colors: {
-    1: '#ff2a3a',
-    2: '#2aff5a',
-    3: '#ffee30',
-    4: '#3a6aff',
-    5: '#ff3af0',
-    6: '#30f6ff',
-    7: '#ffffff',
+    1: '#ff3358',
+    2: '#29f58a',
+    3: '#ffd93d',
+    4: '#4c7dff',
+    5: '#ff4fd1',
+    6: '#33e6ff',
+    7: '#f4f6ff',
   } satisfies Record<Color, string>,
 
-  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, wallSize: 0.56, ringRadius: 0.3, prismSize: 0.36 },
+  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, wallSize: 0.56, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
 
   beam: {
     // Desenhado três vezes com 'lighter': largo/fraco, médio, fino/forte. Larguras em fração da célula.
     layers: [
-      { width: 0.32, alpha: 0.1 },
-      { width: 0.12, alpha: 0.3 },
+      { width: 0.34, alpha: 0.1 },
+      { width: 0.13, alpha: 0.32 },
       { width: 0.035, alpha: 1 },
     ],
     drawMs: 150,
@@ -31,7 +40,19 @@ export const CONFIG = {
     winGrowMs: 300,
   },
 
+  // Difração em arco-íris: liga a partir deste número de marcadores de dificuldade.
+  rainbow: {
+    fromDifficulty: 3,
+    fringes: 7, // franjas coloridas em volta do feixe branco
+    spread: 0.16, // afastamento máximo das franjas, fração da célula
+    alpha: 0.7,
+    shimmerHz: 0.6,
+    fanRadius: 1.25, // leque do prisma, em células
+    fanAlpha: [0.12, 0.38], // [sem arco-íris, arco-íris total]
+  },
+
   mirrorSpinMs: 80,
+  filterSwapMs: 160,
   pulse: { ms: 450, radius: 0.9 },
   targetFillMs: 200,
 
@@ -43,6 +64,7 @@ export const CONFIG = {
     volume: 0.22,
     clickMs: 30,
     clickFilterHz: 2400,
+    filterClickHz: 4200,
     scale: [261.63, 293.66, 329.63, 392.0, 440.0], // dó ré mi sol lá
     noteMs: 320,
     downMs: 140,
@@ -53,7 +75,16 @@ export const CONFIG = {
   },
   vibrateMs: 10,
 
-  layout: { pad: 16, top: 72, bottom: 32 },
-  hudFont: '600 20px system-ui, sans-serif',
-  hudAlpha: 0.55,
+  layout: { pad: 16, top: 116, bottom: 28 },
+  hud: {
+    fontPx: 56,
+    font: '800 56px system-ui, -apple-system, "Segoe UI", sans-serif',
+    y: 50,
+    appearMs: 650,
+    winScale: 0.22,
+    breathe: 0.03,
+    pipY: 92,
+    pipSize: 5,
+    pipGap: 18,
+  },
 } as const;
