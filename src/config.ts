@@ -1,20 +1,23 @@
 // Todos os números de sensação. Ajuste à mão, salve e sinta no celular.
 import type { Color } from './core/types.ts';
 
+// Cor da dificuldade 1..5: azul (fácil) → ciano → verde → amarelo → vermelho (difícil).
+export const difficultyHue = (d: number): number => 220 - (Math.min(5, Math.max(1, d)) - 1) * 55;
+
 export const CONFIG = {
     // Fundo: [centro, borda] da vinheta, tons neutros. Muda a cada fase, com transição suave.
-  // Um tom por bloco de 10 fases (1-10, 11-20...), escuros mas bem distintos entre si.
+  // Um tom por bloco de 10 fases, seguindo a cor da dificuldade: azul (fácil) até vermelho (fase 100).
   backgrounds: [
-    ['#202029', '#0a0a0e'], // grafite
-    ['#132a48', '#060c17'], // azul-noite
-    ['#0f3430', '#051110'], // verde-petróleo
-    ['#2c1d4a', '#0d0817'], // violeta
-    ['#3e1a29', '#12070b'], // vinho
-    ['#203418', '#090f07'], // musgo
-    ['#3c2a13', '#120c05'], // âmbar queimado
-    ['#152b3e', '#060b11'], // ardósia azul
-    ['#3a1a3d', '#110712'], // ameixa
-    ['#1b1d4f', '#07081b'], // índigo (final, 91-100)
+    ['#151f37', '#070a10'], // azul
+    ['#152937', '#070c10'], // azul-ciano
+    ['#142f34', '#070f10'], // ciano
+    ['#132f28', '#080f0d'], // verde-água
+    ['#152e1b', '#080f0a'], // verde
+    ['#232e15', '#0c0f08'], // verde-oliva
+    ['#352e13', '#100e07'], // âmbar
+    ['#3a2612', '#100b07'], // laranja
+    ['#3f1d12', '#110906'], // vermelho-laranja
+    ['#4a1111', '#150707'], // vermelho
   ],
   backgroundFadeMs: 900,
   gridDotAlpha: 0.1,

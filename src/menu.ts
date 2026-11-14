@@ -1,4 +1,5 @@
 import type { Game } from './game.ts';
+import { difficultyHue } from './config.ts';
 import { logoSvg } from './logo.ts';
 
 type Screen = 'home' | 'levels' | null;
@@ -45,7 +46,7 @@ export function setupMenu(game: Game, startOnHome: boolean, mark?: (i: number) =
         const b = document.createElement('button');
         b.className = 'lvl';
         b.textContent = String(i + 1);
-        b.style.setProperty('--c', `hsl(${(game.difficulty(i) - 1) * 60}, 90%, 64%)`);
+        b.style.setProperty('--c', `hsl(${difficultyHue(game.difficulty(i))}, 90%, 64%)`);
         if (game.done.has(i)) b.classList.add('done');
         else if (i <= open) b.classList.add('open');
         else b.classList.add('locked');

@@ -1,4 +1,4 @@
-import { CONFIG } from '../config.ts';
+import { CONFIG, difficultyHue } from '../config.ts';
 import type { Layout } from './layout.ts';
 
 export interface HudState {
@@ -61,7 +61,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
     const bx = x - total / 2 + i * (H.barW + H.barGap);
     const w = H.barW * a;
     ctx.globalAlpha = on ? 0.95 : 0.16;
-    ctx.fillStyle = on ? `hsl(${i * 60}, 90%, 64%)` : '#ffffff';
+    ctx.fillStyle = on ? `hsl(${difficultyHue(i + 1)}, 90%, 64%)` : '#ffffff';
     ctx.beginPath();
     ctx.roundRect(bx + (H.barW - w) / 2, H.barY - H.barH / 2, w, H.barH, H.barH / 2);
     ctx.fill();
