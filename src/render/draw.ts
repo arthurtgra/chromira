@@ -409,8 +409,9 @@ function drawEmitter(ctx: Ctx, x: number, y: number, c: number, dir: Dir, color:
   ctx.globalCompositeOperation = 'source-over';
 
   ctx.globalAlpha = 1;
-  ctx.fillStyle = E.fill;
-  ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+  // tinted: corpo pintado da cor que emite (escurecida), contorno na cor; lente clareada.
+  ctx.fillStyle = E.tinted ? mix(E.fill, col, 0.38) : E.fill;
+  ctx.strokeStyle = E.tinted ? col : 'rgba(255,255,255,0.85)';
   ctx.lineWidth = CONFIG.piece.stroke;
   ctx.beginPath();
   ctx.roundRect(-b, -b, b * 2, b * 2, b * E.radius);
@@ -418,7 +419,7 @@ function drawEmitter(ctx: Ctx, x: number, y: number, c: number, dir: Dir, color:
   ctx.stroke();
 
   const t = E.lens * c;
-  ctx.fillStyle = col;
+  ctx.fillStyle = E.tinted ? mix(col, '#ffffff', 0.55) : col;
   ctx.beginPath();
   ctx.roundRect(b - t / 2, -b * 0.7, t, b * 1.4, t / 2);
   ctx.fill();

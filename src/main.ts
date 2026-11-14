@@ -51,6 +51,13 @@ renderMute();
 onTap(canvas, (x, y) => game.tap(x, y));
 
 // Em tela de toque, pointerdown não conta como gesto para liberar áudio; pointerup/touchend contam.
+// Android (tela cheia / app instalado) aceita travar em retrato; nos outros a tela #rotate cobre o jogo.
+const lockPortrait = (): void => {
+  const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+  o.lock?.('portrait').catch(() => {});
+};
+window.addEventListener('pointerup', lockPortrait, { once: true });
+
 for (const ev of ['pointerup', 'touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => game.synth.unlock(), { capture: true, passive: true });
 }

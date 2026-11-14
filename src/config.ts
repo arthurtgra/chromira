@@ -36,6 +36,7 @@ export const CONFIG = {
     lens: 0.07, // espessura da lente na face de saída
     halo: 0.45, // brilho só em volta da lente, em células
     fill: '#0e0c1a',
+    tinted: true, // corpo na cor que o lançador emite
     pulseHz: 0.6,
   },
 

@@ -331,3 +331,46 @@ button {
 .grid::-webkit-scrollbar {
   display: none;
 }
+
+/* Celular deitado: cobre o jogo e pede para voltar ao retrato (navegadores não deixam travar a rotação). */
+#rotate {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 520px) {
+  #rotate {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    background: #101014;
+    color: var(--ink);
+    font-family: var(--font);
+  }
+  #rotate svg {
+    width: 64px;
+    height: 64px;
+    opacity: 0.8;
+    animation: tilt 2.4s ease-in-out infinite;
+  }
+  #rotate p {
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+}
+@keyframes tilt {
+  0%,
+  30% {
+    transform: rotate(-90deg);
+  }
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+}
