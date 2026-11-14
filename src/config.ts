@@ -28,6 +28,18 @@ export const CONFIG = {
 
   piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, wallSize: 0.56, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
 
+  // Lançador de luz, medidas em fração da célula.
+  emitter: {
+    body: 0.2, // meia largura do corpo
+    barrel: 0.36, // ponta do cano (lente), a partir do centro
+    core: 0.1,
+    ring: 0.15,
+    halo: 0.6,
+    fill: '#0e0c1a',
+    pulseHz: 0.8,
+    spinHz: 0.35,
+  },
+
   beam: {
     // Desenhado três vezes com 'lighter': largo/fraco, médio, fino/forte. Larguras em fração da célula.
     layers: [
