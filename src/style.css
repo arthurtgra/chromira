@@ -180,27 +180,6 @@ button {
   filter: drop-shadow(0 0 18px rgba(140, 160, 255, 0.18));
   animation: float 5s ease-in-out infinite;
 }
-/* Brilho cônico de arco-íris atrás do logo. */
-.logo {
-  position: relative;
-  isolation: isolate;
-}
-.logo::before {
-  content: '';
-  position: absolute;
-  inset: -16% -12% -8%;
-  border-radius: 50%;
-  background: conic-gradient(from 200deg, #ff3358, #ffb02e, #fff35c, #29f58a, #2ee6ff, #4c7dff, #b44cff, #ff3358);
-  filter: blur(26px);
-  opacity: 0.38;
-  z-index: -1;
-  animation: glow 5s ease-in-out infinite;
-}
-@keyframes glow {
-  50% {
-    opacity: 0.5;
-  }
-}
 .logo svg {
   display: block;
   width: 100%;
