@@ -298,6 +298,24 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.stroke();
+    // Cor misturada: anel interno em arcos das cores que a formam (vermelho + verde dentro do amarelo).
+    // Some conforme o alvo enche.
+    const comps = COMPONENTS.filter((c) => (need & c) !== 0);
+    if (comps.length > 1 && fill < 1) {
+      const n = comps.length * 2;
+      const gap = 0.35;
+      ctx.lineWidth = CONFIG.piece.stroke * 1.2;
+      ctx.globalAlpha = 1 - fill;
+      for (let i = 0; i < n; i++) {
+        const a0 = -Math.PI / 2 + (i * TAU) / n + gap / 2;
+        ctx.strokeStyle = CONFIG.colors[comps[i % comps.length]!];
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.58, a0, a0 + TAU / n - gap);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = CONFIG.piece.stroke * 1.5;
+    }
   }
   if (got !== 0 && got !== need) {
     ctx.globalAlpha = wrong ? 0.7 : 0.45;
