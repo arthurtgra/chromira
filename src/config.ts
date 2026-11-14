@@ -107,10 +107,13 @@ export const CONFIG = {
       alpha: [0.8, 1], // [sem arco-íris, arco-íris total]
       pulseHz: 0.55,
       core: 0.45, // brilho central (cor que entra), raio em células
-      coreAlpha: 0.45,
+      coreAlpha: 0.1, // fraco: com 'lighter' o miolo branco estourava
       lobe: 0.38, // brilho de cada cor que sai, raio em células
-      lobeOffset: 0.2, // deslocamento do lóbulo para o lado de saída, em células
-      lobeAlpha: 0.75,
+      lobeOffset: 0.27, // deslocamento do lóbulo para o lado de saída, em células
+      lobeAlpha: 0.65,
+      mix: 0.26, // brilho da mistura entre dois lóbulos (amarelo, ciano, rosa), raio em células
+      mixOffset: 0.3,
+      mixAlpha: 0.35,
     },
   },
 

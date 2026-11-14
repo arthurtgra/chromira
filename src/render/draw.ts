@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { DELTA, FILTER_COLORS, LEFT, RIGHT } from '../core/trace.ts';
+import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
 import { cut, reachedEnd, visibleLength, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
@@ -286,6 +286,22 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       if ((inc.color & c) === 0) continue;
       const off = P.lobeOffset * l.cell;
       blob(x + DELTA[d][0] * off, y + DELTA[d][1] * off, P.lobe * l.cell, CONFIG.colors[c], k * P.lobeAlpha * (0.8 + 0.2 * pulse));
+    }
+    // Entre dois lóbulos vizinhos, um brilho menor da mistura deles: amarelo entre vermelho e verde,
+    // ciano entre verde e azul, rosa atrás (vermelho e azul saem em lados opostos).
+    const back = OPP[dir];
+    const mixes: [Color, Dir, Dir][] = [
+      [3, LEFT[dir], dir],
+      [6, dir, RIGHT[dir]],
+      [5, RIGHT[dir], back],
+      [5, back, LEFT[dir]],
+    ];
+    for (const [c, d1, d2] of mixes) {
+      if ((inc.color & c) !== c) continue;
+      const off = (P.mixOffset * l.cell) / Math.SQRT2;
+      const mx = x + (DELTA[d1][0] + DELTA[d2][0]) * off;
+      const my = y + (DELTA[d1][1] + DELTA[d2][1]) * off;
+      blob(mx, my, P.mix * l.cell, CONFIG.colors[c], k * P.mixAlpha * (0.8 + 0.2 * pulse));
     }
     blob(x, y, P.core * l.cell * (0.92 + 0.08 * pulse), CONFIG.colors[inc.color], k * P.coreAlpha);
   }
