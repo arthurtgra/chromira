@@ -10,6 +10,9 @@ export class Synth {
 
   unlock(): void {
     if (!this.ctx) {
+      // Safari iOS: sem isso a chave de silencioso corta todo o Web Audio.
+      const session = (navigator as Navigator & { audioSession?: { type: string } }).audioSession;
+      if (session) session.type = 'playback';
       this.ctx = new AudioContext();
       const len = Math.ceil((this.ctx.sampleRate * A.clickMs) / 1000);
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
