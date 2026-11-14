@@ -157,11 +157,14 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
   ctx.restore();
 }
 
-// Prisma aceso: espectro girando dentro do triângulo e halo na cor do feixe que entra.
+// Prisma aceso: espectro girando no miolo, bordas com contorno de arco-íris, coroa colorida
+// e raios de espectro vazando para fora em leque, cintilando.
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   if (st.t < 1) return;
   const R = CONFIG.rainbow;
+  const P = R.prism;
   const sz = CONFIG.piece.prismSize * l.cell;
+  const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   for (const p of cells) {
@@ -170,25 +173,63 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     if (!inc) continue;
     const x = cx(l, p.x);
     const y = cy(l, p.y);
-    const halo = ctx.createRadialGradient(x, y, 0, x, y, R.prismHalo * l.cell);
-    halo.addColorStop(0, CONFIG.colors[inc.color]);
-    halo.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = 0.22;
-    ctx.fillStyle = halo;
-    ctx.beginPath();
-    ctx.arc(x, y, R.prismHalo * l.cell, 0, TAU);
-    ctx.fill();
+    const spin = st.time * TAU * P.spinHz;
+    const tri = (): void => {
+      ctx.beginPath();
+      ctx.moveTo(x, y - sz);
+      ctx.lineTo(x + sz * 0.87, y + sz * 0.5);
+      ctx.lineTo(x - sz * 0.87, y + sz * 0.5);
+      ctx.closePath();
+    };
+    const spectrum = (rot: number): CanvasGradient => {
+      const g = ctx.createConicGradient(rot, x, y);
+      for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
+      return g;
+    };
 
-    const g = ctx.createConicGradient(st.time * TAU * R.prismSpinHz, x, y + sz * 0.15);
-    for (let i = 0; i <= 6; i++) g.addColorStop(i / 6, `hsl(${i * 60}, 100%, 60%)`);
-    ctx.globalAlpha = R.prismAlpha[0] + (R.prismAlpha[1] - R.prismAlpha[0]) * st.rainbow;
-    ctx.fillStyle = g;
+    // Raios: cunhas finas de cor saindo do prisma, comprimento ondulando.
+    const r0 = sz * 0.55;
+    for (let i = 0; i < P.rays; i++) {
+      const a = spin * 0.5 + (i * TAU) / P.rays;
+      const len = P.rayLen * l.cell * (0.55 + 0.45 * Math.sin(st.time * P.flickerHz * TAU + i * 1.7));
+      const g = ctx.createRadialGradient(x, y, r0, x, y, r0 + len);
+      g.addColorStop(0, `hsla(${(i * 360) / P.rays}, 100%, 62%, 1)`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = k * 0.55;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a - P.rayWidth) * r0, y + Math.sin(a - P.rayWidth) * r0);
+      ctx.lineTo(x + Math.cos(a) * (r0 + len), y + Math.sin(a) * (r0 + len));
+      ctx.lineTo(x + Math.cos(a + P.rayWidth) * r0, y + Math.sin(a + P.rayWidth) * r0);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Coroa: anel de espectro girando ao contrário, largo e fraco + fino e forte.
+    const cr = P.corona * l.cell * (0.95 + 0.05 * Math.sin(st.time * 2));
+    ctx.strokeStyle = spectrum(-spin);
+    ctx.globalAlpha = k * 0.25;
+    ctx.lineWidth = l.cell * 0.12;
     ctx.beginPath();
-    ctx.moveTo(x, y - sz);
-    ctx.lineTo(x + sz * 0.87, y + sz * 0.5);
-    ctx.lineTo(x - sz * 0.87, y + sz * 0.5);
-    ctx.closePath();
+    ctx.arc(x, y, cr, 0, TAU);
+    ctx.stroke();
+    ctx.globalAlpha = k * 0.6;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Miolo e bordas do triângulo em espectro.
+    ctx.fillStyle = spectrum(spin);
+    ctx.globalAlpha = k * 0.7;
+    tri();
     ctx.fill();
+    ctx.strokeStyle = spectrum(spin + Math.PI);
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = k * 0.5;
+    ctx.lineWidth = l.cell * 0.09;
+    ctx.stroke();
+    ctx.globalAlpha = k;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
   }
   ctx.restore();
 }

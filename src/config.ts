@@ -72,10 +72,16 @@ export const CONFIG = {
     hues: [30, 60, 180, 275],
     alpha: 0.55,
     ampMul: 1.35, // amplitude das ondas extras relativa às RGB, no arco-íris total
-    // Prisma aceso: miolo com espectro girando + halo da cor que entra.
-    prismAlpha: [0.3, 0.6], // [sem arco-íris, arco-íris total]
-    prismSpinHz: 0.15,
-    prismHalo: 0.7, // raio do halo, em células
+    // Prisma aceso: miolo e bordas em espectro, coroa colorida e raios vazando para fora.
+    prism: {
+      alpha: [0.75, 1], // [sem arco-íris, arco-íris total]
+      spinHz: 0.15,
+      rays: 12,
+      rayLen: 0.75, // em células, além da borda
+      rayWidth: 0.09, // meia abertura da cunha, radianos
+      flickerHz: 0.7,
+      corona: 0.62, // raio da coroa, em células
+    },
   },
 
   mirrorSpinMs: 80,
