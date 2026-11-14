@@ -42,6 +42,18 @@ const TIERS: Tier[] = [
       minMoves: lerp(6, 8, k),
     }),
   },
+  // 61+: tudo junto — divisor, espelho, filtro e prisma na mesma fase (um feixe para cada peça especial).
+  {
+    count: 10,
+    options: (k) => ({
+      mirrors: lerp(6, 7, k),
+      beams: 3,
+      prism: true,
+      filters: 1,
+      splitters: 1,
+      minMoves: lerp(7, 9, k),
+    }),
+  },
 ];
 const SEED_BASE = 9100;
 
