@@ -33,12 +33,22 @@ export const CONFIG = {
     layers: [
       { width: 0.34, alpha: 0.1 },
       { width: 0.13, alpha: 0.32 },
-      { width: 0.035, alpha: 1 },
+      { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
     speed: 36, // células por segundo: só o trecho que mudou cresce, o resto fica aceso
     fadeMs: 220, // trecho que deixou de existir apaga neste tempo
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
-    chroma: { band: 0.5, speed: 1.1, hueHz: 0.12, alpha: 0.3, width: 0.09, sat: 95, light: 62 },
+    // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
+    // Onde se cruzam somam (R+G+B = branco). Amplitude some perto de cantos e pontas: as ondas se juntam ali.
+    waves: {
+      amp: 0.085, // fração da célula
+      length: 0.95, // comprimento de onda, em células
+      speed: 1.4, // ciclos por segundo
+      width: 0.04,
+      alpha: 0.95,
+      taper: 0.38, // células até a amplitude cheia, a partir de cada canto
+      step: 0.05, // resolução da curva, em células
+    },
     winWidthMul: 1.8,
     winGrowMs: 300,
   },

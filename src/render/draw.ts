@@ -55,6 +55,34 @@ function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
   ctx.stroke();
 }
 
+function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle): void {
+  const W = CONFIG.beam.waves;
+  const amp = W.amp * l.cell * st.widthMul;
+  const k = TAU / W.length;
+  const wt = st.time * TAU * W.speed;
+  let s = r.d0;
+  ctx.beginPath();
+  for (let i = 1; i < r.pts.length; i++) {
+    const [x1, y1] = r.pts[i - 1]!;
+    const [x2, y2] = r.pts[i]!;
+    const len = Math.abs(x2 - x1) + Math.abs(y2 - y1);
+    const ux = (x2 - x1) / len;
+    const uy = (y2 - y1) / len;
+    const n = Math.max(2, Math.ceil(len / W.step));
+    for (let j = i === 1 ? 0 : 1; j <= n; j++) {
+      const u = (j / n) * len;
+      const env = Math.min(1, u / W.taper, (len - u) / W.taper);
+      const off = amp * env * Math.sin(k * (s + u) - wt + phase);
+      const px = cx(l, x1 + ux * u) - uy * off;
+      const py = cy(l, y1 + uy * u) + ux * off;
+      if (i === 1 && j === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    s += len;
+  }
+  ctx.stroke();
+}
+
 export interface BeamStyle {
   t: number; // fração da animação de crescimento, 0..1
   widthMul: number;
@@ -97,23 +125,21 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
     }
   }
 
-  // Três passadas tracejadas defasadas, cada uma num matiz a 120°: viram faixas de arco-íris que andam.
-  const C = B.chroma;
-  const band = C.band * l.cell;
-  ctx.lineCap = 'butt';
-  ctx.setLineDash([band, band * 2]);
-  ctx.lineWidth = Math.max(1, C.width * l.cell * st.widthMul);
-  ctx.globalAlpha = C.alpha;
-  const hue = st.time * 360 * C.hueHz;
-  for (let k = 0; k < 3; k++) {
-    for (const r of runs) {
-      ctx.strokeStyle = `hsl(${(hue + k * 120 + r.d0 * 25) % 360}, ${C.sat}%, ${C.light}%)`;
-      ctx.lineDashOffset = (r.d0 * l.cell - st.time * C.speed * l.cell) - k * band;
-      strokeRun(ctx, l, r);
+  // Ondas: uma por componente de cor (R, G, B), fases a 120°. Cor pura vira trança de duas ondas em oposição.
+  const W = B.waves;
+  ctx.lineWidth = Math.max(1, W.width * l.cell * st.widthMul);
+  ctx.globalAlpha = W.alpha;
+  for (const r of runs) {
+    const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
+    const waves =
+      comps.length === 1
+        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph }))
+        : comps.map((c) => ({ color: CONFIG.colors[c], ph: (COMPONENTS.indexOf(c) * TAU) / 3 }));
+    for (const w of waves) {
+      ctx.strokeStyle = w.color;
+      strokeWave(ctx, l, r, w.ph, st);
     }
   }
-  ctx.setLineDash([]);
-  ctx.lineCap = 'round';
 
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
