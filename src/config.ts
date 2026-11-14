@@ -66,16 +66,20 @@ export const CONFIG = {
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
       // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
       tint: {} as Partial<Record<Color, number>>,
-      // Tons das ondas componentes dentro de cada mistura. Vermelho e verde puros somam um amarelo
-      // salmão estranho: no amarelo viram laranja + lima. No rosa, o azul é mais claro e mais grosso.
+      // Tons das ondas componentes dentro de cada mistura. Amarelo: laranja + lima puxados para o amarelo,
+      // com miolo amarelo forte (o feixe lê amarelo, as cores de dentro aparecem de leve). Rosa: azul saturado
+      // e grosso, miolo rosa fraco — com 'lighter' muita camada clara vira branco e o azul some.
       comp: {
-        3: { 1: { color: '#ff8a1c' }, 2: { color: '#c4ff2e' } },
-        5: { 1: { color: '#ff3d7f' }, 4: { color: '#7c86ff', width: 1.5, alpha: 1 } },
+        3: { 1: { color: '#ff9a2e', alpha: 0.85 }, 2: { color: '#c8f03a', alpha: 0.85 } },
+        5: { 1: { color: '#ff2f6e' }, 4: { color: '#3f5cff', width: 1.7, alpha: 1 } },
       } as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
-      // Misturas (2+ componentes): miolo liso na cor da mistura entre as ondas puras, para ler amarelo/rosa
-      // sem esconder as cores que o formam.
+      // Misturas (2+ componentes): miolo liso + brilho na cor da mistura entre as ondas.
       mixCore: { width: 0.05, alpha: 0.6 },
       mixGlow: { width: 0.2, alpha: 0.12 },
+      mix: {
+        3: { core: { width: 0.075, alpha: 0.85 }, glow: { width: 0.24, alpha: 0.2 } },
+        5: { core: { width: 0.035, alpha: 0.3 }, glow: { width: 0.2, alpha: 0.07 } },
+      } as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,
       driftAmp: 2.1, // multiplica amp

@@ -126,7 +126,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
   for (const r of runs) {
     if ((r.color & (r.color - 1)) === 0 || r.color === 7) continue;
     ctx.strokeStyle = CONFIG.colors[r.color];
-    for (const m of [W.mixGlow, W.mixCore]) {
+    const mx = W.mix[r.color];
+    for (const m of mx ? [mx.glow, mx.core] : [W.mixGlow, W.mixCore]) {
       ctx.globalAlpha = m.alpha * alphaMul;
       ctx.lineWidth = Math.max(1, m.width * l.cell);
       strokeRun(ctx, l, r);
@@ -267,16 +268,51 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
   const col = CONFIG.colors[need];
   const wrong = (got & ~need) !== 0;
   const jx = wrong ? Math.sin(time * 38) * r * 0.05 : 0;
-  ctx.strokeStyle = col;
+  const comps = COMPONENTS.filter((c) => (need & c) !== 0);
   ctx.lineWidth = CONFIG.piece.stroke * 1.5;
+
+  // Aceso: brilho macio na cor do alvo, para ele ler "amarelo" (ou rosa, ciano...) de longe.
+  if (fill > 0) {
+    const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 1.9);
+    g.addColorStop(0, col);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.35 * fill;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.9, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+  }
+
   if (wrong) {
+    ctx.strokeStyle = col;
     ctx.setLineDash([r * 0.42, r * 0.28]);
     ctx.lineDashOffset = time * r * 2;
+    ctx.beginPath();
+    ctx.arc(x + jx, y, r, 0, TAU);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (comps.length > 1) {
+    // Cor misturada: anel em arcos das cores que a formam (vermelho + verde no amarelo).
+    // Ao acender, os arcos se fundem na cor final e as falhas fecham.
+    const n = comps.length * 2;
+    const gap = 0.32 * (1 - fill);
+    for (let i = 0; i < n; i++) {
+      const c = comps[i % comps.length]!;
+      const a0 = -Math.PI / 2 + (i * TAU) / n + gap / 2;
+      ctx.strokeStyle = mix(CONFIG.colors[c], col, fill);
+      ctx.beginPath();
+      ctx.arc(x, y, r, a0, a0 + TAU / n - gap);
+      ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.stroke();
   }
-  ctx.beginPath();
-  ctx.arc(x + jx, y, r, 0, TAU);
-  ctx.stroke();
-  ctx.setLineDash([]);
   if (got !== 0 && got !== need) {
     ctx.globalAlpha = wrong ? 0.7 : 0.45;
     ctx.fillStyle = CONFIG.colors[got as Color];
