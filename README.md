@@ -1,4 +1,4 @@
-# Prisma (simple_game)
+# Prisma Game (prisma_game)
 
 Puzzle de luz para celular: toque nos espelhos para girá-los até cada alvo receber a cor certa.
 TypeScript + Vite + Canvas 2D, sem engine. Som sintetizado (Web Audio). PWA instalável e offline.

@@ -10,8 +10,8 @@ export default defineConfig({
       injectRegister: 'auto',
       includeAssets: ['icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Prisma',
-        short_name: 'Prisma',
+        name: 'Prisma Game',
+        short_name: 'Prisma Game',
         description: 'Puzzle de luz: gire espelhos e acenda cada alvo com a cor certa.',
         lang: 'pt-BR',
         start_url: './',
