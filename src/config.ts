@@ -119,7 +119,8 @@ export const CONFIG = {
       glassHz: 1900,
       filterHz: 1250, // filtro: vidro mais grosso, mais grave
       detune: 0.025, // ± variação aleatória por toque
-      volume: 0.55,
+      volume: 0.42,
+      attackMs: 6, // ataque um pouco mais macio
       partials: [
         [1, 1, 320], // [razão, volume, decaimento ms]
         [2.32, 0.5, 210],
@@ -127,9 +128,11 @@ export const CONFIG = {
         [6.63, 0.12, 80],
       ],
       tickMs: 8,
-      tickVolume: 0.35,
+      tickVolume: 0.14,
     },
-    echo: { delayMs: 90, feedback: 0.22, wet: 0.22 },
+    echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
+    softHz: 5200, // passa-baixa no master: deixa tudo mais macio
+    reverb: { seconds: 1.8, decay: 3.2, wet: 0.32, toneHz: 4200 }, // sala sintética em todos os sons
     scale: [261.63, 293.66, 329.63, 392.0, 440.0], // dó ré mi sol lá
     noteMs: 320,
     downMs: 140,

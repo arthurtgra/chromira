@@ -8,6 +8,7 @@ export class Synth {
   private ctx: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
   private echo: AudioNode | null = null;
+  private bus: AudioNode | null = null; // entrada do master: suaviza e manda para a reverberação
 
   unlock(): void {
     if (!this.ctx) {
@@ -19,6 +20,7 @@ export class Synth {
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      this.bus = this.makeBus(this.ctx);
       this.echo = this.makeEcho(this.ctx);
     }
     if (this.ctx.state !== 'running') {
@@ -32,6 +34,45 @@ export class Synth {
   }
 
   // Eco curto com realimentação: dá ar e cauda aos sons de toque.
+  // Master: passa-baixa suave (tira o brilho áspero) + reverberação de sala sintética em paralelo
+  // + compressor leve no fim para os acordes não estourarem.
+  private makeBus(ctx: AudioContext): AudioNode {
+    const R = A.reverb;
+    const input = ctx.createGain();
+    const soft = ctx.createBiquadFilter();
+    soft.type = 'lowpass';
+    soft.frequency.value = A.softHz;
+    soft.Q.value = 0.5;
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.005;
+    comp.release.value = 0.2;
+    input.connect(soft);
+    soft.connect(comp);
+
+    const len = Math.floor(ctx.sampleRate * R.seconds);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = ir.getChannelData(ch);
+      for (let i = 0; i < len; i++) {
+        const t = i / len;
+        // Ruído decaindo, com início suave (pré-delay) para a cauda não embolar o ataque.
+        data[i] = (Math.random() * 2 - 1) * (1 - t) ** R.decay * Math.min(1, i / (ctx.sampleRate * 0.012));
+      }
+    }
+    const conv = ctx.createConvolver();
+    conv.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = R.wet;
+    const dark = ctx.createBiquadFilter();
+    dark.type = 'lowpass';
+    dark.frequency.value = R.toneHz;
+    soft.connect(conv).connect(dark).connect(wet).connect(comp);
+    comp.connect(ctx.destination);
+    return input;
+  }
+
   private makeEcho(ctx: AudioContext): AudioNode {
     const input = ctx.createGain();
     const delay = ctx.createDelay(1);
@@ -44,7 +85,7 @@ export class Synth {
     const wet = ctx.createGain();
     wet.gain.value = A.echo.wet;
     input.connect(delay).connect(damp).connect(fb).connect(delay);
-    damp.connect(wet).connect(ctx.destination);
+    damp.connect(wet).connect(this.bus!);
     return input;
   }
 
@@ -62,7 +103,7 @@ export class Synth {
     filter.frequency.value = hz;
     const gain = ctx.createGain();
     gain.gain.value = A.volume * 1.5;
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(this.bus!);
     src.start();
   }
 
@@ -76,7 +117,7 @@ export class Synth {
 
     const out = ctx.createGain();
     out.gain.value = A.volume * T.volume;
-    out.connect(ctx.destination);
+    out.connect(this.bus!);
     out.connect(this.echo);
 
     const tick = ctx.createBufferSource();
@@ -97,7 +138,7 @@ export class Synth {
       osc.frequency.value = base * ratio;
       const g = ctx.createGain();
       g.gain.setValueAtTime(0, t0);
-      g.gain.linearRampToValueAtTime(vol, t0 + 0.002);
+      g.gain.linearRampToValueAtTime(vol, t0 + T.attackMs / 1000);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
       osc.connect(g).connect(out);
       osc.start(t0);
@@ -117,7 +158,7 @@ export class Synth {
     gain.gain.setValueAtTime(0, t0);
     gain.gain.linearRampToValueAtTime(vol, t0 + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.bus!);
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
   }
@@ -142,7 +183,7 @@ export class Synth {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(A.volume * A.downVolume, t0);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + A.downMs / 1000);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.bus!);
     osc.start(t0);
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
