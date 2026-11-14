@@ -144,7 +144,7 @@ export const CONFIG = {
     alpha: 0.95,
     glowWidth: 14,
     glowAlpha: 0.22,
-    echoes: [[0, 1], [220, 0.45]] as [number, number][], // [atraso ms, força]
+    echoes: [[0, 1]] as [number, number][], // [atraso ms, força]; um anel só (dois poluía)
     band: 1,
     dotR: 4.5,
     dotAlpha: 1,
