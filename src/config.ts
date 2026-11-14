@@ -90,7 +90,7 @@ export const CONFIG = {
       driftWidth: 0.11,
       driftAlpha: 0.09,
     },
-    winWidthMul: 1.2, // na vitória as ondas abrem só um pouco
+    winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
   },
 
@@ -123,7 +123,9 @@ export const CONFIG = {
   winDelayMs: 1400,
   // Vitória: depois de uma pausa, todos os feixes renascem dos lançadores até o fim do caminho;
   // a próxima fase abre um pouco depois do replay terminar.
-  winReplay: { pauseMs: 350, speed: 12, ms: [700, 1800], holdMs: 650 },
+  // Vitória: depois de uma pausa, um pulso de luz caminha por cada feixe, do lançador até o fim:
+  // as ondas engordam só num trecho estreito em volta dele, com um ponto de luz andando junto.
+  winPulse: { pauseMs: 300, speed: 11, width: 0.55, swell: 2.4, glow: 0.42, ms: [700, 1800], holdMs: 450 },
 
   audio: {
     volume: 0.22,

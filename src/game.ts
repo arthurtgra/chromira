@@ -53,7 +53,9 @@ export class Game {
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
   private wonAt: number | null = null;
-  private replayAt = Infinity; // quando os feixes renascem na vitória
+  private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
+  private pulseAt = Infinity;
+  private pulseSpeed = 0;
   private nextAt = Infinity; // quando abre a próxima fase
   private fps = 60;
   private readonly levels: Level[];
@@ -85,6 +87,7 @@ export class Game {
     this.loadedAt = this.now;
     this.wonAt = null;
     this.replayAt = Infinity;
+    this.pulseAt = Infinity;
     this.nextAt = Infinity;
     this.fx.clear();
     this.persist();
@@ -176,16 +179,15 @@ export class Game {
       }
     }
 
-    // Vitória: replay dos feixes desde os lançadores; alvos ficam acesos durante o replay.
+    // Vitória: pulso de luz caminha pelos feixes; alvos ficam acesos.
     if (this.wonAt !== null) {
       if (this.now >= this.replayAt) {
         this.replayAt = Infinity;
-        this.plan = planBeams([], this.beamSegments());
-        this.fades = [];
-        this.beamAt = this.now;
-        const W = CONFIG.winReplay;
-        this.beamMs = Math.min(W.ms[1], Math.max(W.ms[0], (this.plan.to / W.speed) * 1000));
-        this.nextAt = this.now + this.beamMs + W.holdMs;
+        this.pulseAt = this.now;
+        const P = CONFIG.winPulse;
+        const ms = Math.min(P.ms[1], Math.max(P.ms[0], ((this.plan.to + P.width * 2) / P.speed) * 1000));
+        this.pulseSpeed = (this.plan.to + P.width * 2) / ms; // células por ms
+        this.nextAt = this.now + ms + P.holdMs;
       }
       if (this.now >= this.nextAt) this.load(this.index + 1);
       return;
@@ -225,6 +227,7 @@ export class Game {
       widthMul: 1 + (CONFIG.beam.winWidthMul - 1) * grow,
       rainbow: this.rainbow(),
       time: this.now / 1000,
+      pulse: this.now >= this.pulseAt ? (this.now - this.pulseAt) * this.pulseSpeed - CONFIG.winPulse.width : undefined,
     };
     const front = this.front();
     const fading = this.fades.map((f) => {
@@ -287,7 +290,7 @@ export class Game {
     this.persist();
     this.onWin?.();
     this.wonAt = this.now;
-    this.replayAt = this.now + CONFIG.winReplay.pauseMs;
+    this.replayAt = this.now + CONFIG.winPulse.pauseMs;
     this.synth.chord((this.index + 1) % 5 === 0);
     this.fx.flash();
     this.fx.burst(

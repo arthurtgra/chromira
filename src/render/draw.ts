@@ -55,6 +55,43 @@ function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
   ctx.stroke();
 }
 
+// Engorda das ondas em volta do pulso de vitória (gaussiana estreita).
+function swell(st: BeamStyle, d: number): number {
+  if (st.pulse === undefined) return 1;
+  const P = CONFIG.winPulse;
+  return 1 + (P.swell - 1) * Math.exp(-(((d - st.pulse) / P.width) ** 2));
+}
+
+// Ponto de luz do pulso: onde ele está ao longo de cada polilinha, brilho na cor do feixe com miolo branco.
+function drawPulseHeads(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle): void {
+  if (st.pulse === undefined) return;
+  const P = CONFIG.winPulse;
+  for (const r of runs) {
+    let s = r.d0;
+    for (let i = 1; i < r.pts.length; i++) {
+      const [x1, y1] = r.pts[i - 1]!;
+      const [x2, y2] = r.pts[i]!;
+      const len = Math.abs(x2 - x1) + Math.abs(y2 - y1);
+      const u = st.pulse - s;
+      if (u >= 0 && u <= len) {
+        const x = cx(l, x1 + ((x2 - x1) / len) * u);
+        const y = cy(l, y1 + ((y2 - y1) / len) * u);
+        const rad = P.glow * l.cell;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)');
+        g.addColorStop(0.3, CONFIG.colors[r.color]);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, rad, 0, TAU);
+        ctx.fill();
+      }
+      s += len;
+    }
+  }
+}
+
 function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1, lenMul = 1, speedMul = 1): void {
   const W = CONFIG.beam.waves;
   const amp = W.amp * ampMul * l.cell * st.widthMul;
@@ -72,7 +109,7 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
     for (let j = i === 1 ? 0 : 1; j <= n; j++) {
       const u = (j / n) * len;
       const env = Math.min(1, u / W.taper, (len - u) / W.taper);
-      const off = amp * env * Math.sin(k * (s + u) - wt + phase);
+      const off = amp * env * swell(st, s + u) * Math.sin(k * (s + u) - wt + phase);
       const px = cx(l, x1 + ux * u) - uy * off;
       const py = cy(l, y1 + uy * u) + ux * off;
       if (i === 1 && j === 0) ctx.moveTo(px, py);
@@ -88,6 +125,7 @@ export interface BeamStyle {
   widthMul: number;
   rainbow: number; // 0..1
   time: number; // segundos
+  pulse?: number; // vitória: distância da fonte onde está o pulso de luz que caminha
 }
 
 export interface FadingBeam {
@@ -106,7 +144,9 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
   for (const f of fading) {
     drawRuns(ctx, l, [{ pts: [[f.seg.x1, f.seg.y1], [f.seg.x2, f.seg.y2]], color: f.seg.color, d0: f.d0 }], st, f.alpha);
   }
-  drawRuns(ctx, l, buildRuns(plan, front), st, 1);
+  const runs = buildRuns(plan, front);
+  drawRuns(ctx, l, runs, st, 1);
+  drawPulseHeads(ctx, l, runs, st);
   ctx.restore();
 }
 
