@@ -1,54 +1,67 @@
-// Logo: triângulo de Penrose com uma viga de cada cor RGB.
-// Três vigas (eixos x, y, z) em projeção isométrica: (L,L,L) e (0,0,0) caem no mesmo ponto, então a escada
-// de vigas fecha um triângulo. O começo da viga X é redesenhado por cima do fim da viga Z — é aí que mora a
-// ilusão. Cada viga tem três tons (topo claro, lado, sombra) para parecer sólida.
+// Logo: triângulo de Penrose em traço, cada lado (viga) numa cor RGB.
+// A figura tem simetria de rotação de 120°: as arestas de uma viga são definidas numa grade triangular
+// e giradas 120° e 240° em torno do centro para formar as outras duas.
+//
+// Grade: triângulo de lado N (ponta para cima). Ponto (s, k) = s unidades na horizontal a partir do canto
+// inferior esquerdo, k = altura em "faixas" (cada faixa = √3/2 unidade). Cada viga mostra duas faces,
+// então cada lado tem três linhas paralelas: k = 0 (fora), 1 (meio), 2 (dentro).
 
-export interface Poly {
-  fill: string;
-  pts: [number, number][]; // normalizado: cabe em [0,1] x [0,h], h = altura/largura
-}
+export type Seg = { color: string; a: [number, number]; b: [number, number] };
 
-type V3 = [number, number, number];
+export const LOGO_COLORS = { r: '#ff3358', g: '#29f58a', b: '#4c7dff' } as const;
 
-const SHADES = {
-  r: { z: '#ff7a92', x: '#ff3358', y: '#a8183a' },
-  g: { z: '#7dffb6', x: '#29f58a', y: '#11935a' },
-  b: { z: '#8eabff', x: '#4c7dff', y: '#2a43b0' },
-} as const;
+const N = 9;
+const H = Math.sqrt(3) / 2;
 
-function boxFaces([x0, x1]: [number, number], [y0, y1]: [number, number], [z0, z1]: [number, number]): Record<'x' | 'y' | 'z', V3[]> {
-  return {
-    y: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]],
-    x: [[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]],
-    z: [[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]],
+// Viga de baixo: começa encostada na tampa da viga vermelha (canto esquerdo) e termina na sua própria tampa
+// no canto direito. As três linhas nascem na linha de dentro da viga vermelha (passam por baixo dela).
+const BEAM: [[number, number], [number, number]][] = [
+  [[2, 0], [N - 1, 0]], // fora
+  [[2.5, 1], [N - 0.5, 1]], // meio
+  [[3, 2], [N - 1, 2]], // dentro
+  [[N - 1, 0], [N - 0.5, 1]], // tampa: canto de fora
+  [[N - 0.5, 1], [N - 1, 2]], // tampa: volta para dentro
+];
+
+export function penroseSegments(): { segs: Seg[]; h: number } {
+  const cx = N / 2;
+  const cy = (N * H) / 3;
+  const toXY = ([s, k]: [number, number]): [number, number] => [s, k * H];
+  const rot = ([x, y]: [number, number], t: number): [number, number] => {
+    const dx = x - cx;
+    const dy = y - cy;
+    return [cx + dx * Math.cos(t) - dy * Math.sin(t), cy + dx * Math.sin(t) + dy * Math.cos(t)];
   };
-}
-
-// Isométrica girada -90°: ponta do triângulo para cima.
-const project = ([x, y, z]: V3): [number, number] => [(x + y) / 2 - z, -(x - y) * (Math.sqrt(3) / 2)];
-
-export function penrose(length = 7): { polys: Poly[]; h: number } {
-  const L = length;
-  const beams: ['r' | 'g' | 'b', ReturnType<typeof boxFaces>][] = [
-    ['r', boxFaces([0, L], [0, 1], [0, 1])],
-    ['g', boxFaces([L - 1, L], [0, L], [0, 1])],
-    ['b', boxFaces([L - 1, L], [L - 1, L], [0, L])],
-    ['r', boxFaces([0, 1], [0, 1], [0, 1])],
+  const raw: Seg[] = [];
+  const turns: [string, number][] = [
+    [LOGO_COLORS.b, 0],
+    [LOGO_COLORS.g, (2 * Math.PI) / 3],
+    [LOGO_COLORS.r, (4 * Math.PI) / 3],
   ];
-  const raw = beams.flatMap(([c, f]) => (['y', 'x', 'z'] as const).map((k) => ({ fill: SHADES[c][k], pts: f[k].map(project) })));
-  const all = raw.flatMap((p) => p.pts);
-  const minX = Math.min(...all.map((p) => p[0]));
-  const maxX = Math.max(...all.map((p) => p[0]));
-  const minY = Math.min(...all.map((p) => p[1]));
-  const maxY = Math.max(...all.map((p) => p[1]));
+  for (const [color, t] of turns) {
+    for (const [a, b] of BEAM) raw.push({ color, a: rot(toXY(a), t), b: rot(toXY(b), t) });
+  }
+  // y para baixo (tela) e normalizado para largura 1.
+  const pts = raw.flatMap((s) => [s.a, s.b]);
+  const minX = Math.min(...pts.map((p) => p[0]));
+  const maxX = Math.max(...pts.map((p) => p[0]));
+  const minY = Math.min(...pts.map((p) => p[1]));
+  const maxY = Math.max(...pts.map((p) => p[1]));
   const w = maxX - minX;
-  const polys = raw.map((p) => ({ fill: p.fill, pts: p.pts.map(([x, y]) => [(x - minX) / w, (y - minY) / w] as [number, number]) }));
-  return { polys, h: (maxY - minY) / w };
+  const map = ([x, y]: [number, number]): [number, number] => [(x - minX) / w, (maxY - y) / w];
+  return { segs: raw.map((s) => ({ color: s.color, a: map(s.a), b: map(s.b) })), h: (maxY - minY) / w };
 }
 
-export function logoSvg(size = 100): string {
-  const { polys, h } = penrose();
-  const f = (n: number): number => Math.round(n * size * 100) / 100;
-  const paths = polys.map((p) => `<path fill="${p.fill}" d="M${p.pts.map(([x, y]) => `${f(x)} ${f(y)}`).join('L')}Z"/>`).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${f(h)}">${paths}</svg>`;
+export function logoSvg(size = 100, stroke = 2.4): string {
+  const { segs, h } = penroseSegments();
+  const pad = stroke;
+  const f = (n: number): number => Math.round((n * size + pad) * 100) / 100;
+  const W = size + pad * 2;
+  const Hh = Math.round((h * size + pad * 2) * 100) / 100;
+  const byColor = new Map<string, string>();
+  for (const s of segs) byColor.set(s.color, (byColor.get(s.color) ?? '') + `M${f(s.a[0])} ${f(s.a[1])}L${f(s.b[0])} ${f(s.b[1])}`);
+  const paths = [...byColor]
+    .map(([c, d]) => `<path d="${d}" fill="none" stroke="${c}" stroke-width="${stroke}" stroke-linecap="round"/>`)
+    .join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Hh}">${paths}</svg>`;
 }

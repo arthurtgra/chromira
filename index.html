@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
@@ -12,7 +12,7 @@
   </head>
   <body>
     <canvas id="game"></canvas>
-    <button id="mute" aria-label="Mudo" aria-pressed="false">
+    <button id="mute" aria-label="Mute" aria-pressed="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 9h4l5-4v14l-5-4H4z" />
         <path class="on" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
@@ -25,26 +25,26 @@
       </svg>
     </button>
     <nav id="mini" class="panel" hidden>
-      <button data-go="levels">Fases</button>
-      <button data-go="home">Início</button>
+      <button data-go="levels">Levels</button>
+      <button data-go="home">Home</button>
     </nav>
 
     <section id="home" class="screen">
       <div class="home-inner">
         <div class="logo" id="logo" aria-hidden="true"></div>
         <h1 class="title">PRISMA</h1>
-        <p class="tagline">guie a luz</p>
-        <button class="big" id="play">Jogar<span id="play-sub"></span></button>
-        <button class="big ghost" data-go="levels">Fases</button>
+        <p class="tagline">guide the light</p>
+        <button class="big" id="play">Play<span id="play-sub"></span></button>
+        <button class="big ghost" data-go="levels">Levels</button>
       </div>
     </section>
 
     <section id="levels" class="screen" hidden>
       <header>
-        <button class="icon" data-go="back" aria-label="Voltar">
+        <button class="icon" data-go="back" aria-label="Back">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <h2>Fases</h2>
+        <h2>Levels</h2>
         <span class="progress" id="progress"></span>
       </header>
       <div class="grid" id="grid"></div>

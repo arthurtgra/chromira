@@ -28,7 +28,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
     levels.hidden = s !== 'levels';
     menuBtn.hidden = s !== null;
     setMini(false);
-    if (s === 'home') $('#play-sub').textContent = `fase ${game.current + 1}`;
+    if (s === 'home') $('#play-sub').textContent = `level ${game.current + 1}`;
     if (s === 'levels') renderGrid();
   };
 
@@ -45,7 +45,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
         else if (i <= open) b.classList.add('open');
         else b.classList.add('locked');
         if (i === game.current) b.classList.add('current');
-        b.setAttribute('aria-label', `Fase ${i + 1}${game.done.has(i) ? ', concluída' : i > open ? ', bloqueada' : ''}`);
+        b.setAttribute('aria-label', `Level ${i + 1}${game.done.has(i) ? ', completed' : i > open ? ', locked' : ''}`);
         b.addEventListener('click', () => {
           game.load(i);
           show(null);

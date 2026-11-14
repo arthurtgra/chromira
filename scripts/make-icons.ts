@@ -1,23 +1,21 @@
-// Gera public/icon-192.png, public/icon-512.png e public/logo.svg a partir do logo (triângulo de Penrose RGB).
-// PNG escrito à mão, sem dependências: polígonos rasterizados com 4x4 amostras por pixel.
+// Gera public/icon-192.png, public/icon-512.png e public/logo.svg a partir do logo (triângulo de Penrose em traço RGB).
+// PNG escrito à mão, sem dependências: 4x4 amostras por pixel, traço = distância ao segmento.
 import { writeFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
-import { logoSvg, penrose } from '../src/logo.ts';
+import { logoSvg, penroseSegments } from '../src/logo.ts';
 
 const BG: [number, number, number] = [22, 22, 27];
 const SCALE = 0.62; // largura do logo em fração do ícone (cabe na zona segura do ícone "maskable")
 const SS = 4;
+const STROKE = 0.022; // espessura do traço em fração da largura do logo
 
 const hex = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
 
-function inside(pts: [number, number][], x: number, y: number): boolean {
-  let hit = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const [xi, yi] = pts[i]!;
-    const [xj, yj] = pts[j]!;
-    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) hit = !hit;
-  }
-  return hit;
+function distSeg([ax, ay]: [number, number], [bx, by]: [number, number], x: number, y: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(x - ax - t * dx, y - ay - t * dy);
 }
 
 function chunk(type: string, data: Buffer): Buffer {
@@ -30,12 +28,13 @@ function chunk(type: string, data: Buffer): Buffer {
 }
 
 function icon(size: number): Buffer {
-  const { polys, h } = penrose();
+  const { segs, h } = penroseSegments();
   const w = size * SCALE;
   const ox = (size - w) / 2;
   const oy = (size - w * h) / 2;
-  // Polígonos em pixels; o último pintado ganha (mesma ordem do SVG).
-  const shapes = polys.map((p) => ({ rgb: hex(p.fill), pts: p.pts.map(([x, y]) => [ox + x * w, oy + y * w] as [number, number]) }));
+  const r = (STROKE * w) / 2;
+  const px = ([x, y]: [number, number]): [number, number] => [ox + x * w, oy + y * w];
+  const lines = segs.map((s) => ({ rgb: hex(s.color), a: px(s.a), b: px(s.b) }));
   const raw = Buffer.alloc((size * 3 + 1) * size);
   for (let y = 0; y < size; y++) {
     raw[y * (size * 3 + 1)] = 0;
@@ -43,10 +42,10 @@ function icon(size: number): Buffer {
       const acc = [0, 0, 0];
       for (let sy = 0; sy < SS; sy++) {
         for (let sx = 0; sx < SS; sx++) {
-          const px = x + (sx + 0.5) / SS;
-          const py = y + (sy + 0.5) / SS;
+          const qx = x + (sx + 0.5) / SS;
+          const qy = y + (sy + 0.5) / SS;
           let c = BG;
-          for (const s of shapes) if (inside(s.pts, px, py)) c = s.rgb;
+          for (const l of lines) if (distSeg(l.a, l.b, qx, qy) <= r) c = l.rgb;
           for (let k = 0; k < 3; k++) acc[k]! += c[k]!;
         }
       }

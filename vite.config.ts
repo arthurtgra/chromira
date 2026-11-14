@@ -12,8 +12,8 @@ export default defineConfig({
       manifest: {
         name: 'Prisma Game',
         short_name: 'Prisma Game',
-        description: 'Puzzle de luz: gire espelhos e acenda cada alvo com a cor certa.',
-        lang: 'pt-BR',
+        description: 'Light puzzle: turn mirrors and light every target with the right color.',
+        lang: 'en',
         start_url: './',
         display: 'standalone',
         orientation: 'portrait',
