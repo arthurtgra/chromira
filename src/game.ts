@@ -12,8 +12,10 @@ import {
   drawImpacts,
   drawPrismGlow,
   drawRails,
+  drawWinWave,
   mix,
   type BeamStyle,
+  type WaveOrigin,
 } from './render/draw.ts';
 import { Fx } from './render/fx.ts';
 import { drawHud } from './render/hud.ts';
@@ -57,6 +59,7 @@ export class Game {
   private litAt = new Map<string, number>();
   private prismAngle = new Map<number, { cur: number; to: number }>(); // por índice em level.cells; // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
+  private waves: WaveOrigin[] = [];
   private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
   private pulseAt = Infinity;
   private pulseSpeed = 0;
@@ -289,6 +292,7 @@ export class Game {
   render(ctx: CanvasRenderingContext2D): void {
     const l = this.layout;
     drawBackground(ctx, l, this.background(), this.level.w, this.level.h);
+    if (this.wonAt !== null) drawWinWave(ctx, l, this.level.w, this.level.h, this.waves, this.now - this.wonAt);
     const grow = this.wonAt === null ? 0 : easeOut(clamp01((this.now - this.wonAt) / CONFIG.beam.winGrowMs));
     const style: BeamStyle = {
       t: this.beamT(),
@@ -360,6 +364,8 @@ export class Game {
     this.persist();
     this.onWin?.();
     this.wonAt = this.now;
+    this.waves = this.level.cells.flatMap((c) => (c.t === 'target' ? [{ x: c.x, y: c.y, color: c.color, at: 0 }] : []));
+    this.waves.forEach((w, i) => (w.at = i * CONFIG.winWave.stagger));
     this.replayAt = this.now + CONFIG.winPulse.pauseMs;
     this.synth.chord((this.index + 1) % 5 === 0);
     this.fx.flash();

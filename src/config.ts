@@ -5,15 +5,15 @@ export const CONFIG = {
     // Fundo: [centro, borda] da vinheta, tons neutros. Muda a cada fase, com transição suave.
   // Um tom por bloco de 10 fases (1-10, 11-20...), escuros mas bem distintos entre si.
   backgrounds: [
-    ['#1c1c22', '#0a0a0d'], // grafite
-    ['#14202e', '#070b10'], // azul-noite
-    ['#122522', '#060d0c'], // verde-petróleo
-    ['#231a2e', '#0c0910'], // violeta
-    ['#2a1a1f', '#0f090b'], // vinho
-    ['#1a2416', '#090c07'], // musgo
-    ['#2a2216', '#0e0b07'], // âmbar queimado
-    ['#162028', '#070a0d'], // ardósia azul
-    ['#281a28', '#0e090e'], // ameixa
+    ['#202029', '#0a0a0e'], // grafite
+    ['#132a48', '#060c17'], // azul-noite
+    ['#0f3430', '#051110'], // verde-petróleo
+    ['#2c1d4a', '#0d0817'], // violeta
+    ['#3e1a29', '#12070b'], // vinho
+    ['#203418', '#090f07'], // musgo
+    ['#3c2a13', '#120c05'], // âmbar queimado
+    ['#152b3e', '#060b11'], // ardósia azul
+    ['#3a1a3d', '#110712'], // ameixa
   ],
   backgroundFadeMs: 900,
   gridDotAlpha: 0.1,
@@ -134,6 +134,21 @@ export const CONFIG = {
   rail: { width: 0.2, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1, dot: 'rgba(255,255,255,0.8)', dotR: 0.06 },
   slideRate: 22, // deslize da peça até a célula do trilho (1/s, suavização exponencial)
   dragSlop: 8, // px de movimento antes de virar arrasto (menos que isso é toque)
+  // Vitória: cada alvo solta um anel fino na sua cor que atravessa a tela; os pontos da grade acendem
+  // (maiores, na cor do anel) quando ele passa. Alvos disparam em sequência, stagger ms entre eles.
+  winWave: {
+    speed: 7,
+    ms: 2200,
+    stagger: 140,
+    width: 2.2,
+    alpha: 0.95,
+    glowWidth: 14,
+    glowAlpha: 0.22,
+    echoes: [[0, 1], [220, 0.45]] as [number, number][], // [atraso ms, força]
+    band: 1,
+    dotR: 4.5,
+    dotAlpha: 1,
+  },
   prismTurnRate: 12, // giro do prisma até a nova direção da luz (1/s, suavização exponencial)
   winPulse: { pauseMs: 300, speed: 11, width: 0.55, swell: 2.4, glow: 0.42, ms: [700, 1800], holdMs: 450 },
 

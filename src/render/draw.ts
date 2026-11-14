@@ -23,6 +23,57 @@ export function drawBackground(ctx: Ctx, l: Layout, colors: readonly [string, st
   }
 }
 
+export interface WaveOrigin {
+  x: number; // célula
+  y: number;
+  color: Color;
+  at: number; // ms desde a vitória em que este anel começa
+}
+
+// Onda de vitória: anéis saindo dos alvos e pontos da grade acendendo quando o anel passa por eles.
+export function drawWinWave(ctx: Ctx, l: Layout, cols: number, rows: number, origins: WaveOrigin[], ms: number): void {
+  const W = CONFIG.winWave;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const o of origins) {
+    const t = ms - o.at;
+    if (t < 0 || t > W.ms) continue;
+    const k = t / W.ms;
+    const rad = (t / 1000) * W.speed; // em células
+    const fade = (1 - k) ** 1.5;
+    const col = CONFIG.colors[o.color];
+    const ox = cx(l, o.x);
+    const oy = cy(l, o.y);
+    ctx.strokeStyle = col;
+    // Anel principal com halo largo + um eco mais fraco logo atrás.
+    for (const [lag, mul] of W.echoes) {
+      const r = rad - (lag / 1000) * W.speed;
+      if (r <= 0) continue;
+      ctx.globalAlpha = W.glowAlpha * fade * mul;
+      ctx.lineWidth = W.glowWidth;
+      ctx.beginPath();
+      ctx.arc(ox, oy, r * l.cell, 0, TAU);
+      ctx.stroke();
+      ctx.globalAlpha = W.alpha * fade * mul;
+      ctx.lineWidth = W.width;
+      ctx.stroke();
+    }
+    ctx.fillStyle = col;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        const d = Math.abs(Math.hypot(x - o.x, y - o.y) - rad);
+        if (d > W.band) continue;
+        const b = 1 - d / W.band;
+        ctx.globalAlpha = W.dotAlpha * fade * b;
+        ctx.beginPath();
+        ctx.arc(cx(l, x), cy(l, y), W.dotR * (0.6 + 0.4 * b), 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+  ctx.restore();
+}
+
 interface Run {
   pts: [number, number][];
   color: Color;
