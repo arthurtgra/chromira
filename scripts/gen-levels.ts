@@ -108,17 +108,38 @@ const handmade = JSON.parse(readFileSync(new URL('handmade.json', dir), 'utf8'))
 // Fases geradas aprovadas no playtest: ficam iguais e entram na sua faixa, ordenadas junto com as novas.
 const kept = JSON.parse(readFileSync(new URL('kept.json', dir), 'utf8')) as { tier: number; level: Level }[];
 const levels: Level[] = [...handmade];
-for (const [t, tier] of TIERS.entries()) {
-  const batch = kept.filter((k) => k.tier === t).map(({ level }) => ({ level, score: difficultyScore(level) }));
+type Scored = { level: Level; score: number; tier: number };
+const tiers: Scored[][] = TIERS.map((tier, t) => {
+  const batch: Scored[] = kept.filter((k) => k.tier === t).map(({ level }) => ({ level, score: difficultyScore(level), tier: t }));
   for (let i = 0; i < tier.count; i++) {
     const level = generate(tier.seed + i, tier.options(tier.count === 1 ? 0 : i / (tier.count - 1)));
-    batch.push({ level, score: difficultyScore(level) });
+    batch.push({ level, score: difficultyScore(level), tier: t });
   }
-  batch.sort((a, b) => a.score - b.score);
-  for (const { level, score } of batch) {
-    levels.push(level);
-    process.stdout.write(`faixa ${t + 1} fase ${levels.length}: nota ${score.toFixed(1)}\n`);
-  }
+  return batch.sort((a, b) => a.score - b.score);
+});
+
+// Ordem: cada mecânica nova entra com suas INTRO fases mais fáceis (o jogador vê a novidade num bloco).
+// Entre uma introdução e a próxima vão as demais fases já liberadas, em ordem de dificuldade, até a nota
+// da próxima introdução; o que sobra no fim entra em ordem crescente. Assim a dificuldade sobe de forma
+// contínua sem que uma faixa inteira fácil caia depois de outra difícil.
+const INTRO = 2;
+const pool: Scored[] = [];
+const emit = (x: Scored, tag: string): void => {
+  levels.push(x.level);
+  process.stdout.write(`fase ${levels.length}: faixa ${x.tier + 1} nota ${x.score.toFixed(1)}${tag}
+`);
+};
+// Mecânicas na ordem da dificuldade média das suas fases (índices de TIERS): misturas, trilho, dicroico,
+// filtro+prisma, divisor, prismas com 3 feixes, alvos combinados, tudo junto.
+const FEATURE_ORDER = [0, 3, 5, 1, 6, 2, 4, 7];
+for (const [n, t] of FEATURE_ORDER.entries()) {
+  const batch = tiers[t]!;
+  batch.slice(0, INTRO).forEach((x, i) => emit(x, i === 0 ? '  <- nova mecânica' : ''));
+  pool.push(...batch.slice(INTRO));
+  pool.sort((a, b) => a.score - b.score);
+  const nt = FEATURE_ORDER[n + 1];
+  const next = nt === undefined ? Infinity : tiers[nt]!.slice(0, INTRO).reduce((m, x) => Math.max(m, x.score), 0);
+  while (pool.length > 0 && pool[0]!.score <= next) emit(pool.shift()!, '');
 }
 for (const [i, level] of levels.entries()) {
   level.id = i + 1;
