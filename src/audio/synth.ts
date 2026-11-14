@@ -4,7 +4,9 @@ const A = CONFIG.audio;
 
 // Sons sintetizados com Web Audio. O AudioContext só nasce no primeiro toque (regra do navegador).
 export class Synth {
-  muted = false;
+  private _muted = false;
+  private musicWanted = false;
+  private music: { gain: GainNode; timer: number; nextChord: number; nextNote: number; chord: number } | null = null;
   private ctx: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
   private echo: AudioNode | null = null;
@@ -24,6 +26,7 @@ export class Synth {
       this.bus = this.makeBus(this.ctx);
       this.echo = this.makeEcho(this.ctx);
     }
+    if (this.musicWanted && !this.music) this.startMusic();
     if (this.ctx.state !== 'running') {
       void this.ctx.resume().catch(() => {});
       // iOS só libera o áudio depois de tocar algo dentro do gesto.
@@ -90,8 +93,122 @@ export class Synth {
     return input;
   }
 
+  get muted(): boolean {
+    return this._muted;
+  }
+
+  set muted(m: boolean) {
+    this._muted = m;
+    if (this.music && this.ctx) this.music.gain.gain.setTargetAtTime(m ? 0 : A.music.volume, this.ctx.currentTime, 0.2);
+  }
+
+  // Sino zen: seno com um harmônico fraco, ataque macio e cauda longa na reverberação.
+  private bell(freq: number, at: number, vol: number, ms: number, out?: AudioNode): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.bus) return;
+    const t0 = ctx.currentTime + at / 1000;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+    g.connect(out ?? this.bus);
+    for (const [mul, v] of [[1, 1], [2.01, 0.18], [3, 0.05]] as const) {
+      const o = ctx.createOscillator();
+      o.frequency.value = freq * mul;
+      const og = ctx.createGain();
+      og.gain.value = v;
+      o.connect(og).connect(g);
+      o.start(t0);
+      o.stop(t0 + ms / 1000 + 0.05);
+    }
+  }
+
+  // Botões do menu: um sino suave.
+  uiTap(): void {
+    if (!this.ready()) return;
+    this.bell(A.ui.tapHz, 0, A.volume * A.ui.volume, A.ui.ms);
+  }
+
+  // Escolher fase / jogar: duas notas subindo.
+  uiSelect(): void {
+    if (!this.ready()) return;
+    const [a, b] = A.ui.selectHz;
+    this.bell(a, 0, A.volume * A.ui.volume, A.ui.ms);
+    this.bell(b, A.ui.stepMs, A.volume * A.ui.volume, A.ui.ms * 1.4);
+  }
+
+  // Música do menu: pedido fica guardado até o áudio ser liberado pelo primeiro toque.
+  setMusic(on: boolean): void {
+    this.musicWanted = on;
+    if (on && !this.music && this.ctx) this.startMusic();
+    if (!on && this.music) this.stopMusic();
+  }
+
+  private startMusic(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.bus) return;
+    const M = A.music;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(this._muted ? 0 : M.volume, ctx.currentTime + M.fadeInMs / 1000);
+    gain.connect(this.bus);
+    const m = { gain, timer: 0, nextChord: ctx.currentTime + 0.1, nextNote: ctx.currentTime + 1.5, chord: 0 };
+    // Agenda com folga de 1 s à frente; o setInterval só precisa acordar de vez em quando.
+    const tick = (): void => {
+      const now = ctx.currentTime;
+      while (m.nextChord < now + 1) {
+        const chord = M.chords[m.chord % M.chords.length]!;
+        for (const f of chord) this.pad(f, m.nextChord, M.chordMs / 1000, gain);
+        m.chord++;
+        m.nextChord += M.chordMs / 1000;
+      }
+      while (m.nextNote < now + 1) {
+        if (Math.random() < M.noteChance) {
+          const f = M.melody[Math.floor(Math.random() * M.melody.length)]!;
+          this.bell(f, (m.nextNote - now) * 1000, M.noteVolume, M.noteMs, gain);
+        }
+        m.nextNote += M.noteGapMs[0] / 1000 + (Math.random() * (M.noteGapMs[1] - M.noteGapMs[0])) / 1000;
+      }
+    };
+    tick();
+    m.timer = window.setInterval(tick, 250);
+    this.music = m;
+  }
+
+  private stopMusic(): void {
+    const m = this.music;
+    const ctx = this.ctx;
+    if (!m || !ctx) return;
+    this.music = null;
+    window.clearInterval(m.timer);
+    m.gain.gain.cancelScheduledValues(ctx.currentTime);
+    m.gain.gain.setTargetAtTime(0, ctx.currentTime, A.music.fadeOutMs / 3000);
+    window.setTimeout(() => m.gain.disconnect(), A.music.fadeOutMs + 4000);
+  }
+
+  // Nota de pad: dois senos levemente desafinados, entrada e saída bem lentas.
+  private pad(freq: number, t0: number, dur: number, out: AudioNode): void {
+    const ctx = this.ctx!;
+    const M = A.music;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(M.padVolume, t0 + M.padAttackMs / 1000);
+    g.gain.setValueAtTime(M.padVolume, t0 + dur);
+    g.gain.linearRampToValueAtTime(0, t0 + dur + M.padReleaseMs / 1000);
+    g.connect(out);
+    for (const det of [-4, 4]) {
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      o.detune.value = det;
+      o.connect(g);
+      o.start(t0);
+      o.stop(t0 + dur + M.padReleaseMs / 1000 + 0.05);
+    }
+  }
+
   private ready(): AudioContext | null {
-    return this.muted || !this.ctx ? null : this.ctx;
+    return this._muted || !this.ctx ? null : this.ctx;
   }
 
   click(hz: number = A.clickFilterHz): void {

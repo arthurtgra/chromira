@@ -139,6 +139,29 @@ export const CONFIG = {
       tickVolume: 0.14,
     },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
+    // Sons do menu: sino zen.
+    ui: { tapHz: 659.25, selectHz: [523.25, 783.99], stepMs: 95, ms: 900, volume: 0.5 },
+    // Música do menu: pad lento (Lá menor → Fá → Dó → Sol) + sinos pentatônicos esparsos e aleatórios.
+    music: {
+      volume: 0.5,
+      fadeInMs: 2500,
+      fadeOutMs: 1200,
+      chordMs: 4000,
+      chords: [
+        [220.0, 261.63, 329.63], // Lá menor
+        [174.61, 220.0, 261.63], // Fá
+        [130.81, 196.0, 329.63], // Dó
+        [196.0, 246.94, 293.66], // Sol
+      ],
+      padVolume: 0.035,
+      padAttackMs: 1600,
+      padReleaseMs: 2200,
+      melody: [440.0, 523.25, 587.33, 659.25, 783.99, 880.0], // lá menor pentatônica
+      noteChance: 0.7,
+      noteGapMs: [900, 2200],
+      noteMs: 2200,
+      noteVolume: 0.06,
+    },
     softHz: 5200, // passa-baixa no master: deixa tudo mais macio
     reverb: { seconds: 1.8, decay: 3.2, wet: 0.32, toneHz: 4200 }, // sala sintética em todos os sons
     scale: [261.63, 293.66, 329.63, 392.0, 440.0], // dó ré mi sol lá

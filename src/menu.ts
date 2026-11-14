@@ -28,6 +28,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
     levels.hidden = s !== 'levels';
     menuBtn.hidden = s !== null;
     setMini(false);
+    game.synth.setMusic(s !== null);
     if (s === 'home') $('#play-sub').textContent = `level ${game.current + 1}`;
     if (s === 'levels') renderGrid();
   };
@@ -47,6 +48,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
         if (i === game.current) b.classList.add('current');
         b.setAttribute('aria-label', `Level ${i + 1}${game.done.has(i) ? ', completed' : i > open ? ', locked' : ''}`);
         b.addEventListener('click', () => {
+          game.synth.uiSelect();
           game.load(i);
           show(null);
         });
@@ -58,15 +60,22 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
 
   for (const el of document.querySelectorAll<HTMLElement>('[data-go]')) {
     el.addEventListener('click', () => {
+      game.synth.uiTap();
       const go = el.dataset.go;
       if (go === 'levels') show('levels');
       else if (go === 'home') show('home');
       else if (go === 'back') show(back);
     });
   }
-  $('#play').addEventListener('click', () => show(null));
+  $('#play').addEventListener('click', () => {
+    game.synth.uiSelect();
+    show(null);
+  });
   menuBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-  menuBtn.addEventListener('click', () => setMini(Boolean(mini.hidden)));
+  menuBtn.addEventListener('click', () => {
+    game.synth.uiTap();
+    setMini(Boolean(mini.hidden));
+  });
   // Toque fora do mini menu fecha (sem girar peça por baixo).
   window.addEventListener(
     'pointerdown',
