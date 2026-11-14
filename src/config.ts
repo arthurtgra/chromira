@@ -129,7 +129,7 @@ export const CONFIG = {
   // Vitória: depois de uma pausa, um pulso de luz caminha por cada feixe, do lançador até o fim:
   // as ondas engordam só num trecho estreito em volta dele, com um ponto de luz andando junto.
   // Trilho (fases 71+): cápsula por baixo da peça arrastável.
-  rail: { width: 0.5, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1.2, dot: 'rgba(255,255,255,0.45)', dotR: 0.04 },
+  rail: { width: 0.2, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1, dot: 'rgba(255,255,255,0.5)', dotR: 0.035 },
   slideRate: 22, // deslize da peça até a célula do trilho (1/s, suavização exponencial)
   dragSlop: 8, // px de movimento antes de virar arrasto (menos que isso é toque)
   prismTurnRate: 12, // giro do prisma até a nova direção da luz (1/s, suavização exponencial)
