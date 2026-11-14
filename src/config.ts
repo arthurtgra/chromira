@@ -22,7 +22,7 @@ export const CONFIG = {
     2: '#29f58a',
     3: '#ffd93d',
     4: '#4c7dff',
-    5: '#ff4fd1',
+    5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
     7: '#f4f6ff',
   } satisfies Record<Color, string>,
@@ -65,7 +65,13 @@ export const CONFIG = {
       // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
       // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
-      tint: { 3: 0.15, 5: 0.2 } as Partial<Record<Color, number>>,
+      tint: {} as Partial<Record<Color, number>>,
+      // Tons das ondas componentes dentro de cada mistura. Vermelho e verde puros somam um amarelo
+      // salmão estranho: no amarelo viram laranja + lima. No rosa, o azul é mais claro e mais grosso.
+      comp: {
+        3: { 1: { color: '#ff8a1c' }, 2: { color: '#c4ff2e' } },
+        5: { 1: { color: '#ff3d7f' }, 4: { color: '#7c86ff', width: 1.5, alpha: 1 } },
+      } as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
       // Misturas (2+ componentes): miolo liso na cor da mistura entre as ondas puras, para ler amarelo/rosa
       // sem esconder as cores que o formam.
       mixCore: { width: 0.05, alpha: 0.6 },

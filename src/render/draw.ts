@@ -136,11 +136,16 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
     const waves =
       comps.length === 1
-        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph }))
-        : comps.map((c) => ({
-            color: mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
-            ph: (COMPONENTS.indexOf(c) * TAU) / 3,
-          }));
+        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number }))
+        : comps.map((c) => {
+            const o = W.comp[r.color]?.[c];
+            return {
+              color: o?.color ?? mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
+              ph: (COMPONENTS.indexOf(c) * TAU) / 3,
+              width: o?.width ?? 1,
+              alpha: o?.alpha ?? W.alpha,
+            };
+          });
     for (const w of waves) {
       ctx.strokeStyle = w.color;
       ctx.lineWidth = W.driftWidth * l.cell;
@@ -149,8 +154,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       ctx.lineWidth = W.glowWidth * l.cell;
       ctx.globalAlpha = W.glowAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st);
-      ctx.lineWidth = Math.max(1, W.width * l.cell);
-      ctx.globalAlpha = W.alpha * alphaMul;
+      ctx.lineWidth = Math.max(1, W.width * w.width * l.cell);
+      ctx.globalAlpha = w.alpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st);
     }
   }
