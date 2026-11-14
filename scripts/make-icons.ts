@@ -8,6 +8,25 @@ const BG: [number, number, number] = [22, 22, 27];
 const SCALE = 0.62; // largura do logo em fração do ícone (cabe na zona segura do ícone "maskable")
 const SS = 4;
 const STROKE = 0.022; // espessura do traço em fração da largura do logo
+// Brilho cônico atrás do logo: cor pelo ângulo (arco-íris), força cai do centro para fora.
+const RAINBOW = ['#ff3358', '#ffb02e', '#fff35c', '#29f58a', '#2ee6ff', '#4c7dff', '#b44cff', '#ff3358'];
+const GLOW = { alpha: 0.42, sigma: 0.42 }; // sigma em fração da largura do logo
+
+function glowAt(cx: number, cy: number, sigma: number, x: number, y: number): [number, number, number] {
+  const t = ((Math.atan2(y - cy, x - cx) / (2 * Math.PI) + 1.05) % 1) * (RAINBOW.length - 1);
+  const i = Math.floor(t);
+  const a = hex(RAINBOW[i]!);
+  const b = hex(RAINBOW[i + 1]!);
+  const r = Math.hypot(x - cx, y - cy);
+  const k = GLOW.alpha * Math.exp(-((r / sigma) ** 2));
+  // No miolo as cores do cone se encontram num ponto; ali elas se fundem num tom neutro claro.
+  const m = Math.min(1, r / (0.45 * sigma)) ** 1.5;
+  const mid: [number, number, number] = [170, 165, 190];
+  return [0, 1, 2].map((j) => {
+    const cone = a[j]! + (b[j]! - a[j]!) * (t - i);
+    return BG[j]! + (mid[j]! + (cone - mid[j]!) * m - BG[j]!) * k;
+  }) as [number, number, number];
+}
 
 const hex = (h: string): [number, number, number] => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
 
@@ -44,7 +63,7 @@ function icon(size: number): Buffer {
         for (let sx = 0; sx < SS; sx++) {
           const qx = x + (sx + 0.5) / SS;
           const qy = y + (sy + 0.5) / SS;
-          let c = BG;
+          let c = glowAt(size / 2, size / 2, GLOW.sigma * w, qx, qy);
           for (const l of lines) if (distSeg(l.a, l.b, qx, qy) <= r) c = l.rgb;
           for (let k = 0; k < 3; k++) acc[k]! += c[k]!;
         }
