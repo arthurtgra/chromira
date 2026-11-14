@@ -261,9 +261,9 @@ export class Game {
       return;
     }
 
-    // Cada alvo reage no instante em que a luz chega nele (ou deixa de chegar).
+    // Cada alvo reage no instante em que a luz toca o anel (raio ringRadius), não o centro.
     const front = this.front();
-    const got = arrived(this.plan, front);
+    const got = arrived(this.plan, front + CONFIG.piece.ringRadius);
     let down = false;
     for (const t of this.level.cells) {
       if (t.t !== 'target') continue;
@@ -305,7 +305,7 @@ export class Game {
     });
     drawPrismGlow(ctx, l, placeCells(this.level, this.rots), visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
-    const got = arrived(this.plan, front);
+    const got = arrived(this.plan, front + CONFIG.piece.ringRadius);
     drawRails(ctx, l, this.level.cells);
     drawPieces(ctx, l, this.drawnCells(), {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),

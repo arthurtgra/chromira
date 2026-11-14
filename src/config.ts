@@ -119,7 +119,7 @@ export const CONFIG = {
   mirrorSpinMs: 80,
   filterSwapMs: 160,
   pulse: { ms: 450, radius: 0.9 },
-  targetFillMs: 200,
+  targetFillMs: 110,
 
   particles: { min: 60, max: 100, speed: [80, 320], lifeMs: [500, 1100], size: [1.5, 3.5], drag: 2.2 },
   flash: { alpha: 0.16, ms: 260 },
