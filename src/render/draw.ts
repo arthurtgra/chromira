@@ -305,7 +305,7 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     h.globalCompositeOperation = 'destination-in';
     const fall = h.createRadialGradient(R, R, R * P.haloInner, R, R, R);
     fall.addColorStop(0, 'rgba(0,0,0,1)');
-    fall.addColorStop(0.35, 'rgba(0,0,0,0.6)');
+    fall.addColorStop(0.35, 'rgba(0,0,0,0.75)');
     fall.addColorStop(1, 'rgba(0,0,0,0)');
     h.fillStyle = fall;
     h.fillRect(0, 0, size, size);

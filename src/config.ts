@@ -110,9 +110,9 @@ export const CONFIG = {
       coreAlpha: 0.12, // fraco: com 'lighter' o miolo branco estourava
       halo: 0.62, // halo contínuo em volta, raio em células
       haloInner: 0.12, // fração do raio onde o halo começa a sumir
-      haloAlpha: 0.95,
-      mixAlpha: 0.55, // força das misturas (amarelo, ciano, rosa) relativa às cores puras
-      rays: { count: 18, width: 1.3, from: 0.18, len: [0.22, 0.5], alpha: 0.7, spin: 0.015 },
+      haloAlpha: 1,
+      mixAlpha: 0.68, // força das misturas (amarelo, ciano, rosa) relativa às cores puras
+      rays: { count: 18, width: 1.3, from: 0.18, len: [0.22, 0.5], alpha: 0.85, spin: 0.015 },
     },
   },
 
