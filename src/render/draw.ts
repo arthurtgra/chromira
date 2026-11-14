@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { DELTA, FILTER_COLORS } from '../core/trace.ts';
-import type { Cell, Segment } from '../core/types.ts';
+import type { Cell, Color, Segment } from '../core/types.ts';
+import { cut, visibleLength, visibleSegments, type BeamPlan } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -22,55 +23,117 @@ export function drawBackground(ctx: Ctx, l: Layout, colors: readonly [string, st
   }
 }
 
-const segLen = (s: Segment): number => Math.abs(s.x2 - s.x1) + Math.abs(s.y2 - s.y1);
+interface Run {
+  pts: [number, number][];
+  color: Color;
+  d0: number;
+}
 
-function visibleSegments(segments: Segment[], t: number): Segment[] {
-  const total = segments.reduce((a, s) => a + segLen(s), 0);
-  let budget = total * Math.min(1, Math.max(0, t));
-  const out: Segment[] = [];
-  for (const s of segments) {
-    if (budget <= 0) break;
-    const len = segLen(s);
-    if (len <= budget) out.push(s);
-    else {
-      const f = budget / len;
-      out.push({ ...s, x2: s.x1 + (s.x2 - s.x1) * f, y2: s.y1 + (s.y2 - s.y1) * f });
+// Junta segmentos encadeados da mesma cor numa polilinha só: cantos contínuos, sem emendas.
+function buildRuns(plan: BeamPlan, front: number): { runs: Run[]; heads: Segment[]; ends: Segment[] } {
+  const runs: Run[] = [];
+  const heads: Segment[] = [];
+  const ends: Segment[] = [];
+  let open = false;
+  for (const p of plan.pieces) {
+    const v = visibleLength(p, front);
+    if (v <= 0) {
+      open = false;
+      continue;
     }
-    budget -= len;
+    const s = cut(p, 0, v);
+    const last = runs.at(-1);
+    const tail = last?.pts.at(-1);
+    if (open && last && tail && last.color === s.color && tail[0] === s.x1 && tail[1] === s.y1) last.pts.push([s.x2, s.y2]);
+    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: p.d0 });
+    open = v >= p.len;
+    if (open) ends.push(s);
+    else if (front - p.d0 >= p.known) heads.push(s);
   }
-  return out;
+  return { runs, heads, ends };
+}
+
+function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
+  ctx.beginPath();
+  r.pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(cx(l, x), cy(l, y)) : ctx.lineTo(cx(l, x), cy(l, y))));
+  ctx.stroke();
+}
+
+function glow(ctx: Ctx, x: number, y: number, r: number, color: string, alpha: number): void {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.3, color);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, TAU);
+  ctx.fill();
 }
 
 export interface BeamStyle {
-  t: number; // fração desenhada, 0..1
+  t: number; // fração da animação de crescimento, 0..1
   widthMul: number;
   rainbow: number; // 0..1
   time: number; // segundos
 }
 
-// Desenha os segmentos até a fração t do comprimento total; feixes brancos ganham franjas de difração.
-export function drawBeams(ctx: Ctx, l: Layout, segments: Segment[], st: BeamStyle): void {
-  const visible = visibleSegments(segments, st.t);
+export interface FadingBeam {
+  seg: Segment;
+  k: number; // 0..1, quanto já apagou
+}
+
+// Feixe como polilinhas contínuas com três camadas, pulsos de luz correndo no sentido da propagação,
+// cabeça brilhante na frente que avança e franjas de difração nos feixes brancos.
+export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fading: FadingBeam[], st: BeamStyle): void {
+  const B = CONFIG.beam;
+  const { runs, heads } = buildRuns(plan, front);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
-  for (const layer of CONFIG.beam.layers) {
-    ctx.globalAlpha = layer.alpha;
-    ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
-    for (const s of visible) {
-      ctx.strokeStyle = CONFIG.colors[s.color];
+  ctx.lineJoin = 'round';
+
+  for (const f of fading) {
+    const a = (1 - f.k) ** 2;
+    for (const layer of B.layers) {
+      ctx.globalAlpha = layer.alpha * a;
+      ctx.lineWidth = Math.max(1, layer.width * l.cell * (1 - 0.5 * f.k));
+      ctx.strokeStyle = CONFIG.colors[f.seg.color];
       ctx.beginPath();
-      ctx.moveTo(cx(l, s.x1), cy(l, s.y1));
-      ctx.lineTo(cx(l, s.x2), cy(l, s.y2));
+      ctx.moveTo(cx(l, f.seg.x1), cy(l, f.seg.y1));
+      ctx.lineTo(cx(l, f.seg.x2), cy(l, f.seg.y2));
       ctx.stroke();
     }
   }
+
+  for (const layer of B.layers) {
+    ctx.globalAlpha = layer.alpha;
+    ctx.lineWidth = Math.max(1, layer.width * l.cell * st.widthMul);
+    for (const r of runs) {
+      ctx.strokeStyle = CONFIG.colors[r.color];
+      strokeRun(ctx, l, r);
+    }
+  }
+
+  // Pulsos: tracejado cuja fase segue a distância da fonte, então atravessa cantos sem pular.
+  const F = B.flow;
+  ctx.setLineDash([F.dash * l.cell, F.gap * l.cell]);
+  ctx.lineWidth = Math.max(1.5, F.width * l.cell * st.widthMul);
+  ctx.globalAlpha = F.alpha;
+  ctx.strokeStyle = '#ffffff';
+  for (const r of runs) {
+    ctx.lineDashOffset = (r.d0 - st.time * F.speed) * l.cell;
+    strokeRun(ctx, l, r);
+  }
+  ctx.setLineDash([]);
+
+  for (const h of heads) glow(ctx, cx(l, h.x2), cy(l, h.y2), B.head * l.cell, CONFIG.colors[h.color], 0.9);
 
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
     const n = R.fringes;
     ctx.lineWidth = Math.max(1, 0.025 * l.cell * st.widthMul);
-    for (const s of visible) {
+    for (const s of visibleSegments(plan, front)) {
       if (s.color !== 7) continue;
       const vertical = s.x1 === s.x2;
       for (let i = 0; i < n; i++) {
@@ -84,6 +147,44 @@ export function drawBeams(ctx: Ctx, l: Layout, segments: Segment[], st: BeamStyl
         ctx.lineTo(cx(l, s.x2) + (vertical ? off : 0), cy(l, s.y2) + (vertical ? 0 : off));
         ctx.stroke();
       }
+    }
+  }
+  ctx.restore();
+}
+
+// Desenhado por cima das peças: reflexo cintilante onde o feixe bate num espelho ou filtro,
+// e clarão de impacto onde ele morre numa parede ou na borda.
+export function drawBeamHits(ctx: Ctx, l: Layout, cells: Cell[], plan: BeamPlan, front: number, st: BeamStyle): void {
+  const B = CONFIG.beam;
+  const shiny = new Set(cells.flatMap((c) => (c.t === 'mirror' || c.t === 'filter' ? [`${c.x},${c.y}`] : [])));
+  const { ends } = buildRuns(plan, front);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
+  for (const s of ends) {
+    const x = cx(l, s.x2);
+    const y = cy(l, s.y2);
+    const col = CONFIG.colors[s.color];
+    const seed = s.x2 * 1.7 + s.y2 * 2.3;
+    if (shiny.has(`${s.x2},${s.y2}`)) {
+      const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * B.glint.hz + seed);
+      const r = B.glint.radius * l.cell * (0.85 + 0.15 * pulse) * st.widthMul;
+      glow(ctx, x, y, r, col, 0.45 + 0.3 * pulse);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      const rot = st.time * B.glint.spin + seed;
+      for (let i = 0; i < 4; i++) {
+        const a = rot + (i * Math.PI) / 4;
+        const len = r * (i % 2 === 0 ? 1.15 : 0.6);
+        ctx.globalAlpha = (i % 2 === 0 ? 0.75 : 0.45) * (0.6 + 0.4 * pulse);
+        ctx.beginPath();
+        ctx.moveTo(x - Math.cos(a) * len, y - Math.sin(a) * len);
+        ctx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+        ctx.stroke();
+      }
+    } else if (!Number.isInteger(s.x2) || !Number.isInteger(s.y2)) {
+      const flicker = 0.75 + 0.25 * Math.sin(st.time * 11 + seed);
+      glow(ctx, x, y, B.impact * l.cell * flicker * st.widthMul, col, 0.7);
     }
   }
   ctx.restore();
