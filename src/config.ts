@@ -78,7 +78,7 @@ export const CONFIG = {
       driftWidth: 0.11,
       driftAlpha: 0.09,
     },
-    winWidthMul: 1.8,
+    winWidthMul: 1.2, // na vitória as ondas abrem só um pouco
     winGrowMs: 300,
   },
 
@@ -152,9 +152,8 @@ export const CONFIG = {
     numberWeight: 250,
     y: 50,
     appearMs: 650,
-    winScale: 0.16,
+    winScale: 0.08,
     breathe: 0.015,
-    glow: { w: 70, h: 26, dy: 4, rest: 0.1, flare: 0.45, win: 0.4, decayMs: 1100 }, // halo elíptico atrás do número
     barY: 92,
     barW: 14,
     barH: 3,
