@@ -6,7 +6,7 @@ type Screen = 'home' | 'levels' | null;
 const $ = <T extends HTMLElement>(sel: string): T => document.querySelector<T>(sel)!;
 
 // Menus em HTML por cima do canvas: o jogo continua desenhando atrás, desfocado.
-export function setupMenu(game: Game, startOnHome: boolean): void {
+export function setupMenu(game: Game, startOnHome: boolean, mark?: (i: number) => string | undefined): void {
   const home = $<HTMLElement>('#home');
   const levels = $<HTMLElement>('#levels');
   const mini = $<HTMLElement>('#mini');
@@ -27,6 +27,7 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
     home.hidden = s !== 'home';
     levels.hidden = s !== 'levels';
     menuBtn.hidden = s !== null;
+    document.body.dataset.screen = s ?? 'game';
     setMini(false);
     game.synth.setMusic(s !== null);
     if (s === 'home') $('#play-sub').textContent = `level ${game.current + 1}`;
@@ -46,6 +47,8 @@ export function setupMenu(game: Game, startOnHome: boolean): void {
         else if (i <= open) b.classList.add('open');
         else b.classList.add('locked');
         if (i === game.current) b.classList.add('current');
+        const m = mark?.(i);
+        if (m) b.classList.add(`fb-${m}`);
         b.setAttribute('aria-label', `Level ${i + 1}${game.done.has(i) ? ', completed' : i > open ? ', locked' : ''}`);
         b.addEventListener('click', () => {
           game.synth.uiSelect();

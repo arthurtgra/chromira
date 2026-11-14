@@ -61,6 +61,8 @@ export class Game {
   private readonly levels: Level[];
   readonly done = new Set<number>();
   onWin: (() => void) | null = null;
+  onLoad: (() => void) | null = null;
+  skip = new Set<number>(); // fases cortadas no playtest: o avanço automático pula
 
   constructor(levels: Level[]) {
     this.levels = levels;
@@ -91,6 +93,20 @@ export class Game {
     this.nextAt = Infinity;
     this.fx.clear();
     this.persist();
+    this.onLoad?.();
+  }
+
+  // Próxima fase não cortada depois de i (se todas cortadas, a seguinte).
+  nextIndex(i: number): number {
+    for (let k = 1; k < this.levels.length; k++) {
+      const j = (i + k) % this.levels.length;
+      if (!this.skip.has(j)) return j;
+    }
+    return (i + 1) % this.levels.length;
+  }
+
+  get levelId(): number {
+    return this.level.id;
   }
 
   get current(): number {
@@ -189,7 +205,7 @@ export class Game {
         this.pulseSpeed = (this.plan.to + P.width * 2) / ms; // células por ms
         this.nextAt = this.now + ms + P.holdMs;
       }
-      if (this.now >= this.nextAt) this.load(this.index + 1);
+      if (this.now >= this.nextAt) this.load(this.nextIndex(this.index));
       return;
     }
 
