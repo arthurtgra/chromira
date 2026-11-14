@@ -7,6 +7,7 @@ import type { Level } from '../src/core/types.ts';
 interface Tier {
   count: number; // fases novas geradas (as mantidas de kept.json entram a mais)
   seed: number; // seed própria: mexer numa faixa não muda as outras
+  finale?: boolean; // fica no fim do jogo, fora da ordenação global
   options: (k: number) => GenOptions; // k = 0..1 dentro da faixa
 }
 
@@ -97,11 +98,44 @@ const TIERS: Tier[] = [
       minMoves: lerp(7, 9, k),
     }),
   },
+  // 91–100: final — todas as mecânicas juntas: prisma, filtro, alvo combinado, trilho e divisor ou dicroico.
+  {
+    count: 10,
+    seed: 20400,
+    finale: true,
+    options: (k) => {
+      const i = Math.round(k * 9);
+      return {
+        mirrors: lerp(7, 9, k),
+        beams: 3,
+        prism: true,
+        filters: 1,
+        merge: 1,
+        mergeMirrors: 2,
+        splitters: i % 2 === 0 ? 1 : 0,
+        dichroics: i % 2 === 1 ? 1 : 0,
+        slider: i % 3 === 0 ? ('prism' as const) : ('mirror' as const),
+        minMoves: lerp(9, 11, k),
+      };
+    },
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.
 const THRESHOLDS = [4.5, 8, 12, 16];
 const pips = (score: number): number => 1 + THRESHOLDS.filter((t) => score >= t).length;
+
+// Seed sem fase válida (comum nas faixas com muitas mecânicas): tenta seeds derivadas, deterministicamente.
+// Faixas antigas acertam de primeira, então não mudam.
+function generateRetry(seed: number, opts: GenOptions): Level {
+  for (let n = 0; ; n++) {
+    try {
+      return generate(seed + n * 1000, opts);
+    } catch (e) {
+      if (n >= 30) throw e;
+    }
+  }
+}
 
 const dir = new URL('../src/levels/', import.meta.url);
 const handmade = JSON.parse(readFileSync(new URL('handmade.json', dir), 'utf8')) as Level[];
@@ -112,7 +146,7 @@ type Scored = { level: Level; score: number; tier: number };
 const tiers: Scored[][] = TIERS.map((tier, t) => {
   const batch: Scored[] = kept.filter((k) => k.tier === t).map(({ level }) => ({ level, score: difficultyScore(level), tier: t }));
   for (let i = 0; i < tier.count; i++) {
-    const level = generate(tier.seed + i, tier.options(tier.count === 1 ? 0 : i / (tier.count - 1)));
+    const level = generateRetry(tier.seed + i, tier.options(tier.count === 1 ? 0 : i / (tier.count - 1)));
     batch.push({ level, score: difficultyScore(level), tier: t });
   }
   return batch.sort((a, b) => a.score - b.score);
@@ -120,7 +154,7 @@ const tiers: Scored[][] = TIERS.map((tier, t) => {
 
 // Ordem: dificuldade estritamente crescente (nota do solver). Cada mecânica aparece pela primeira vez na
 // sua fase mais fácil, onde ela cai na curva; empates seguem a ordem das faixas.
-const all = tiers.flat().sort((a, b) => a.score - b.score || a.tier - b.tier);
+const all = tiers.filter((_, t) => !TIERS[t]!.finale).flat().sort((a, b) => a.score - b.score || a.tier - b.tier);
 const seenTier = new Set<number>();
 for (const x of all) {
   levels.push(x.level);
@@ -128,6 +162,14 @@ for (const x of all) {
   seenTier.add(x.tier);
   process.stdout.write(`fase ${levels.length}: faixa ${x.tier + 1} nota ${x.score.toFixed(1)}${tag}
 `);
+}
+for (const [t, batch] of tiers.entries()) {
+  if (!TIERS[t]!.finale) continue;
+  for (const x of batch) {
+    levels.push(x.level);
+    process.stdout.write(`fase ${levels.length}: final nota ${x.score.toFixed(1)}
+`);
+  }
 }
 for (const [i, level] of levels.entries()) {
   level.id = i + 1;

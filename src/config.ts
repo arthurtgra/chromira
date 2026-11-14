@@ -14,6 +14,7 @@ export const CONFIG = {
     ['#3c2a13', '#120c05'], // âmbar queimado
     ['#152b3e', '#060b11'], // ardósia azul
     ['#3a1a3d', '#110712'], // ameixa
+    ['#1b1d4f', '#07081b'], // índigo (final, 91-100)
   ],
   backgroundFadeMs: 900,
   gridDotAlpha: 0.1,
