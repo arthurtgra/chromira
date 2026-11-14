@@ -91,43 +91,47 @@ export interface BeamStyle {
 }
 
 export interface FadingBeam {
-  seg: Segment;
-  k: number; // 0..1, quanto já apagou
+  seg: Segment; // já recortado: só o que ainda não foi recolhido
+  d0: number; // fase das ondas
+  alpha: number;
 }
 
 // Três camadas por polilinha, faixas cromáticas correndo no sentido da luz e franjas de difração nos brancos.
 export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fading: FadingBeam[], st: BeamStyle): void {
-  const B = CONFIG.beam;
-  const runs = buildRuns(plan, front);
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
+  // Trechos sendo recolhidos: mesmo visual, mais fracos.
   for (const f of fading) {
-    for (const layer of B.layers) {
-      ctx.globalAlpha = layer.alpha * (1 - f.k) ** 2;
-      ctx.lineWidth = Math.max(1, layer.width * l.cell);
-      ctx.strokeStyle = CONFIG.colors[f.seg.color];
-      ctx.beginPath();
-      ctx.moveTo(cx(l, f.seg.x1), cy(l, f.seg.y1));
-      ctx.lineTo(cx(l, f.seg.x2), cy(l, f.seg.y2));
-      ctx.stroke();
-    }
+    drawRuns(ctx, l, [{ pts: [[f.seg.x1, f.seg.y1], [f.seg.x2, f.seg.y2]], color: f.seg.color, d0: f.d0 }], st, f.alpha);
   }
+  drawRuns(ctx, l, buildRuns(plan, front), st, 1);
+  ctx.restore();
+}
 
+// Névoa e miolo na cor do feixe, miolo de mistura, e as ondas (uma por componente R/G/B, fases a 120°;
+// cor pura vira trança de duas ondas). Cada onda tem aura que a acompanha e uma deriva lenta mais aberta.
+function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number): void {
+  const B = CONFIG.beam;
+  const W = B.waves;
   for (const layer of B.layers) {
-    ctx.globalAlpha = layer.alpha;
+    ctx.globalAlpha = layer.alpha * alphaMul;
     ctx.lineWidth = Math.max(1, layer.width * l.cell);
     for (const r of runs) {
       ctx.strokeStyle = CONFIG.colors[r.color];
       strokeRun(ctx, l, r);
     }
   }
-
-  // Ondas: uma por componente de cor (R, G, B), fases a 120°. Cor pura vira trança de duas ondas em oposição.
-  // Cada onda tem aura larga que a acompanha e uma deriva lenta mais aberta: o brilho se mexe junto.
-  const W = B.waves;
+  for (const r of runs) {
+    if ((r.color & (r.color - 1)) === 0 || r.color === 7) continue;
+    ctx.strokeStyle = CONFIG.colors[r.color];
+    for (const m of [W.mixGlow, W.mixCore]) {
+      ctx.globalAlpha = m.alpha * alphaMul;
+      ctx.lineWidth = Math.max(1, m.width * l.cell);
+      strokeRun(ctx, l, r);
+    }
+  }
   for (const r of runs) {
     const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
     const waves =
@@ -140,21 +144,20 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
     for (const w of waves) {
       ctx.strokeStyle = w.color;
       ctx.lineWidth = W.driftWidth * l.cell;
-      ctx.globalAlpha = W.driftAlpha;
+      ctx.globalAlpha = W.driftAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp, W.driftLength, W.driftSpeed);
       ctx.lineWidth = W.glowWidth * l.cell;
-      ctx.globalAlpha = W.glowAlpha;
+      ctx.globalAlpha = W.glowAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st);
       ctx.lineWidth = Math.max(1, W.width * l.cell);
-      ctx.globalAlpha = W.alpha;
+      ctx.globalAlpha = W.alpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st);
     }
   }
-
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
     ctx.lineWidth = Math.max(1, W.width * 0.7 * l.cell);
-    ctx.globalAlpha = R.alpha * st.rainbow;
+    ctx.globalAlpha = R.alpha * st.rainbow * alphaMul;
     const ampMul = 1 + (R.ampMul - 1) * st.rainbow;
     for (const r of runs) {
       if (r.color !== 7) continue;
@@ -164,7 +167,6 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
       });
     }
   }
-  ctx.restore();
 }
 
 const DIRS: Dir[] = ['N', 'E', 'S', 'W'];

@@ -45,8 +45,11 @@ export const CONFIG = {
       { width: 0.3, alpha: 0.035 }, // névoa bem fraca; o brilho de verdade vem das auras das ondas
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
-    speed: 36, // células por segundo: só o trecho que mudou cresce, o resto fica aceso
-    fadeMs: 220, // trecho que deixou de existir apaga neste tempo
+    // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
+    speed: 30, // ao abrir a fase
+    turnSpeed: 15, // ao girar uma peça: mais devagar, vira transição
+    growMs: [160, 650], // duração mínima e máxima de um crescimento
+    retractSpeed: 16, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
     // Onde se cruzam somam (R+G+B = branco). Amplitude some perto de cantos e pontas: as ondas se juntam ali.
@@ -61,7 +64,11 @@ export const CONFIG = {
       // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
       // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
-      tint: { 5: 0.6 } as Partial<Record<Color, number>>,
+      tint: { 3: 0.15, 5: 0.2 } as Partial<Record<Color, number>>,
+      // Misturas (2+ componentes): miolo liso na cor da mistura entre as ondas puras, para ler amarelo/rosa
+      // sem esconder as cores que o formam.
+      mixCore: { width: 0.05, alpha: 0.6 },
+      mixGlow: { width: 0.2, alpha: 0.12 },
       glowWidth: 0.15,
       glowAlpha: 0.13,
       driftAmp: 2.1, // multiplica amp

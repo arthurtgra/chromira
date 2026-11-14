@@ -3,7 +3,7 @@ import { CONFIG } from './config.ts';
 import { key, pieceStates, pieces, startRots, trace } from './core/trace.ts';
 import type { Cell, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { planBeams, visibleSegments, type BeamPlan } from './render/beams.ts';
+import { cut, planBeams, segLen, visibleSegments, type BeamPlan } from './render/beams.ts';
 import {
   drawBackground,
   drawBeams,
@@ -47,7 +47,8 @@ export class Game {
   private bgFrom: readonly [string, string] | null = null;
   private bgAt = 0;
   private plan: BeamPlan = planBeams([], []);
-  private fades: { seg: Segment; at: number }[] = [];
+  private fades: { seg: Segment; at: number; off: number }[] = [];
+  private beamMs = 1;
   private pending = false;
   private pendingDown = false;
   private litAt = new Map<string, number>();
@@ -77,6 +78,7 @@ export class Game {
     this.pendingDown = false;
     this.plan = planBeams([], this.result.segments);
     this.fades = [];
+    this.timeBeam(CONFIG.beam.speed);
     this.beamAt = this.now;
     this.loadedAt = this.now;
     this.wonAt = null;
@@ -116,7 +118,15 @@ export class Game {
     const before = visibleSegments(this.plan, this.front());
     this.result = trace(this.level, this.rots);
     this.plan = planBeams(before, this.result.segments);
-    for (const seg of this.plan.fading) this.fades.push({ seg, at: this.now });
+    // Recolhe o que sumiu a partir do ponto que mudou: trechos encadeados recolhem em sequência.
+    let off = 0;
+    let prev: Segment | null = null;
+    for (const seg of this.plan.fading) {
+      off = prev && prev.x2 === seg.x1 && prev.y2 === seg.y1 ? off + segLen(prev) : 0;
+      this.fades.push({ seg, at: this.now, off });
+      prev = seg;
+    }
+    this.timeBeam(CONFIG.beam.turnSpeed);
     const lit = new Set(this.litKeys(this.result));
     for (const k of [...this.litAt.keys()]) {
       if (lit.has(k)) continue;
@@ -131,7 +141,7 @@ export class Game {
     this.now += dtMs;
     this.fps += (1000 / Math.max(1, dtMs) - this.fps) * 0.05;
     this.fx.update(dtMs);
-    this.fades = this.fades.filter((f) => this.now - f.at < CONFIG.beam.fadeMs);
+    this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
     // Efeitos de alvo só disparam quando o feixe termina de ser desenhado.
     if (this.pending && this.front() >= this.plan.to) {
@@ -164,7 +174,11 @@ export class Game {
       time: this.now / 1000,
     };
     const front = this.front();
-    const fading = this.fades.map((f) => ({ seg: f.seg, k: clamp01((this.now - f.at) / CONFIG.beam.fadeMs) }));
+    const fading = this.fades.map((f) => {
+      const len = segLen(f.seg);
+      const r = Math.max(0, this.retracted(f));
+      return { seg: cut(f.seg, r, len), d0: r, alpha: 1 - 0.5 * clamp01(r / len) };
+    });
     drawPrismGlow(ctx, l, this.level.cells, this.result.segments, style);
     drawBeams(ctx, l, this.plan, front, fading, style);
     drawPieces(ctx, l, this.level.cells, {
@@ -226,8 +240,19 @@ export class Game {
   }
 
   // Distância da fonte já alcançada pela frente de luz, em células.
+  // Distância da fonte já alcançada pela frente de luz: rápida no começo, desacelera no fim.
   private front(): number {
-    return this.plan.from + ((this.now - this.beamAt) / 1000) * CONFIG.beam.speed;
+    const { from, to } = this.plan;
+    return from + (to - from) * easeOut(clamp01((this.now - this.beamAt) / this.beamMs));
+  }
+
+  private timeBeam(speed: number): void {
+    const [lo, hi] = CONFIG.beam.growMs;
+    this.beamMs = Math.min(hi, Math.max(lo, ((this.plan.to - this.plan.from) / speed) * 1000));
+  }
+
+  private retracted(f: { at: number; off: number }): number {
+    return ((this.now - f.at) / 1000) * CONFIG.beam.retractSpeed - f.off;
   }
 
   private beamT(): number {
