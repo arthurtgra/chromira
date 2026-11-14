@@ -23,7 +23,11 @@ export function reflect(dir: Dir, rot: number): Dir {
 }
 
 export const isPiece = (c: Cell): boolean =>
-  c.t === 'mirror' || c.t === 'filter' || c.t === 'splitter' || (c.t === 'prism' && c.rail !== undefined);
+  c.t === 'mirror' ||
+  c.t === 'filter' ||
+  c.t === 'splitter' ||
+  c.t === 'dichroic' ||
+  (c.t === 'prism' && c.rail !== undefined);
 // Estados de rotação (sem contar o trilho).
 export const baseStates = (c: Cell): number => (c.t === 'filter' ? 3 : c.t === 'prism' ? 1 : 2);
 export const railOf = (c: Cell): Rail | undefined => (c.t === 'mirror' || c.t === 'prism' ? c.rail : undefined);
@@ -115,6 +119,17 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
           push(x, y);
           dir = reflect(dir, (rots[pieceIdx.get(k)!] ?? 0) % 2);
           break;
+        case 'dichroic': {
+          // Filme fino: a cor do espelho reflete, as outras componentes atravessam reto.
+          const refl = color & c.color;
+          const pass = color & ~c.color;
+          if (refl === 0) break;
+          push(x, y);
+          if (pass !== 0) queue.push({ x, y, dir, color: pass as Color });
+          color = refl as Color;
+          dir = reflect(dir, (rots[pieceIdx.get(k)!] ?? 0) % 2);
+          break;
+        }
         case 'splitter':
           // Metade segue reto (novo feixe na fila), metade reflete como espelho.
           push(x, y);

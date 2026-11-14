@@ -86,6 +86,17 @@ const TIERS: Tier[] = [
       };
     },
   },
+  // 81+: espelho dicroico — reflete só a sua cor e deixa as outras passarem (separa um feixe misturado).
+  {
+    count: 10,
+    seed: 20300,
+    options: (k) => ({
+      mirrors: lerp(5, 8, k),
+      beams: 2,
+      dichroics: k > 0.5 ? 2 : 1,
+      minMoves: lerp(4, 7, k),
+    }),
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.

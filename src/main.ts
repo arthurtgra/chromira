@@ -14,6 +14,12 @@ const muteBtn = document.querySelector<HTMLButtonElement>('#mute')!;
 const ctx = canvas.getContext('2d')!;
 
 const params = new URLSearchParams(location.search);
+// Restos de versões antigas (?feedback=1) saem da barra de endereço.
+if (params.has('feedback')) {
+  params.delete('feedback');
+  const q = params.toString();
+  history.replaceState(null, '', location.pathname + (q ? `?${q}` : '') + location.hash);
+}
 const save = loadSave();
 const game = new Game(levels);
 game.debug = params.get('debug') === '1';

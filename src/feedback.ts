@@ -34,7 +34,7 @@ export function feedbackEnabled(): boolean {
 }
 
 // Só o hash fica no código. Não é segurança de verdade (o site é público), só tira a barra do caminho dos jogadores.
-const PASS_HASH = '03d009d326a38acb16e1aa4e7392018bc0e7fe31421c5de569d2bdcf989bd097';
+const PASS_HASH = 'a1878c173c3cb3e882a2024b8c34af657be6b0db9397e83868f1ac45cc38184d';
 
 async function checkPassword(p: string): Promise<boolean> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`chromira:${p}`));
@@ -47,12 +47,12 @@ export function setupDev(game: Game): void {
   const on = feedbackEnabled();
   const menu = document.querySelector<HTMLElement>('#mini-panel')!;
   const panel = document.querySelector<HTMLFormElement>('#dev-panel')!;
-  const state = panel.querySelector<HTMLElement>('.dev-state')!;
   const input = panel.querySelector<HTMLInputElement>('input')!;
   const submit = panel.querySelector<HTMLButtonElement>('button[type=submit]')!;
   const msg = panel.querySelector<HTMLElement>('.dev-msg')!;
-  state.textContent = `Playtest feedback: ${on ? 'ON' : 'OFF'}`;
-  submit.textContent = on ? 'Turn off' : 'Turn on';
+  // Ligar pede a senha; desligar não.
+  input.hidden = on;
+  submit.textContent = on ? 'Turn off' : 'Enter';
 
   const dev = document.createElement('button');
   dev.className = 'dev-item';
@@ -63,7 +63,7 @@ export function setupDev(game: Game): void {
     panel.hidden = false;
     input.value = '';
     msg.textContent = '';
-    input.focus();
+    if (!on) input.focus();
   });
   menu.append(dev);
   panel.querySelector<HTMLButtonElement>('.dev-back')!.addEventListener('click', () => {
@@ -74,7 +74,7 @@ export function setupDev(game: Game): void {
 
   panel.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!(await checkPassword(input.value))) {
+    if (!on && !(await checkPassword(input.value))) {
       msg.textContent = 'Wrong password';
       input.select();
       return;

@@ -39,5 +39,5 @@ export function difficultyScore(level: Level): number {
   const start = level.start ?? sol.map(() => 0);
   const moves = start.filter((v, i) => v !== sol[i]).length;
   const count = (t: string): number => level.cells.filter((c) => c.t === t).length;
-  return moves + 0.6 * Math.log2(searchSpace(level)) + 0.5 * count('target') + 1.2 * count('filter') + count('prism') + 1.3 * count('splitter');
+  return moves + 0.6 * Math.log2(searchSpace(level)) + 0.5 * count('target') + 1.2 * count('filter') + count('prism') + 1.3 * count('splitter') + 1.3 * count('dichroic');
 }

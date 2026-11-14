@@ -6,6 +6,8 @@ export type Cell =
   | { x: number; y: number; t: 'mirror'; rail?: Rail } // estado fica em rots
   | { x: number; y: number; t: 'filter' } // estado fica em rots
   | { x: number; y: number; t: 'splitter' } // vidro semi-espelhado: reflete e deixa passar; estado em rots
+  // Espelho dicroico: reflete só a sua cor (componente R, G ou B) e deixa o resto atravessar; estado em rots.
+  | { x: number; y: number; t: 'dichroic'; color: 1 | 2 | 4 }
   | { x: number; y: number; t: 'wall' }
   | { x: number; y: number; t: 'target'; color: Color }
   | { x: number; y: number; t: 'prism'; rail?: Rail };

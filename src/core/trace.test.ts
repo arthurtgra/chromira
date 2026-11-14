@@ -220,3 +220,26 @@ describe('trace', () => {
     expect(() => trace(lv, [1, 0, 1, 0])).not.toThrow();
   });
 });
+
+describe('dichroic and rail', () => {
+  it('dichroic reflects its own color and lets the rest through', () => {
+    const lv = level([
+      { x: 0, y: 3, t: 'emitter', dir: 'E', color: 3 },
+      { x: 2, y: 3, t: 'dichroic', color: 1 },
+      { x: 2, y: 0, t: 'target', color: 1 },
+      { x: 5, y: 3, t: 'target', color: 2 },
+    ]);
+    expect(trace(lv, [0]).solved).toBe(true);
+    expect(trace(lv, [1]).solved).toBe(false);
+  });
+
+  it('rail state moves the piece along its axis', () => {
+    const lv = level([
+      { x: 0, y: 3, t: 'emitter', dir: 'E', color: 7 },
+      { x: 2, y: 1, t: 'mirror', rail: { axis: 'y', len: 3 } },
+      { x: 2, y: 0, t: 'target', color: 7 },
+    ]);
+    expect(trace(lv, [0 + 2 * 2]).solved).toBe(true); // '/' na posição 2 = (2,3)
+    expect(trace(lv, [0 + 2 * 1]).solved).toBe(false);
+  });
+});

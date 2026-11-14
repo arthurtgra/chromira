@@ -553,6 +553,43 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.stroke();
         break;
       }
+      case 'dichroic': {
+        // Espelho dicroico: placa de vidro tingida na cor que reflete, face espelhada nessa cor e verso claro.
+        const a = view.mirrorAngle(pi++);
+        const col = CONFIG.colors[cell.color];
+        const r = (p.mirrorLen * c) / 2;
+        const ux = Math.cos(a) * r;
+        const uy = Math.sin(a) * r;
+        const t = p.splitterGap * c * 1.2;
+        const nx = -Math.sin(a) * t;
+        const ny = Math.cos(a) * t;
+        ctx.globalAlpha = 0.3;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.moveTo(x - ux + nx, y - uy + ny);
+        ctx.lineTo(x + ux + nx, y + uy + ny);
+        ctx.lineTo(x + ux - nx, y + uy - ny);
+        ctx.lineTo(x - ux - nx, y - uy - ny);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = p.stroke;
+        ctx.beginPath();
+        ctx.moveTo(x - ux + nx, y - uy + ny);
+        ctx.lineTo(x + ux + nx, y + uy + ny);
+        ctx.stroke();
+        ctx.globalAlpha = 0.7;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - ux - nx, y - uy - ny);
+        ctx.lineTo(x + ux - nx, y + uy - ny);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
       case 'splitter': {
         // Vidro: placa translúcida entre dois filetes finos, mais curta que o espelho. Lê como "meio espelho".
         const a = view.mirrorAngle(pi++);
