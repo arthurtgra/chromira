@@ -1,0 +1,44 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #0b0b12;
+  overflow: hidden;
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#game {
+  display: block;
+  touch-action: none;
+}
+
+#mute {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  opacity: 0.55;
+  touch-action: manipulation;
+}
+
+#mute svg {
+  width: 100%;
+  height: 100%;
+}
+
+#mute .off,
+#mute.muted .on {
+  display: none;
+}
+
+#mute.muted .off {
+  display: inline;
+}
