@@ -41,7 +41,7 @@ export const CONFIG = {
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
     // Onde se cruzam somam (R+G+B = branco). Amplitude some perto de cantos e pontas: as ondas se juntam ali.
     waves: {
-      amp: 0.085, // fração da célula
+      amp: 0.06, // fração da célula
       length: 0.95, // comprimento de onda, em células
       speed: 1.4, // ciclos por segundo
       width: 0.04,
@@ -77,17 +77,23 @@ export const CONFIG = {
     volume: 0.22,
     clickMs: 30,
     clickFilterHz: 2400,
-    // Girar peça: sopro de ar filtrado + sino curto com eco. Notas sorteadas da escala, oitava acima.
+    // Girar peça: "tim" de vidro. Parciais inarmônicos de uma taça (agudos morrem antes) + estalo curtíssimo.
+    // Frequência fixa com leve variação: nada de melodia, para não soar como piano.
     turn: {
-      swishMs: 140,
-      swishHz: [700, 2600], // varredura do filtro do sopro
-      swishVolume: 0.5,
-      bellMs: 380,
-      bellVolume: 0.45,
-      bellOctave: 2, // multiplica a escala
-      filterOctave: 1, // filtro soa uma oitava abaixo do espelho
+      glassHz: 1900,
+      filterHz: 1250, // filtro: vidro mais grosso, mais grave
+      detune: 0.025, // ± variação aleatória por toque
+      volume: 0.55,
+      partials: [
+        [1, 1, 320], // [razão, volume, decaimento ms]
+        [2.32, 0.5, 210],
+        [4.25, 0.26, 130],
+        [6.63, 0.12, 80],
+      ],
+      tickMs: 8,
+      tickVolume: 0.35,
     },
-    echo: { delayMs: 120, feedback: 0.28, wet: 0.3 },
+    echo: { delayMs: 90, feedback: 0.22, wet: 0.22 },
     scale: [261.63, 293.66, 329.63, 392.0, 440.0], // dó ré mi sol lá
     noteMs: 320,
     downMs: 140,

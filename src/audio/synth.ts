@@ -66,48 +66,42 @@ export class Synth {
     src.start();
   }
 
-  // Girar espelho/filtro: sopro de ar que varre o filtro + sino suave numa nota da escala.
+  // Girar espelho/filtro: tim de vidro.
   turn(filter = false): void {
     const ctx = this.ready();
     if (!ctx || !this.noise || !this.echo) return;
     const T = A.turn;
     const t0 = ctx.currentTime;
+    const base = (filter ? T.filterHz : T.glassHz) * (1 + (Math.random() * 2 - 1) * T.detune);
 
-    const swish = ctx.createBufferSource();
-    swish.buffer = this.noise;
-    swish.playbackRate.value = A.clickMs / T.swishMs; // estica o ruído curto
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.Q.value = 1.2;
-    const [lo, hi] = filter ? [T.swishHz[1], T.swishHz[0]] : T.swishHz;
-    bp.frequency.setValueAtTime(lo, t0);
-    bp.frequency.exponentialRampToValueAtTime(hi, t0 + T.swishMs / 1000);
-    const sg = ctx.createGain();
-    sg.gain.setValueAtTime(0, t0);
-    sg.gain.linearRampToValueAtTime(A.volume * T.swishVolume, t0 + 0.025);
-    sg.gain.exponentialRampToValueAtTime(0.0001, t0 + T.swishMs / 1000);
-    swish.connect(bp).connect(sg).connect(ctx.destination);
-    swish.start(t0);
+    const out = ctx.createGain();
+    out.gain.value = A.volume * T.volume;
+    out.connect(ctx.destination);
+    out.connect(this.echo);
 
-    const oct = filter ? T.filterOctave : T.bellOctave;
-    const f = A.scale[Math.floor(Math.random() * A.scale.length)]! * oct;
-    const dur = T.bellMs / 1000;
-    const bell = ctx.createGain();
-    bell.gain.setValueAtTime(0, t0);
-    bell.gain.linearRampToValueAtTime(A.volume * T.bellVolume, t0 + 0.006);
-    bell.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    bell.connect(ctx.destination);
-    bell.connect(this.echo);
-    // Fundamental + parcial inarmônico fraco: timbre de vidro, não de apito.
-    for (const [mul, vol] of [[1, 1], [2.76, 0.18]] as const) {
+    const tick = ctx.createBufferSource();
+    tick.buffer = this.noise;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 5000;
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(T.tickVolume, t0);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t0 + T.tickMs / 1000);
+    tick.connect(hp).connect(tg).connect(out);
+    tick.start(t0);
+    tick.stop(t0 + T.tickMs / 1000 + 0.01);
+
+    for (const [ratio, vol, ms] of T.partials) {
       const osc = ctx.createOscillator();
       osc.type = 'sine';
-      osc.frequency.value = f * mul;
+      osc.frequency.value = base * ratio;
       const g = ctx.createGain();
-      g.gain.value = vol;
-      osc.connect(g).connect(bell);
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(vol, t0 + 0.002);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+      osc.connect(g).connect(out);
       osc.start(t0);
-      osc.stop(t0 + dur + 0.02);
+      osc.stop(t0 + ms / 1000 + 0.02);
     }
   }
 
