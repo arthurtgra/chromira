@@ -64,7 +64,17 @@ export const CONFIG = {
     volume: 0.22,
     clickMs: 30,
     clickFilterHz: 2400,
-    filterClickHz: 4200,
+    // Girar peça: sopro de ar filtrado + sino curto com eco. Notas sorteadas da escala, oitava acima.
+    turn: {
+      swishMs: 140,
+      swishHz: [700, 2600], // varredura do filtro do sopro
+      swishVolume: 0.5,
+      bellMs: 380,
+      bellVolume: 0.45,
+      bellOctave: 2, // multiplica a escala
+      filterOctave: 1, // filtro soa uma oitava abaixo do espelho
+    },
+    echo: { delayMs: 120, feedback: 0.28, wet: 0.3 },
     scale: [261.63, 293.66, 329.63, 392.0, 440.0], // dó ré mi sol lá
     noteMs: 320,
     downMs: 140,

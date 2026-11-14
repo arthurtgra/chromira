@@ -89,10 +89,10 @@ export class Game {
     const a = this.anims[i]!;
     if (cell.t === 'mirror') {
       this.anims[i] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
-      this.synth.click();
+      this.synth.turn();
     } else {
       this.anims[i] = { from: a.to, to: this.rots[i]!, at: this.now };
-      this.synth.click(CONFIG.audio.filterClickHz);
+      this.synth.turn(true);
     }
     navigator.vibrate?.(CONFIG.vibrateMs);
 

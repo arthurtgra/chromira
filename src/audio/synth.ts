@@ -7,6 +7,7 @@ export class Synth {
   muted = false;
   private ctx: AudioContext | null = null;
   private noise: AudioBuffer | null = null;
+  private echo: AudioNode | null = null;
 
   unlock(): void {
     if (!this.ctx) {
@@ -18,6 +19,7 @@ export class Synth {
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
       for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+      this.echo = this.makeEcho(this.ctx);
     }
     if (this.ctx.state !== 'running') {
       void this.ctx.resume().catch(() => {});
@@ -27,6 +29,23 @@ export class Synth {
       src.connect(this.ctx.destination);
       src.start();
     }
+  }
+
+  // Eco curto com realimentação: dá ar e cauda aos sons de toque.
+  private makeEcho(ctx: AudioContext): AudioNode {
+    const input = ctx.createGain();
+    const delay = ctx.createDelay(1);
+    delay.delayTime.value = A.echo.delayMs / 1000;
+    const fb = ctx.createGain();
+    fb.gain.value = A.echo.feedback;
+    const damp = ctx.createBiquadFilter();
+    damp.type = 'lowpass';
+    damp.frequency.value = 3000;
+    const wet = ctx.createGain();
+    wet.gain.value = A.echo.wet;
+    input.connect(delay).connect(damp).connect(fb).connect(delay);
+    damp.connect(wet).connect(ctx.destination);
+    return input;
   }
 
   private ready(): AudioContext | null {
@@ -45,6 +64,51 @@ export class Synth {
     gain.gain.value = A.volume * 1.5;
     src.connect(filter).connect(gain).connect(ctx.destination);
     src.start();
+  }
+
+  // Girar espelho/filtro: sopro de ar que varre o filtro + sino suave numa nota da escala.
+  turn(filter = false): void {
+    const ctx = this.ready();
+    if (!ctx || !this.noise || !this.echo) return;
+    const T = A.turn;
+    const t0 = ctx.currentTime;
+
+    const swish = ctx.createBufferSource();
+    swish.buffer = this.noise;
+    swish.playbackRate.value = A.clickMs / T.swishMs; // estica o ruído curto
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.2;
+    const [lo, hi] = filter ? [T.swishHz[1], T.swishHz[0]] : T.swishHz;
+    bp.frequency.setValueAtTime(lo, t0);
+    bp.frequency.exponentialRampToValueAtTime(hi, t0 + T.swishMs / 1000);
+    const sg = ctx.createGain();
+    sg.gain.setValueAtTime(0, t0);
+    sg.gain.linearRampToValueAtTime(A.volume * T.swishVolume, t0 + 0.025);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t0 + T.swishMs / 1000);
+    swish.connect(bp).connect(sg).connect(ctx.destination);
+    swish.start(t0);
+
+    const oct = filter ? T.filterOctave : T.bellOctave;
+    const f = A.scale[Math.floor(Math.random() * A.scale.length)]! * oct;
+    const dur = T.bellMs / 1000;
+    const bell = ctx.createGain();
+    bell.gain.setValueAtTime(0, t0);
+    bell.gain.linearRampToValueAtTime(A.volume * T.bellVolume, t0 + 0.006);
+    bell.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    bell.connect(ctx.destination);
+    bell.connect(this.echo);
+    // Fundamental + parcial inarmônico fraco: timbre de vidro, não de apito.
+    for (const [mul, vol] of [[1, 1], [2.76, 0.18]] as const) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f * mul;
+      const g = ctx.createGain();
+      g.gain.value = vol;
+      osc.connect(g).connect(bell);
+      osc.start(t0);
+      osc.stop(t0 + dur + 0.02);
+    }
   }
 
   private tone(freq: number, ms: number, vol: number, at = 0, type: OscillatorType = 'sine'): void {
