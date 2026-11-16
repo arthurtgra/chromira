@@ -33,7 +33,22 @@ export const CONFIG = {
     7: '#f4f6ff',
   } satisfies Record<Color, string>,
 
-  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, mirrorThick: 0.075, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
+  piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
+  // Espelho: placa retangular de vidro azulado (frações da célula).
+  mirror: {
+    thick: 0.13, // espessura da placa
+    corner: 0.022, // raio dos cantos: quase reto
+    face: '#f2f8ff', // face espelhada
+    mid: '#a9c6ec',
+    back: '#2f4469', // verso
+    edge: '#d8e8ff',
+    halo: '#6fa8ff',
+    glints: [
+      [-0.35, 0.05, 0.35], // [posição ao longo da placa (-1..1), largura, opacidade]
+      [-0.12, 0.022, 0.25],
+      [0.45, 0.03, 0.2],
+    ],
+  },
 
   // Lançador de luz, medidas em fração da célula.
   emitter: {
@@ -177,6 +192,15 @@ export const CONFIG = {
       ],
       tickMs: 8,
       tickVolume: 0.14,
+    },
+    // Trocar a cor do filtro: "bwip" que sobe de tom (nota por cor) + chiado de lâmina deslizando.
+    filter: {
+      hz: [392, 493.88, 587.33], // vermelho sol, verde si, azul ré
+      glideFrom: 0.55, // começa bem abaixo e sobe até a nota
+      glideMs: 90,
+      ms: 260,
+      volume: 0.55,
+      swish: { fromHz: 700, toHz: 2600, q: 4, ms: 170, volume: 0.45 },
     },
     // Luz atravessando o prisma: "vrum" eletromagnético que se abre em três vozes e se dissipa.
     prism: {

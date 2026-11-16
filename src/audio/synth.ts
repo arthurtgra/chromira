@@ -394,6 +394,48 @@ export class Synth {
     noise.stop(end + 0.05);
   }
 
+  // Trocar a cor do filtro: nada de vidro. Um "bwip" macio que sobe de tom (cada cor tem a sua nota)
+  // e um chiado curto de lâmina colorida deslizando na frente da luz.
+  filter(color: number): void {
+    const ctx = this.ready();
+    if (!ctx) return;
+    const F = A.filter;
+    const t0 = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.value = A.volume * F.volume;
+    out.connect(this.bus!);
+    if (this.echo) out.connect(this.echo);
+
+    const f = F.hz[color] ?? F.hz[0];
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f * F.glideFrom, t0);
+    osc.frequency.exponentialRampToValueAtTime(f, t0 + F.glideMs / 1000);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(1, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + F.ms / 1000);
+    osc.connect(g).connect(out);
+    osc.start(t0);
+    osc.stop(t0 + F.ms / 1000 + 0.02);
+
+    const S = F.swish;
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.whooshNoise(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = S.q;
+    bp.frequency.setValueAtTime(S.fromHz, t0);
+    bp.frequency.exponentialRampToValueAtTime(S.toHz, t0 + S.ms / 1000);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t0);
+    ng.gain.exponentialRampToValueAtTime(S.volume, t0 + 0.02);
+    ng.gain.exponentialRampToValueAtTime(0.0001, t0 + S.ms / 1000);
+    noise.connect(bp).connect(ng).connect(out);
+    noise.start(t0);
+    noise.stop(t0 + S.ms / 1000 + 0.02);
+  }
+
   private longNoise: AudioBuffer | null = null;
   private whooshNoise(ctx: AudioContext): AudioBuffer {
     if (!this.longNoise) {

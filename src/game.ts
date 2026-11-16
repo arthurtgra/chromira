@@ -244,7 +244,7 @@ export class Game {
       this.synth.turn();
     } else {
       this.anims[i] = { from: a.to, to: this.rots[i]!, at: this.now };
-      this.synth.turn(true);
+      this.synth.filter(rotOf(cell, this.rots[i]!));
     }
     navigator.vibrate?.(CONFIG.vibrateMs);
     this.retrace();

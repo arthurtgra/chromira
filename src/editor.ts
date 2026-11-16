@@ -203,7 +203,8 @@ export class Editor {
       states[i] = s - r + ((r + 1) % baseStates(cell));
     } else return;
     this.commit(cells, states);
-    this.game.synth.turn(cell.t === 'filter');
+    if (cell.t === 'filter') this.game.synth.filter(rotOf(cell, states[i] ?? 0));
+    else this.game.synth.turn();
     navigator.vibrate?.(CONFIG.vibrateMs);
   }
 
