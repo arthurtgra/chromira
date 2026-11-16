@@ -589,62 +589,29 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
     const y = cy(l, cell.y);
     switch (cell.t) {
       case 'mirror': {
-        // Placa de espelho: retângulo de vidro azulado com cantos pouco arredondados. Face espelhada
-        // prateada-azul, verso azul escuro, borda fina clara, filete brilhante na face e dois reflexos
-        // diagonais no vidro. Desenhado no referencial da peça (eixo x = comprimento).
+        // Espelho minimalista: placa fina de vidro azulado (cantos quase retos, degradê claro → azul)
+        // e um único tracinho diagonal de reflexo mostrando que é vidro. Referencial da peça: x = comprimento.
         const a = view.mirrorAngle(pi++);
         const M = CONFIG.mirror;
         const hl = (p.mirrorLen * c) / 2;
         const ht = (M.thick * c) / 2;
-        const rad = M.corner * c;
         ctx.save();
         ctx.translate(x, y);
         ctx.rotate(a);
-        const slab = (grow = 0): void => {
-          ctx.beginPath();
-          ctx.roundRect(-hl - grow, -ht - grow, (hl + grow) * 2, (ht + grow) * 2, rad + grow);
-        };
-        // Halo azul fraco em volta.
-        ctx.globalAlpha = 0.16;
-        ctx.fillStyle = M.halo;
-        slab(ht * 1.1);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        // Corpo: degradê na espessura (face → verso).
+        ctx.beginPath();
+        ctx.roundRect(-hl, -ht, hl * 2, ht * 2, M.corner * c);
         const body = ctx.createLinearGradient(0, -ht, 0, ht);
         body.addColorStop(0, M.face);
-        body.addColorStop(0.35, M.mid);
         body.addColorStop(1, M.back);
-        slab();
         ctx.fillStyle = body;
         ctx.fill();
-        // Reflexos diagonais no vidro, recortados dentro da placa.
-        ctx.save();
-        slab();
         ctx.clip();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineCap = 'butt';
-        for (const [k, w, al] of M.glints) {
-          ctx.globalAlpha = al;
-          ctx.lineWidth = w * c;
-          ctx.beginPath();
-          ctx.moveTo(k * hl - ht * 1.2, ht * 1.5);
-          ctx.lineTo(k * hl + ht * 1.2, -ht * 1.5);
-          ctx.stroke();
-        }
-        ctx.restore();
-        // Borda fina e filete brilhante ao longo da face espelhada.
-        ctx.globalAlpha = 0.55;
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = M.edge;
-        slab();
-        ctx.stroke();
-        ctx.globalAlpha = 0.95;
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineCap = 'round';
+        ctx.globalAlpha = M.glint.alpha;
+        ctx.lineWidth = M.glint.width * c;
         ctx.beginPath();
-        ctx.moveTo(-hl + rad + 1, -ht + 1.2);
-        ctx.lineTo(hl - rad - 1, -ht + 1.2);
+        ctx.moveTo(M.glint.at * hl - ht * 1.2, ht * 1.5);
+        ctx.lineTo(M.glint.at * hl + ht * 1.2, -ht * 1.5);
         ctx.stroke();
         ctx.restore();
         ctx.globalAlpha = 1;

@@ -34,20 +34,13 @@ export const CONFIG = {
   } satisfies Record<Color, string>,
 
   piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
-  // Espelho: placa retangular de vidro azulado (frações da célula).
+  // Espelho: placa fina de vidro azulado (frações da célula).
   mirror: {
-    thick: 0.13, // espessura da placa
-    corner: 0.022, // raio dos cantos: quase reto
-    face: '#f2f8ff', // face espelhada
-    mid: '#a9c6ec',
-    back: '#2f4469', // verso
-    edge: '#d8e8ff',
-    halo: '#6fa8ff',
-    glints: [
-      [-0.35, 0.05, 0.35], // [posição ao longo da placa (-1..1), largura, opacidade]
-      [-0.12, 0.022, 0.25],
-      [0.45, 0.03, 0.2],
-    ],
+    thick: 0.085, // espessura
+    corner: 0.015, // raio dos cantos: quase reto
+    face: '#eef6ff', // face espelhada (clara)
+    back: '#6f93c8', // verso (azulado)
+    glint: { at: -0.3, width: 0.04, alpha: 0.9 }, // tracinho de reflexo: posição ao longo da placa (-1..1)
   },
 
   // Lançador de luz, medidas em fração da célula.
@@ -193,14 +186,20 @@ export const CONFIG = {
       tickMs: 8,
       tickVolume: 0.14,
     },
-    // Trocar a cor do filtro: "bwip" que sobe de tom (nota por cor) + chiado de lâmina deslizando.
+    // Trocar a cor do filtro: roda de filtros girando (dois cliques de trava) + tom abafado da nova cor.
     filter: {
-      hz: [392, 493.88, 587.33], // vermelho sol, verde si, azul ré
-      glideFrom: 0.55, // começa bem abaixo e sobe até a nota
-      glideMs: 90,
-      ms: 260,
-      volume: 0.55,
-      swish: { fromHz: 700, toHz: 2600, q: 4, ms: 170, volume: 0.45 },
+      clicks: [
+        [0, 2600, 0.9], // [ms, Hz do clique, volume]: trava saindo
+        [48, 1800, 1.0], // encaixe na nova cor, mais grave
+      ],
+      clickMs: 22,
+      clickQ: 6,
+      hz: [196, 246.94, 293.66], // vermelho sol, verde si, azul ré (graves, abafados)
+      toneAtMs: 48,
+      toneMs: 160,
+      toneLowpassHz: 900,
+      toneVolume: 0.35,
+      volume: 0.7,
     },
     // Luz atravessando o prisma: "vrum" eletromagnético que se abre em três vozes e se dissipa.
     prism: {
