@@ -47,6 +47,8 @@ export async function publishEdits(change: (e: Edits) => void, message: string):
   };
   for (let attempt = 0; attempt < 3; attempt++) {
     const r = await fetch(`${url}?ref=${BRANCH}`, { headers, cache: 'no-store' });
+    if (r.status === 401) throw new Error('token rejected by GitHub: paste it again');
+    if (r.status === 403 || r.status === 404) throw new Error(`token has no access to ${REPO} (${r.status})`);
     if (!r.ok) throw new Error(`GitHub read ${r.status}`);
     const cur = (await r.json()) as { content: string; sha: string };
     const edits = JSON.parse(fromBase64(cur.content)) as Edits;
@@ -63,6 +65,7 @@ export async function publishEdits(change: (e: Edits) => void, message: string):
       }),
     });
     if (w.ok) return;
+    if (w.status === 403) throw new Error('token can read but not write: needs Contents: Read and write');
     if (w.status !== 409 && w.status !== 422) throw new Error(`GitHub write ${w.status}`);
   }
   throw new Error('GitHub write conflict');

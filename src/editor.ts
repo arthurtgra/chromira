@@ -348,12 +348,22 @@ function setupPublishPanel(game: Game): void {
   const dev = document.querySelector<HTMLFormElement>('#dev-panel')!;
   const box = document.createElement('div');
   box.className = 'dev-publish';
+  // Campo de texto (não senha): o iOS preenchia o campo de senha sozinho com a senha do Developer.
+  // O token salvo não volta para o campo; só aparece o começo e o fim para conferir.
   const token = document.createElement('input');
-  token.type = 'password';
-  token.placeholder = 'GitHub token (to publish edits)';
+  token.type = 'text';
   token.setAttribute('aria-label', 'GitHub token');
   token.autocomplete = 'off';
-  token.value = githubToken() ?? '';
+  token.spellcheck = false;
+  token.setAttribute('autocapitalize', 'off');
+  token.setAttribute('autocorrect', 'off');
+  token.name = 'chromira-github-token';
+  const showSaved = (): void => {
+    const t = githubToken();
+    token.value = '';
+    token.placeholder = t ? `Token: ${t.slice(0, 15)}…${t.slice(-4)} (paste to replace)` : 'Paste GitHub token';
+  };
+  showSaved();
   // Enter no campo do token não pode enviar o formulário (ele liga/desliga o modo Developer).
   token.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -362,8 +372,18 @@ function setupPublishPanel(game: Game): void {
     }
   });
   token.addEventListener('change', () => {
-    setGithubToken(token.value.trim() || null);
-    msg.textContent = token.value.trim() ? 'Token saved on this device' : 'Token removed';
+    const raw = token.value.trim();
+    if (!raw) return;
+    // Pega só o token, mesmo se vier texto junto, espaço ou quebra de linha no meio.
+    const found = raw.replace(/\s+/g, '').match(/github_pat_[A-Za-z0-9_]+|gh[pousr]_[A-Za-z0-9]+/);
+    if (!found) {
+      msg.textContent = "That doesn't look like a GitHub token (github_pat_…)";
+      token.value = '';
+      return;
+    }
+    setGithubToken(found[0]);
+    showSaved();
+    msg.textContent = 'Token saved on this device';
     render();
   });
   const publish = document.createElement('button');
