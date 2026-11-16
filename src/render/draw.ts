@@ -300,11 +300,15 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
               alpha: o?.alpha ?? (pair ? W.pairAlpha : W.alpha),
             };
           });
+    const drift = W.driftByColors[comps.length] ?? 0; // 1 cor: sem deriva; 2: média; branco: a mais grossa
     for (const w of waves) {
+      if (drift > 0) {
+        ctx.strokeStyle = comps.length === 2 ? mix(w.color, CONFIG.colors[r.color], W.driftTint) : w.color;
+        ctx.lineWidth = W.driftWidth * drift * l.cell;
+        ctx.globalAlpha = W.driftAlpha * alphaMul;
+        strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
+      }
       ctx.strokeStyle = w.color;
-      ctx.lineWidth = W.driftWidth * tw * l.cell;
-      ctx.globalAlpha = W.driftAlpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
       ctx.lineWidth = W.glowWidth * tw * l.cell;
       ctx.globalAlpha = W.glowAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st, ta);

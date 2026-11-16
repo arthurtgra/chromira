@@ -98,7 +98,7 @@ export const CONFIG = {
       pairAlpha: 1,
       // Ajustes por mistura (vazio = todas iguais).
       comp: {} as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
-      mixCore: { width: 0.03, alpha: 0.25 },
+      mixCore: { width: 0.055, alpha: 0.4 }, // miolo na cor da mistura: mais grosso para a cor combinada aparecer
       mixGlow: { width: 0.22, alpha: 0.09 },
       mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
@@ -108,6 +108,10 @@ export const CONFIG = {
       driftSpeed: -0.45, // multiplica speed (negativo: anda contra o feixe)
       driftWidth: 0.11,
       driftAlpha: 0.09,
+      // Deriva (a onda larga que corre contra o feixe) por número de cores no feixe: 1 cor sem deriva,
+      // 2 cores média, branco (3) a mais grossa. Assim dá para ver quantas cores o feixe junta.
+      driftByColors: [0, 0, 1, 1.6],
+      driftTint: 0.6, // nas misturas de 2 cores a deriva puxa para a cor combinada (0 = cores puras)
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
