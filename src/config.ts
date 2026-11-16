@@ -108,11 +108,11 @@ export const CONFIG = {
       mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,
-      driftAmp: 2.1, // multiplica amp
+      driftAmp: 1.5, // multiplica amp (abre um pouco mais que o feixe)
       driftLength: 1.7, // multiplica length
       driftSpeed: -0.45, // multiplica speed (negativo: anda contra o feixe)
-      driftWidth: 0.11,
-      driftAlpha: 0.13,
+      driftWidth: 0.08,
+      driftAlpha: 0.22, // cor mais forte, deriva menor
       // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
       // cores no feixe: 1 cor sem deriva, 2 cores média, branco (3) a mais grossa.
       driftByColors: [0, 0, 1, 1.25],
