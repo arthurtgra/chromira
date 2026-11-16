@@ -620,3 +620,18 @@ body:not([data-screen='game']) #editor {
   opacity: 1;
   background: rgba(255, 255, 255, 0.14);
 }
+#dev-panel .dev-publish {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#dev-panel .dev-publish[hidden],
+#dev-panel .dev-publish button[hidden] {
+  display: none;
+}
+#dev-panel .dev-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}

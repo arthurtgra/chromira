@@ -9,6 +9,7 @@ import { countSolutions, MAX_SPACE, searchSpace } from './core/solver.ts';
 import { baseStates, isPiece, placeCells, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Dir, Level } from './core/types.ts';
 import type { Game } from './game.ts';
+import { githubToken, publishEdits, setGithubToken } from './github.ts';
 import fileEdits from './levels/edits.json';
 
 type PlaceTool = 'emitter' | 'mirror' | 'splitter' | 'filter' | 'prism' | 'dichroic' | 'wall' | 'target';
@@ -40,9 +41,14 @@ function writeLocal(e: Edits): void {
   }
 }
 
-// Aplica as edições salvas sobre as fases geradas: edits.json sempre; as do aparelho só no modo desenvolvedor.
-export function applyEdits(levels: Level[], dev: boolean): void {
-  const all: Edits = { ...(fileEdits as unknown as Edits), ...(dev ? readLocal() : {}) };
+// Aplica as edições salvas sobre as fases geradas: edits.json (o jogo de todos) e, por cima, as guardadas
+// neste aparelho (valem no modo normal também). Cópia do aparelho igual à do arquivo já foi publicada e sai.
+export function applyEdits(levels: Level[]): void {
+  const file = fileEdits as unknown as Edits;
+  const local = readLocal();
+  for (const k of Object.keys(local)) if (JSON.stringify(local[k]) === JSON.stringify(file[k])) delete local[k];
+  writeLocal(local);
+  const all: Edits = { ...file, ...local };
   for (const [k, lv] of Object.entries(all)) {
     const i = Number(k) - 1;
     const base = levels[i];
@@ -231,36 +237,41 @@ export class Editor {
     navigator.vibrate?.(CONFIG.vibrateMs);
   }
 
-  // Grava a fase atual: no arquivo pelo servidor de dev; se não houver servidor, no aparelho + área de transferência.
+  // Grava a fase atual. Sempre fica no aparelho (vale no modo normal também) e depois vai para o jogo:
+  // pelo servidor de dev (npm run dev) direto no arquivo; no site, por um commit no GitHub (precisa do
+  // token no painel Developer), que dispara o deploy. Fase sem solução não é publicada: o deploy roda
+  // check-levels e falharia.
   async save(): Promise<void> {
     const n = this.game.current + 1;
     const lv = structuredClone(this.level);
     const check = checkLevel(lv);
     const local = readLocal();
-    try {
-      const r = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ n, level: lv }),
-      });
-      if (!r.ok) throw new Error(String(r.status));
+    local[String(n)] = lv;
+    writeLocal(local);
+    if (await devServer(n, lv)) {
       delete local[String(n)];
       writeLocal(local);
       this.notify(`Level ${n} saved to edits.json · ${check}`);
-    } catch {
-      local[String(n)] = lv;
-      writeLocal(local);
-      let copied = true;
-      try {
-        await navigator.clipboard.writeText(JSON.stringify(lv));
-      } catch {
-        copied = false;
-      }
-      this.notify(`No dev server: level ${n} saved on this device${copied ? ', JSON copied' : ''} · ${check}`);
+      return;
+    }
+    if (!githubToken()) {
+      this.notify(`Level ${n} saved on this device only · add a GitHub token in Developer to publish · ${check}`);
+      return;
+    }
+    if (!publishable(check)) {
+      this.notify(`Level ${n} kept on this device, not published: ${check}`);
+      return;
+    }
+    this.notify(`Publishing level ${n}…`);
+    try {
+      await publishEdits((e) => (e[String(n)] = lv), `Edit level ${n} (in-game editor)`);
+      this.notify(`Level ${n} published · ${check} · site updates in ~1 min`);
+    } catch (e) {
+      this.notify(`Publish failed (${(e as Error).message}) · level ${n} kept on this device`);
     }
   }
 
-  // Volta a fase para a versão gerada (levels.json), apagando a edição salva.
+  // Volta a fase para a versão gerada (levels.json), apagando a edição salva (aparelho, arquivo e GitHub).
   async revert(original: Level): Promise<void> {
     const n = this.game.current + 1;
     const lv = this.level;
@@ -271,18 +282,46 @@ export class Editor {
     const local = readLocal();
     delete local[String(n)];
     writeLocal(local);
+    if (await devServer(n, null)) return this.notify(`Level ${n} reverted`);
+    if (!githubToken()) return this.notify(`Level ${n} reverted on this device`);
     try {
-      await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ n, level: null }),
-      });
-    } catch {
-      // sem servidor: só a cópia do aparelho
+      await publishEdits((e) => delete e[String(n)], `Revert level ${n} (in-game editor)`);
+      this.notify(`Level ${n} reverted and published`);
+    } catch (e) {
+      this.notify(`Revert publish failed (${(e as Error).message})`);
     }
-    this.notify(`Level ${n} reverted`);
   }
 }
+
+// Só no `npm run dev`: o plugin do Vite grava edits.json. No site estático a chamada falha.
+async function devServer(n: number, level: Level | null): Promise<boolean> {
+  try {
+    const r = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ n, level }),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
+const publishable = (check: string): boolean => /^\d+\+? solutions?$/.test(check);
+
+// Publica de uma vez todas as fases guardadas só no aparelho (as válidas).
+export async function publishDeviceEdits(): Promise<string> {
+  const local = readLocal();
+  const ok = Object.entries(local).filter(([, lv]) => publishable(checkLevel(lv)));
+  const skipped = Object.keys(local).length - ok.length;
+  if (ok.length === 0) return skipped ? `${skipped} level(s) not publishable (no solution)` : 'Nothing to publish';
+  await publishEdits((e) => {
+    for (const [k, lv] of ok) e[k] = lv;
+  }, `Edit levels ${ok.map(([k]) => k).join(', ')} (in-game editor)`);
+  return `Published ${ok.length} level(s)${skipped ? `, ${skipped} skipped (no solution)` : ''} · site updates in ~1 min`;
+}
+
+export const deviceEditCount = (): number => Object.keys(readLocal()).length;
 
 const svg = (body: string): string =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -302,6 +341,59 @@ const TOOL_ICONS: Record<Tool, [string, string]> = {
 };
 
 export const EDIT_ICON = svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>');
+
+// No painel Developer: token do GitHub (guardado só neste aparelho) e botão para publicar as fases
+// que ficaram só no aparelho.
+function setupPublishPanel(game: Game): void {
+  const dev = document.querySelector<HTMLFormElement>('#dev-panel')!;
+  const box = document.createElement('div');
+  box.className = 'dev-publish';
+  const token = document.createElement('input');
+  token.type = 'password';
+  token.placeholder = 'GitHub token (to publish edits)';
+  token.setAttribute('aria-label', 'GitHub token');
+  token.autocomplete = 'off';
+  token.value = githubToken() ?? '';
+  // Enter no campo do token não pode enviar o formulário (ele liga/desliga o modo Developer).
+  token.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      token.blur();
+    }
+  });
+  token.addEventListener('change', () => {
+    setGithubToken(token.value.trim() || null);
+    msg.textContent = token.value.trim() ? 'Token saved on this device' : 'Token removed';
+    render();
+  });
+  const publish = document.createElement('button');
+  publish.type = 'button';
+  const msg = document.createElement('p');
+  msg.className = 'dev-note';
+  publish.addEventListener('click', async () => {
+    game.synth.uiTap();
+    if (!githubToken()) {
+      msg.textContent = 'Add a GitHub token first';
+      token.focus();
+      return;
+    }
+    msg.textContent = 'Publishing…';
+    try {
+      msg.textContent = await publishDeviceEdits();
+    } catch (e) {
+      msg.textContent = `Publish failed (${(e as Error).message})`;
+    }
+    render();
+  });
+  function render(): void {
+    const n = deviceEditCount();
+    publish.textContent = `Publish device edits (${n})`;
+    publish.hidden = n === 0;
+  }
+  render();
+  box.append(token, publish, msg);
+  dev.insertBefore(box, dev.querySelector('button[type=submit]'));
+}
 
 // Barra do editor: ferramentas embaixo, ações (salvar, desfazer edição, sair) acima delas.
 export function setupEditor(
@@ -362,6 +454,7 @@ export function setupEditor(
   bar.append(status, actions, tools);
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   document.body.append(bar);
+  setupPublishPanel(game);
 
   function render(): void {
     for (const b of toolButtons) b.classList.toggle('on', b.dataset.tool === editor.tool);

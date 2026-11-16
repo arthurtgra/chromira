@@ -35,9 +35,16 @@ Com o modo Developer ligado (menu → Developer → senha), o lápis na barra de
 - **Lançador, espelho, divisor, filtro, prisma, dicroico, parede, alvo**: toque numa célula vazia para adicionar.
 - **Cor**: toque num lançador, alvo, dicroico ou filtro para trocar a cor. **Apagar**: toque para remover.
 - A fase começa exatamente como aparece no editor (as rotações viram o `start`).
-- **Save** grava em `src/levels/edits.json` (precisa do `npm run dev`; funciona pelo celular na rede também)
-  e mostra quantas soluções a fase tem. Sem servidor, fica salvo no aparelho e o JSON vai para a área de transferência.
-- **Revert** volta a fase para a versão gerada. **Done** sai do editor.
+- **Save** guarda a fase no aparelho (vale no modo normal também) e a publica em `src/levels/edits.json`:
+  - no `npm run dev` (PC ou celular na rede), direto no arquivo;
+  - no site (GitHub Pages), por um commit na `main` pela API do GitHub, que dispara o deploy (~1 min).
+    Precisa de um token no painel Developer: GitHub → Settings → Developer settings → Fine-grained tokens,
+    só o repositório `chromira`, permissão **Contents: Read and write**. O token fica só no aparelho.
+  - Fase sem solução (ou que já começa resolvida) fica só no aparelho: o deploy roda `check-levels` e falharia.
+- **Publish device edits** (painel Developer) publica de uma vez as fases que ficaram só no aparelho.
+- **Revert** volta a fase para a versão gerada (também publica). **Done** sai do editor.
+
+Como o celular faz commits na `main`, rode `git pull` antes de mexer no código no PC.
 
 `edits.json` substitui a fase na mesma posição (número da fase), por cima de `levels.json`, e o
 `check-levels` também usa as edições. Se o `gen-levels` mudar a ordem das fases, confira as edições.

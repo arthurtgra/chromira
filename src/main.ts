@@ -11,7 +11,7 @@ import './style.css';
 
 const levels = levelsJson as unknown as Level[];
 const original = structuredClone(levels); // versão gerada, para "Revert" no editor
-applyEdits(levels, feedbackEnabled());
+applyEdits(levels); // edits.json + fases editadas guardadas neste aparelho
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const muteBtn = document.querySelector<HTMLButtonElement>('#mute')!;
 const ctx = canvas.getContext('2d')!;
