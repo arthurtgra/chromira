@@ -110,7 +110,7 @@ export const CONFIG = {
       glowAlpha: 0.13,
       driftAmp: 1.5, // multiplica amp (abre um pouco mais que o feixe)
       driftLength: 1.7, // multiplica length
-      driftSpeed: -0.45, // multiplica speed (negativo: anda contra o feixe)
+      driftSpeed: -0.9, // multiplica speed (negativo: anda contra o feixe)
       driftWidth: 0.08,
       driftAlpha: 0.22, // cor mais forte, deriva menor
       // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
