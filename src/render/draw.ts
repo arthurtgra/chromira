@@ -178,7 +178,10 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
     const off = offAt(g.s + u) * g.sign;
     return [cx(l, g.x + g.ux * u) - g.uy * off, cy(l, g.y + g.uy * u) + g.ux * off];
   };
-  const ext = (amp * CONFIG.winPulse.swell) / l.cell + W.step; // até onde a onda pode passar da linha do espelho
+  // A luz reflete na face do espelho (a camada de fora, voltada para a luz), não no meio da placa.
+  const face = (CONFIG.mirror.thick * l.cell) / 2; // px do centro da placa até a face
+  // Até onde, em volta do vértice, a onda pode cruzar a face (amplitude + recuo da face a 45°).
+  const ext = (amp * CONFIG.winPulse.swell) / l.cell + CONFIG.mirror.thick * Math.SQRT1_2 + W.step;
   ctx.beginPath();
   let started = false;
   const put = ([px, py]: [number, number]): void => {
@@ -198,18 +201,26 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
     const n = Math.max(1, Math.ceil((u1 - u0) / W.step));
     for (let j = i === 0 || turnIn ? 0 : 1; j <= n; j++) put(at(g, u0 + ((u1 - u0) * j) / n));
     if (!turnOut || !next) continue;
-    // Canto: para cada ponto perto do vértice, desenha a onda que chega enquanto ela está do lado de
-    // dentro do espelho; quando ela atravessaria a linha, desenha a refletida (mesma distância percorrida).
+    // Canto: para cada ponto perto do vértice, desenha a onda que chega até ela tocar a face do espelho;
+    // depois, a refletida (mesma distância percorrida) a partir de onde ela sai da face. O trecho entre
+    // as duas corre rente à face: a luz bate na superfície e volta, sem entrar na placa.
     const vx = cx(l, next.x);
     const vy = cy(l, next.y);
-    const mx = next.ux - g.ux;
-    const my = next.uy - g.uy;
+    const mx = (next.ux - g.ux) * Math.SQRT1_2; // normal da face, apontando para o lado da luz
+    const my = (next.uy - g.uy) * Math.SQRT1_2;
+    const outside = ([px, py]: [number, number]): boolean => (px - vx) * mx + (py - vy) * my >= face;
     const e2 = Math.min(ext, next.len / 2);
     const m = Math.max(2, Math.ceil((e + e2) / W.step));
+    let hit = false; // a onda que chega já tocou a face: daqui em diante só a refletida
     for (let j = 1; j < m; j++) {
       const t = -e + ((e + e2) * j) / m; // distância ao vértice ao longo da luz
       const pin = at(g, g.len + t);
-      put((pin[0] - vx) * mx + (pin[1] - vy) * my >= 0 ? pin : at(next, t));
+      if (!hit && outside(pin)) put(pin);
+      else {
+        hit = true;
+        const pout = at(next, t);
+        if (outside(pout)) put(pout);
+      }
     }
   }
   ctx.stroke();
