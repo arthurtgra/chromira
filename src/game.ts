@@ -3,7 +3,7 @@ import { CONFIG } from './config.ts';
 import { baseStates, isPiece, key, pieces, placeCells, posOf, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { arrived, cut, extendToObstacles, planBeams, segLen, visibleSegments, type BeamPlan } from './render/beams.ts';
+import { arrived, cut, extendToObstacles, planBeams, segLen, visibleSegments, type BeamPiece, type BeamPlan } from './render/beams.ts';
 import {
   drawBackground,
   drawBeams,
@@ -49,12 +49,13 @@ export class Game {
   private anims: Anim[] = [];
   private now = 0;
   private loadedAt = 0;
-  private beamAt = 0;
   private bgFrom: readonly [string, string] | null = null;
   private bgAt = 0;
   private plan: BeamPlan = planBeams([], []);
   private fades: { seg: Segment; at: number; off: number }[] = [];
-  private beamMs = 1;
+  // Crescimento da luz por lançador: cada um tem a sua frente e o seu tempo. Mexer num espelho só
+  // reinicia o lançador cujo caminho mudou; os outros continuam de onde estavam.
+  private grow = new Map<number, { from: number; to: number; at: number; ms: number; key: string }>();
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
   private prismHit = new Set<string>(); // prismas que a frente de luz já alcançou (som toca ao chegar)
@@ -95,10 +96,9 @@ export class Game {
     this.litAt = new Map();
     this.prismHit = new Set();
     this.quiet = true;
-    this.plan = planBeams([], this.beamSegments());
+    this.grow = new Map();
+    this.plan = this.planAll([], this.beamSegments(), CONFIG.beam.speed);
     this.fades = [];
-    this.timeBeam(CONFIG.beam.speed);
-    this.beamAt = this.now;
     this.loadedAt = this.now;
     this.wonAt = null;
     this.replayAt = Infinity;
@@ -251,10 +251,10 @@ export class Game {
   }
 
   private retrace(): void {
-    const before = visibleSegments(this.plan, this.front());
+    const before = visibleSegments(this.plan, this.fronts());
     this.result = trace(this.level, this.rots);
     this.aimPrisms(false);
-    this.plan = planBeams(before, this.beamSegments());
+    this.plan = this.planAll(before, this.beamSegments(), CONFIG.beam.turnSpeed);
     this.quiet = false;
     // Recolhe o que sumiu a partir do ponto que mudou: trechos encadeados recolhem em sequência.
     let off = 0;
@@ -264,8 +264,56 @@ export class Game {
       this.fades.push({ seg, at: this.now, off });
       prev = seg;
     }
-    this.timeBeam(CONFIG.beam.turnSpeed);
-    this.beamAt = this.now;
+  }
+
+  // Plano da luz por lançador. Lançador cujo caminho não mudou mantém trechos e tempo (continua
+  // crescendo de onde estava); os que mudaram recomeçam do ponto alterado, cada um no seu tempo.
+  private planAll(before: Segment[], next: Segment[], speed: number): BeamPlan {
+    const srcs = new Set([...before, ...next].map((s) => s.src ?? 0));
+    const pieces: BeamPiece[] = [];
+    const fading: Segment[] = [];
+    const grow = new Map<number, { from: number; to: number; at: number; ms: number; key: string }>();
+    for (const src of srcs) {
+      const nx = next.filter((s) => (s.src ?? 0) === src);
+      const key = nx.map((s) => `${s.x1},${s.y1},${s.x2},${s.y2},${s.color}`).join(';');
+      const old = this.grow.get(src);
+      if (old && old.key === key) {
+        pieces.push(...this.plan.pieces.filter((p) => (p.src ?? 0) === src));
+        grow.set(src, old);
+        continue;
+      }
+      const p = planBeams(before.filter((s) => (s.src ?? 0) === src), nx);
+      pieces.push(...p.pieces);
+      fading.push(...p.fading);
+      const [lo, hi] = CONFIG.beam.growMs;
+      const ms = Math.min(hi, Math.max(lo, ((p.to - p.from) / speed) * 1000));
+      grow.set(src, { from: p.from, to: p.to, at: this.now, ms, key });
+    }
+    this.grow = grow;
+    const g = [...grow.values()];
+    return {
+      pieces,
+      fading,
+      from: Math.min(...g.map((x) => x.from), Infinity),
+      to: Math.max(0, ...g.map((x) => x.to)),
+    };
+  }
+
+  // Frente de luz de um lançador: rápida no começo, desacelera suave no fim.
+  private frontOf(src: number): number {
+    const g = this.grow.get(src);
+    if (!g) return Infinity;
+    return g.from + (g.to - g.from) * (1 - (1 - clamp01((this.now - g.at) / g.ms)) ** CONFIG.beam.easePow);
+  }
+
+  // Frente por trecho (cada um segue o seu lançador), com uma folga opcional.
+  private fronts(extra = 0): (p: BeamPiece) => number {
+    return (p) => this.frontOf(p.src ?? 0) + extra;
+  }
+
+  // Ainda tem luz crescendo em algum lançador.
+  private growing(): boolean {
+    return [...this.grow.entries()].some(([src, g]) => this.frontOf(src) < g.to);
   }
 
   update(dtMs: number): void {
@@ -281,7 +329,7 @@ export class Game {
     // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
     // Faísca assim que a ponta da luz encosta no obstáculo (um pouco antes do fim exato do trecho,
     // que a desaceleração da frente de luz demora a cobrir).
-    const reached = arrived(this.plan, this.front() + CONFIG.beam.sparks.lead);
+    const reached = arrived(this.plan, this.fronts(CONFIG.beam.sparks.lead));
     for (const h of this.hits) {
       if (reached[`${h.x},${h.y}`] === undefined) continue;
       let n = (CONFIG.beam.sparks.perSec * dtMs) / 1000;
@@ -309,8 +357,7 @@ export class Game {
     }
 
     // Cada alvo reage no instante em que a luz toca o anel (raio ringRadius), não o centro.
-    const front = this.front();
-    const got = arrived(this.plan, front + CONFIG.piece.ringRadius);
+    const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
     let down = false;
     for (const t of this.level.cells) {
       if (t.t !== 'target') continue;
@@ -329,7 +376,7 @@ export class Game {
 
     // Som do prisma quando a frente de luz chega nele (inclusive ao abrir a fase); um intervalo mínimo
     // evita rajada ao arrastar um prisma em trilho.
-    const atCenter = arrived(this.plan, front);
+    const atCenter = arrived(this.plan, this.fronts());
     for (const c of placeCells(this.level, this.rots)) {
       if (c.t !== 'prism') continue;
       const k = key(c.x, c.y);
@@ -343,7 +390,7 @@ export class Game {
         }
       }
     }
-    if (front >= this.plan.to) this.quiet = false;
+    if (!this.growing()) this.quiet = false;
     // Vitória assim que o último alvo acende: não espera o resto da luz (ramos indo para paredes ou
     // para fora da grade) terminar de crescer.
     const targets = this.level.cells.filter((c) => c.t === 'target');
@@ -358,13 +405,13 @@ export class Game {
     if (this.wonAt !== null) drawWinWave(ctx, l, this.level.w, this.level.h, this.waves, this.now - this.wonAt);
     const grow = this.wonAt === null ? 0 : easeOut(clamp01((this.now - this.wonAt) / CONFIG.beam.winGrowMs));
     const style: BeamStyle = {
-      t: this.beamT(),
+      t: this.growing() ? 0 : 1,
       widthMul: 1 + (CONFIG.beam.winWidthMul - 1) * grow,
       rainbow: this.rainbow(),
       time: this.now / 1000,
       pulse: this.now >= this.pulseAt ? (this.now - this.pulseAt) * this.pulseSpeed - CONFIG.winPulse.width : undefined,
     };
-    const front = this.front();
+    const front = this.fronts();
     const fading = this.fades.map((f) => {
       const len = segLen(f.seg);
       const r = Math.max(0, this.retracted(f));
@@ -372,7 +419,7 @@ export class Game {
     });
     drawPrismGlow(ctx, l, placeCells(this.level, this.rots), visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
-    const got = arrived(this.plan, front + CONFIG.piece.ringRadius);
+    const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
     drawRails(ctx, l, this.level.cells);
     drawPieces(ctx, l, this.drawnCells(), {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
@@ -388,7 +435,7 @@ export class Game {
       prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
       time: this.now / 1000,
     });
-    drawImpacts(ctx, l, this.hits, this.plan, front + CONFIG.beam.sparks.lead, style); // clarão junto com as faíscas
+    drawImpacts(ctx, l, this.hits, this.plan, this.fronts(CONFIG.beam.sparks.lead), style); // clarão junto com as faíscas
     this.fx.draw(ctx, l.w, l.h);
     if (this.editing) this.drawEditOverlay(ctx);
     drawHud(ctx, l, {
@@ -473,26 +520,9 @@ export class Game {
     );
   }
 
-  // Distância da fonte já alcançada pela frente de luz, em células.
-  // Distância da fonte já alcançada pela frente de luz: rápida no começo, desacelera no fim.
-  private front(): number {
-    const { from, to } = this.plan;
-    // Desaceleração suave no fim (expoente menor que o cúbico: a cauda lenta atrasava faíscas e alvos).
-    return from + (to - from) * (1 - (1 - clamp01((this.now - this.beamAt) / this.beamMs)) ** CONFIG.beam.easePow);
-  }
-
-  private timeBeam(speed: number): void {
-    const [lo, hi] = CONFIG.beam.growMs;
-    this.beamMs = Math.min(hi, Math.max(lo, ((this.plan.to - this.plan.from) / speed) * 1000));
-  }
 
   private retracted(f: { at: number; off: number }): number {
     return ((this.now - f.at) / 1000) * CONFIG.beam.retractSpeed - f.off;
-  }
-
-  private beamT(): number {
-    const { from, to } = this.plan;
-    return to > from ? clamp01((this.front() - from) / (to - from)) : 1;
   }
 
   private animValue(a: Anim, ms: number): number {
@@ -532,7 +562,7 @@ export class Game {
   private beamSegments(): Segment[] {
     const E = CONFIG.emitter.body;
     const W = CONFIG.piece.wallSize / 2;
-    const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
+    const { segs, hits } = extendToObstacles(withSources(this.result.segments), this.level.cells, (c) =>
       c.t === 'wall' ? W : c.t === 'emitter' ? E : 0.5,
     );
     this.hits = segs.flatMap((s, i) =>
@@ -540,4 +570,23 @@ export class Game {
     );
     return segs;
   }
+}
+
+// Lançador de origem de cada trecho do trace: trecho com d0 = 0 sai de um lançador (chave = sua posição);
+// os outros continuam um trecho anterior que termina no seu começo, à mesma distância da fonte.
+function withSources(segs: Segment[]): Segment[] {
+  const out: Segment[] = [];
+  const ids = new Map<string, number>();
+  for (const s of segs) {
+    let src: number | undefined;
+    if ((s.d0 ?? 0) === 0) {
+      const k = `${s.x1},${s.y1}`;
+      if (!ids.has(k)) ids.set(k, ids.size);
+      src = ids.get(k);
+    } else {
+      src = out.find((p) => p.x2 === s.x1 && p.y2 === s.y1 && Math.abs((p.d0 ?? 0) + segLen(p) - s.d0!) < 1e-9)?.src;
+    }
+    out.push({ ...s, src: src ?? 0 });
+  }
+  return out;
 }

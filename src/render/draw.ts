@@ -1,7 +1,7 @@
 import { CONFIG } from '../config.ts';
 import { DELTA, FILTER_COLORS } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
-import { cut, reachedEnd, visibleLength, type BeamPlan } from './beams.ts';
+import { cut, reachedEnd, visibleLength, type BeamPlan, type Front } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
 
 type Ctx = CanvasRenderingContext2D;
@@ -81,7 +81,7 @@ interface Run {
 }
 
 // Junta segmentos encadeados da mesma cor numa polilinha: cantos sem emenda.
-function buildRuns(plan: BeamPlan, front: number): Run[] {
+function buildRuns(plan: BeamPlan, front: Front): Run[] {
   const runs: Run[] = [];
   let open = false;
   for (const p of plan.pieces) {
@@ -241,7 +241,7 @@ export interface FadingBeam {
 }
 
 // Três camadas por polilinha, faixas cromáticas correndo no sentido da luz e franjas de difração nos brancos.
-export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fading: FadingBeam[], st: BeamStyle): void {
+export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: Front, fading: FadingBeam[], st: BeamStyle): void {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
@@ -352,7 +352,7 @@ export function drawImpacts(
   l: Layout,
   hits: { x: number; y: number; color: Color }[],
   plan: BeamPlan,
-  front: number,
+  front: Front,
   st: BeamStyle,
 ): void {
   const I = CONFIG.beam.impact;

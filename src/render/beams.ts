@@ -16,6 +16,10 @@ export interface BeamPlan {
   to: number;
 }
 
+// Frente de luz: um número para todo o feixe, ou uma por trecho (cada lançador cresce no seu tempo).
+export type Front = number | ((p: BeamPiece) => number);
+const frontAt = (front: Front, p: BeamPiece): number => (typeof front === 'number' ? front : front(p));
+
 export const segLen = (s: Segment): number => Math.abs(s.x2 - s.x1) + Math.abs(s.y2 - s.y1);
 const pkey = (x: number, y: number): string => `${x},${y}`;
 
@@ -33,7 +37,9 @@ export function cut(s: Segment, a: number, b: number): Segment {
   const n = segLen(s) || 1;
   const ux = (s.x2 - s.x1) / n;
   const uy = (s.y2 - s.y1) / n;
-  return { x1: s.x1 + ux * a, y1: s.y1 + uy * a, x2: s.x1 + ux * b, y2: s.y1 + uy * b, color: s.color };
+  const out: Segment = { x1: s.x1 + ux * a, y1: s.y1 + uy * a, x2: s.x1 + ux * b, y2: s.y1 + uy * b, color: s.color };
+  if (s.src !== undefined) out.src = s.src;
+  return out;
 }
 
 export function planBeams(prev: Segment[], next: Segment[]): BeamPlan {
@@ -60,10 +66,10 @@ export function planBeams(prev: Segment[], next: Segment[]): BeamPlan {
   return { pieces, fading, from: Math.min(from, to), to };
 }
 
-export const visibleLength = (p: BeamPiece, front: number): number =>
-  Math.max(p.known, Math.min(p.len, front - p.d0));
+export const visibleLength = (p: BeamPiece, front: Front): number =>
+  Math.max(p.known, Math.min(p.len, frontAt(front, p) - p.d0));
 
-export function visibleSegments(plan: BeamPlan, front: number): Segment[] {
+export function visibleSegments(plan: BeamPlan, front: Front): Segment[] {
   return plan.pieces.flatMap((p) => {
     const v = visibleLength(p, front);
     return v > 0 ? [cut(p, 0, v)] : [];
@@ -97,10 +103,10 @@ export function extendToObstacles(
 
 // Trecho aceso até o fim: a frente passou dele ou ele já estava aceso antes do toque.
 // Tolerância: trechos esticados até obstáculos têm comprimento fracionário (0.6 vira 0.5999…).
-export const reachedEnd = (p: BeamPiece, front: number): boolean => visibleLength(p, front) >= p.len - 1e-6;
+export const reachedEnd = (p: BeamPiece, front: Front): boolean => visibleLength(p, front) >= p.len - 1e-6;
 
 // OR das cores que já chegaram em cada ponto final.
-export function arrived(plan: BeamPlan, front: number): Record<string, number> {
+export function arrived(plan: BeamPlan, front: Front): Record<string, number> {
   const got: Record<string, number> = {};
   for (const p of plan.pieces) {
     if (!reachedEnd(p, front)) continue;
