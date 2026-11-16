@@ -213,6 +213,48 @@
         "y": 4,
         "t": "target",
         "color": 2
+      },
+      {
+        "x": 1,
+        "y": 1,
+        "t": "emitter",
+        "dir": "E",
+        "color": 3
+      },
+      {
+        "x": 1,
+        "y": 2,
+        "t": "emitter",
+        "dir": "E",
+        "color": 5
+      },
+      {
+        "x": 1,
+        "y": 3,
+        "t": "emitter",
+        "dir": "E",
+        "color": 6
+      },
+      {
+        "x": 1,
+        "y": 5,
+        "t": "emitter",
+        "dir": "E",
+        "color": 1
+      },
+      {
+        "x": 1,
+        "y": 6,
+        "t": "emitter",
+        "dir": "E",
+        "color": 2
+      },
+      {
+        "x": 1,
+        "y": 7,
+        "t": "emitter",
+        "dir": "E",
+        "color": 4
       }
     ],
     "difficulty": 1
