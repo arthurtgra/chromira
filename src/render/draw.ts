@@ -148,25 +148,69 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
   const amp = W.amp * ampMul * l.cell * st.widthMul;
   const k = TAU / (W.length * lenMul);
   const wt = st.time * TAU * W.speed * speedMul;
+  // Trechos da polilinha. Cada canto é uma reflexão (espelho, divisor, dicroico): a onda que sai é a
+  // imagem espelhada da que chega, então o lado da onda (sign) inverte a cada canto, e perto do canto
+  // a onda é cortada na linha do espelho. A amplitude só afina no começo e no fim do feixe.
+  const segs: { x: number; y: number; ux: number; uy: number; len: number; s: number; sign: number }[] = [];
   let s = r.d0;
-  ctx.beginPath();
+  let sign = 1;
   for (let i = 1; i < r.pts.length; i++) {
     const [x1, y1] = r.pts[i - 1]!;
     const [x2, y2] = r.pts[i]!;
     const len = Math.abs(x2 - x1) + Math.abs(y2 - y1);
+    if (len <= 0) continue;
     const ux = (x2 - x1) / len;
     const uy = (y2 - y1) / len;
-    const n = Math.max(2, Math.ceil(len / W.step));
-    for (let j = i === 1 ? 0 : 1; j <= n; j++) {
-      const u = (j / n) * len;
-      const env = Math.min(1, u / W.taper, (len - u) / W.taper);
-      const off = amp * env * swell(st, s + u) * Math.sin(k * (s + u) - wt + phase);
-      const px = cx(l, x1 + ux * u) - uy * off;
-      const py = cy(l, y1 + uy * u) + ux * off;
-      if (i === 1 && j === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
+    const prev = segs.at(-1);
+    if (prev && (prev.ux !== ux || prev.uy !== uy)) sign = -sign;
+    segs.push({ x: x1, y: y1, ux, uy, len, s, sign });
     s += len;
+  }
+  if (segs.length === 0) return;
+  const total = s - r.d0;
+  const offAt = (d: number): number => {
+    const a = d - r.d0;
+    const env = Math.max(0, Math.min(1, a / W.taper, (total - a) / W.taper));
+    return amp * env * swell(st, d) * Math.sin(k * d - wt + phase);
+  };
+  // Ponto da onda no trecho g, a u células do início dele (u pode sair do trecho perto dos cantos).
+  const at = (g: (typeof segs)[number], u: number): [number, number] => {
+    const off = offAt(g.s + u) * g.sign;
+    return [cx(l, g.x + g.ux * u) - g.uy * off, cy(l, g.y + g.uy * u) + g.ux * off];
+  };
+  const ext = (amp * CONFIG.winPulse.swell) / l.cell + W.step; // até onde a onda pode passar da linha do espelho
+  ctx.beginPath();
+  let started = false;
+  const put = ([px, py]: [number, number]): void => {
+    if (started) ctx.lineTo(px, py);
+    else ctx.moveTo(px, py);
+    started = true;
+  };
+  for (let i = 0; i < segs.length; i++) {
+    const g = segs[i]!;
+    const prev = segs[i - 1];
+    const next = segs[i + 1];
+    const turnIn = prev !== undefined && (prev.ux !== g.ux || prev.uy !== g.uy);
+    const turnOut = next !== undefined && (next.ux !== g.ux || next.uy !== g.uy);
+    const e = Math.min(ext, g.len / 2);
+    const u0 = turnIn ? e : 0;
+    const u1 = turnOut ? g.len - e : g.len;
+    const n = Math.max(1, Math.ceil((u1 - u0) / W.step));
+    for (let j = i === 0 || turnIn ? 0 : 1; j <= n; j++) put(at(g, u0 + ((u1 - u0) * j) / n));
+    if (!turnOut || !next) continue;
+    // Canto: para cada ponto perto do vértice, desenha a onda que chega enquanto ela está do lado de
+    // dentro do espelho; quando ela atravessaria a linha, desenha a refletida (mesma distância percorrida).
+    const vx = cx(l, next.x);
+    const vy = cy(l, next.y);
+    const mx = next.ux - g.ux;
+    const my = next.uy - g.uy;
+    const e2 = Math.min(ext, next.len / 2);
+    const m = Math.max(2, Math.ceil((e + e2) / W.step));
+    for (let j = 1; j < m; j++) {
+      const t = -e + ((e + e2) * j) / m; // distância ao vértice ao longo da luz
+      const pin = at(g, g.len + t);
+      put((pin[0] - vx) * mx + (pin[1] - vy) * my >= 0 ? pin : at(next, t));
+    }
   }
   ctx.stroke();
 }

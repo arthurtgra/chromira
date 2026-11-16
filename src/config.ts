@@ -40,7 +40,7 @@ export const CONFIG = {
     corner: 0.015, // raio dos cantos: quase reto
     face: '#eef6ff', // face espelhada (clara)
     back: '#6f93c8', // verso (azulado)
-    glint: { at: -0.3, width: 0.04, alpha: 0.9 }, // tracinho de reflexo: posição ao longo da placa (-1..1)
+    glint: { at: 0, width: 0.04, alpha: 0.9 }, // tracinho de reflexo: posição ao longo da placa (-1..1, 0 = meio)
   },
 
   // Lançador de luz, medidas em fração da célula.
@@ -70,14 +70,14 @@ export const CONFIG = {
     retractSpeed: 10, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
-    // Onde se cruzam somam (R+G+B = branco). Amplitude some perto de cantos e pontas: as ondas se juntam ali.
+    // Onde se cruzam somam (R+G+B = branco). Nos espelhos a onda reflete como imagem espelhada; só afina nas pontas.
     waves: {
       amp: 0.06, // fração da célula
       length: 0.95, // comprimento de onda, em células
       speed: 1.4, // ciclos por segundo
       width: 0.04,
       alpha: 0.95,
-      taper: 0.38, // células até a amplitude cheia, a partir de cada canto
+      taper: 0.38, // células até a amplitude cheia, a partir do começo e do fim do feixe
       step: 0.05, // resolução da curva, em células
       // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
