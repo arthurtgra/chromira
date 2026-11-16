@@ -261,13 +261,14 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number): void {
   const B = CONFIG.beam;
   const W = B.waves;
+  const cell = l.cell * B.thickness; // espessura geral do feixe (todas as linhas)
   // Feixe branco (as três cores juntas) um pouco mais grosso que os outros: ondas mais largas e abertas.
   const thick = (r: Run): number => (r.color === 7 ? B.white.width : 1);
   const spread = (r: Run): number => (r.color === 7 ? B.white.amp : 1);
   for (const layer of B.layers) {
     ctx.globalAlpha = layer.alpha * alphaMul;
     for (const r of runs) {
-      ctx.lineWidth = Math.max(1, layer.width * thick(r) * l.cell);
+      ctx.lineWidth = Math.max(1, layer.width * thick(r) * cell);
       ctx.strokeStyle = CONFIG.colors[r.color];
       strokeRun(ctx, l, r);
     }
@@ -278,7 +279,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const mx = W.mix[r.color];
     for (const m of mx ? [mx.glow, mx.core] : [W.mixGlow, W.mixCore]) {
       ctx.globalAlpha = m.alpha * alphaMul;
-      ctx.lineWidth = Math.max(1, m.width * l.cell);
+      ctx.lineWidth = Math.max(1, m.width * cell);
       strokeRun(ctx, l, r);
     }
   }
@@ -305,24 +306,24 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const drift = W.driftByColors[comps.length] ?? 0;
     if (drift > 0) {
       ctx.strokeStyle = CONFIG.colors[r.color];
-      ctx.lineWidth = W.driftWidth * drift * l.cell;
+      ctx.lineWidth = W.driftWidth * drift * cell;
       ctx.globalAlpha = W.driftAlpha * alphaMul;
       strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
     }
     for (const w of waves) {
       const bw = w.blue ? W.blueBoost : 1;
       ctx.strokeStyle = w.color;
-      ctx.lineWidth = W.glowWidth * tw * bw * l.cell;
+      ctx.lineWidth = W.glowWidth * tw * bw * cell;
       ctx.globalAlpha = W.glowAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st, ta);
-      ctx.lineWidth = Math.max(1, W.width * w.width * tw * bw * l.cell);
+      ctx.lineWidth = Math.max(1, W.width * w.width * tw * bw * cell);
       ctx.globalAlpha = w.alpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st, ta);
     }
   }
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
-    ctx.lineWidth = Math.max(1, W.width * 0.7 * B.white.width * l.cell);
+    ctx.lineWidth = Math.max(1, W.width * 0.7 * B.white.width * cell);
     ctx.globalAlpha = R.alpha * st.rainbow * alphaMul;
     const ampMul = (1 + (R.ampMul - 1) * st.rainbow) * B.white.amp;
     for (const r of runs) {
