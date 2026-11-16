@@ -279,7 +279,9 @@ export class Game {
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
 
     // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
-    const reached = arrived(this.plan, this.front());
+    // Faísca assim que a ponta da luz encosta no obstáculo (um pouco antes do fim exato do trecho,
+    // que a desaceleração da frente de luz demora a cobrir).
+    const reached = arrived(this.plan, this.front() + CONFIG.beam.sparks.lead);
     for (const h of this.hits) {
       if (reached[`${h.x},${h.y}`] === undefined) continue;
       let n = (CONFIG.beam.sparks.perSec * dtMs) / 1000;
@@ -341,10 +343,12 @@ export class Game {
         }
       }
     }
-    if (front >= this.plan.to) {
-      this.quiet = false;
-      if (this.result.solved && this.wonAt === null && !this.editing) this.win();
-    }
+    if (front >= this.plan.to) this.quiet = false;
+    // Vitória assim que o último alvo acende: não espera o resto da luz (ramos indo para paredes ou
+    // para fora da grade) terminar de crescer.
+    const targets = this.level.cells.filter((c) => c.t === 'target');
+    const allLit = targets.length > 0 && targets.every((t) => this.litAt.has(key(t.x, t.y)));
+    if (this.result.solved && allLit && this.wonAt === null && !this.editing) this.win();
 
   }
 
@@ -384,7 +388,7 @@ export class Game {
       prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
       time: this.now / 1000,
     });
-    drawImpacts(ctx, l, this.hits, this.plan, front, style);
+    drawImpacts(ctx, l, this.hits, this.plan, front + CONFIG.beam.sparks.lead, style); // clarão junto com as faíscas
     this.fx.draw(ctx, l.w, l.h);
     if (this.editing) this.drawEditOverlay(ctx);
     drawHud(ctx, l, {
@@ -473,7 +477,8 @@ export class Game {
   // Distância da fonte já alcançada pela frente de luz: rápida no começo, desacelera no fim.
   private front(): number {
     const { from, to } = this.plan;
-    return from + (to - from) * easeOut(clamp01((this.now - this.beamAt) / this.beamMs));
+    // Desaceleração suave no fim (expoente menor que o cúbico: a cauda lenta atrasava faíscas e alvos).
+    return from + (to - from) * (1 - (1 - clamp01((this.now - this.beamAt) / this.beamMs)) ** CONFIG.beam.easePow);
   }
 
   private timeBeam(speed: number): void {

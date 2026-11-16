@@ -71,11 +71,12 @@ export const CONFIG = {
     white: { width: 1.35, amp: 1.3 }, // feixe branco (as três cores juntas): mais grosso (largura) e ondas mais abertas (amplitude)
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
     speed: 12, // ao abrir a fase
+    easePow: 2, // desaceleração no fim do crescimento (3 = cúbica, cauda longa; 1 = sem desacelerar)
     turnSpeed: 6, // ao girar uma peça: mais devagar, vira transição
     growMs: [360, 1600], // duração mínima e máxima de um crescimento
     impact: { radius: 0.14, alpha: 0.6 }, // clarão onde a luz bate em parede/lançador
     // Faíscas na colisão: traços curtos na cor do feixe, ricocheteando para trás em leque.
-    sparks: { perSec: 30, spread: 1.45, speed: [90, 230], lifeMs: [200, 450], len: 8, width: 1.6, drag: 4.5 },
+    sparks: { lead: 0.15, perSec: 30, spread: 1.45, speed: [90, 230], lifeMs: [200, 450], len: 8, width: 1.6, drag: 4.5 },
     retractSpeed: 10, // trecho que deixou de existir é recolhido a partir do ponto que mudou
     // Faixas cromáticas que correm pelo feixe; matiz gira com o tempo.
     // Feixe = ondas das cores básicas sobrepostas, defasadas 120°, viajando no sentido da luz.
