@@ -32,3 +32,32 @@ export function recenter(level: Level): Level {
   const dy = shift(b.y0, b.y1, h);
   return { ...level, w, h, cells: level.cells.map((c) => ({ ...c, x: c.x + dx, y: c.y + dy })) };
 }
+
+// Onde abrir a linha/coluna nova: antes do índice k, o mais perto do meio do conteúdo,
+// sem cortar um trilho no mesmo eixo (o trilho precisa continuar contínuo).
+function gap(cells: Cell[], axis: 'x' | 'y', lo: number, hi: number): number {
+  const mid = (lo + hi + 1) / 2;
+  const ks: number[] = [];
+  for (let k = lo + 1; k <= hi; k++) ks.push(k);
+  ks.sort((a, b) => Math.abs(a - mid) - Math.abs(b - mid) || a - b);
+  const ok = (k: number): boolean =>
+    cells.every((c) => {
+      const r = railOf(c);
+      if (!r || r.axis !== axis) return true;
+      const s = c[axis];
+      return k <= s || k > s + r.len - 1;
+    });
+  return ks.find(ok) ?? hi + 1;
+}
+
+// Fase feita na grade antiga 6x8 → 7x9: abre uma coluna e uma linha vazias no meio do conteúdo,
+// então a fase ocupa a grade nova inteira. Uma linha vazia entre as peças só alonga os feixes:
+// as mesmas peças continuam alinhadas, e as soluções não mudam. Depois centraliza o que sobrar.
+export function expand(level: Level): Level {
+  if (level.cells.length === 0) return { ...level, w: GRID.w, h: GRID.h };
+  const b = bounds(level.cells);
+  const kx = gap(level.cells, 'x', b.x0, b.x1);
+  const ky = gap(level.cells, 'y', b.y0, b.y1);
+  const cells = level.cells.map((c) => ({ ...c, x: c.x + (c.x >= kx ? 1 : 0), y: c.y + (c.y >= ky ? 1 : 0) }));
+  return recenter({ ...level, w: GRID.w, h: GRID.h, cells });
+}

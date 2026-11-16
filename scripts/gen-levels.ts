@@ -1,7 +1,6 @@
 // Gera src/levels/levels.json: fases feitas à mão + faixas geradas, cada faixa ordenada por dificuldade.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { generate, type GenOptions } from '../src/core/generate.ts';
-import { recenter } from '../src/core/grid.ts';
 import { difficultyScore } from '../src/core/solver.ts';
 import type { Level } from '../src/core/types.ts';
 
@@ -172,9 +171,8 @@ for (const [t, batch] of tiers.entries()) {
 `);
   }
 }
-// Todas as fases centralizadas na grade 7x9 (as feitas à mão e as mantidas já estão; não muda nada).
-for (const [i, level] of levels.map(recenter).entries()) {
-  levels[i] = level;
+// handmade.json e kept.json já estão na grade 7x9; as geradas saem dela pelo generate.
+for (const [i, level] of levels.entries()) {
   level.id = i + 1;
   level.difficulty = pips(difficultyScore(level));
 }
