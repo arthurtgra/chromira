@@ -310,34 +310,67 @@ export class Synth {
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
 
-  // Luz passando pelo prisma: três notas de vidro em sequência rápida, com um parcial agudo de brilho.
+  // Luz passando pelo prisma: zumbido de sabre de luz ligando. Duas serras desafinadas sobem de tom
+  // (ignição), um vibrato lento dá o "hum", o filtro abre e fecha (o brilho do whoosh) e o tom cai um
+  // pouco no fim, como o efeito Doppler do golpe. Um estalo de ruído agudo marca a ignição.
   prism(): void {
     const ctx = this.ready();
-    if (!ctx || !this.echo) return;
+    if (!ctx || !this.echo || !this.noise) return;
     const P = A.prism;
+    const t0 = ctx.currentTime;
+    const ign = t0 + P.ignitionMs / 1000;
+    const end = t0 + P.ms / 1000;
+
     const out = ctx.createGain();
-    out.gain.value = A.volume * P.volume;
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(A.volume * P.volume, t0 + 0.03);
+    out.gain.setValueAtTime(A.volume * P.volume, ign);
+    out.gain.exponentialRampToValueAtTime(0.0001, end);
     out.connect(this.bus!);
     out.connect(this.echo);
-    P.steps.forEach((step, k) => {
-      const t0 = ctx.currentTime + (k * P.stepMs) / 1000;
-      const f = this.freq(step);
-      for (const [ratio, vol, ms] of [
-        [1, 1, P.ms],
-        [P.shimmer, 0.22, P.ms * 0.45],
-      ] as const) {
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        osc.frequency.value = f * ratio;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0, t0);
-        g.gain.linearRampToValueAtTime(vol, t0 + 0.006);
-        g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
-        osc.connect(g).connect(out);
-        osc.start(t0);
-        osc.stop(t0 + ms / 1000 + 0.02);
-      }
-    });
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 6;
+    const [fLo, fHi, fEnd] = P.filterHz;
+    lp.frequency.setValueAtTime(fLo, t0);
+    lp.frequency.exponentialRampToValueAtTime(fHi, ign);
+    lp.frequency.exponentialRampToValueAtTime(fEnd, end);
+    lp.connect(out);
+
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = P.lfoHz;
+    const depth = ctx.createGain();
+    depth.gain.value = P.lfoDepth;
+    lfo.connect(depth);
+    lfo.start(t0);
+    lfo.stop(end + 0.05);
+
+    for (const det of [-P.detune, P.detune]) {
+      const osc = ctx.createOscillator();
+      osc.type = 'sawtooth';
+      osc.detune.value = det;
+      osc.frequency.setValueAtTime(P.fromHz, t0);
+      osc.frequency.exponentialRampToValueAtTime(P.hz, ign);
+      osc.frequency.setValueAtTime(P.hz, end - (P.ms - P.ignitionMs) / 2000);
+      osc.frequency.exponentialRampToValueAtTime(P.hz * P.dropTo, end);
+      depth.connect(osc.frequency);
+      osc.connect(lp);
+      osc.start(t0);
+      osc.stop(end + 0.05);
+    }
+
+    const crack = ctx.createBufferSource();
+    crack.buffer = this.noise;
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 3200;
+    bp.Q.value = 1.2;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(P.crackVolume, t0);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
+    crack.connect(bp).connect(cg).connect(out);
+    crack.start(t0);
   }
 
   chord(big = false): void {

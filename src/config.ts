@@ -178,8 +178,21 @@ export const CONFIG = {
       tickMs: 8,
       tickVolume: 0.14,
     },
-    // Luz atravessando o prisma: três notas de vidro subindo rápido (a luz se abrindo em três cores).
-    prism: { steps: [7, 9, 11], stepMs: 55, ms: 750, volume: 0.45, shimmer: 2.76, minGapMs: 180 },
+    // Luz atravessando o prisma: sabre de luz ligando (serra grave que sobe, vibrato, filtro que abre).
+    prism: {
+      fromHz: 55, // tom no início da ignição
+      hz: 98, // zumbido
+      ignitionMs: 180,
+      ms: 950,
+      dropTo: 0.82, // queda de tom no fim (Doppler)
+      detune: 9, // cents entre as duas serras: batimento do zumbido
+      lfoHz: 5.5,
+      lfoDepth: 3, // Hz de vibrato
+      filterHz: [350, 2600, 700], // início, pico na ignição, fim
+      volume: 0.75,
+      crackVolume: 0.5,
+      minGapMs: 250,
+    },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
     // Sons do menu: sino zen.
     ui: { tapHz: 659.25, selectHz: [523.25, 783.99], stepMs: 95, ms: 900, volume: 0.5 },
