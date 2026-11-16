@@ -4,6 +4,7 @@
 // Salvar grava em src/levels/edits.json pelo servidor de desenvolvimento (npm run dev); sem servidor,
 // fica guardado no aparelho e o JSON vai para a área de transferência.
 import { CONFIG } from './config.ts';
+import { GRID, recenter } from './core/grid.ts';
 import { countSolutions, MAX_SPACE, searchSpace } from './core/solver.ts';
 import { baseStates, isPiece, placeCells, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Dir, Level } from './core/types.ts';
@@ -46,7 +47,9 @@ export function applyEdits(levels: Level[], dev: boolean): void {
     const i = Number(k) - 1;
     const base = levels[i];
     if (!base) continue;
-    levels[i] = { ...structuredClone(lv), id: base.id, difficulty: lv.difficulty ?? base.difficulty };
+    // Edição salva numa grade de outro tamanho (ex.: 6x8 antiga): centraliza na grade atual.
+    const fit = lv.w === GRID.w && lv.h === GRID.h ? structuredClone(lv) : recenter(structuredClone(lv));
+    levels[i] = { ...fit, id: base.id, difficulty: lv.difficulty ?? base.difficulty };
   }
 }
 

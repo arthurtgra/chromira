@@ -84,6 +84,7 @@ export class Game {
     this.bgAt = this.now;
     this.index = ((index % this.levels.length) + this.levels.length) % this.levels.length;
     this.level = this.levels[this.index]!;
+    this.relayout(); // a grade segue o tamanho da fase carregada
     this.initPieces();
     this.drag = null;
     this.result = trace(this.level, this.rots);
