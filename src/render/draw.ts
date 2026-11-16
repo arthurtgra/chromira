@@ -265,14 +265,16 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
   // Feixe branco (as três cores juntas) um pouco mais grosso que os outros: ondas mais largas e abertas.
   const thick = (r: Run): number => (r.color === 7 ? B.white.width : 1);
   const spread = (r: Run): number => (r.color === 7 ? B.white.amp : 1);
-  for (const layer of B.layers) {
-    ctx.globalAlpha = layer.alpha * alphaMul;
+  B.layers.forEach((layer, li) => {
     for (const r of runs) {
-      ctx.lineWidth = Math.max(1, layer.width * thick(r) * cell);
+      // Branco: núcleo próprio, largo e forte, para não sobrar espaço entre as três ondas.
+      const L = r.color === 7 && li === B.layers.length - 1 ? B.white.core : layer;
+      ctx.globalAlpha = L.alpha * alphaMul;
+      ctx.lineWidth = Math.max(1, L.width * (L === layer ? thick(r) : 1) * cell);
       ctx.strokeStyle = CONFIG.colors[r.color];
       strokeRun(ctx, l, r);
     }
-  }
+  });
   for (const r of runs) {
     if ((r.color & (r.color - 1)) === 0 || r.color === 7) continue;
     ctx.strokeStyle = CONFIG.colors[r.color];

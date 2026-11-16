@@ -27,7 +27,7 @@ export const CONFIG = {
     1: '#ff3358',
     2: '#29f58a',
     3: '#ffe23d', // amarelo limão: lê amarelo, não laranja
-    4: '#5c8fff', // azul mais claro: o azul escuro sumia no fundo e ao lado das outras cores
+    4: '#3d8eff', // azul vivo e claro: o azul escuro sumia no fundo e ao lado das outras cores
     5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
     7: '#f4f6ff',
@@ -66,10 +66,10 @@ export const CONFIG = {
     // Desenhado três vezes com 'lighter': largo/fraco, médio, fino/forte. Larguras em fração da célula.
     layers: [
       { width: 0.3, alpha: 0.035 }, // névoa bem fraca; o brilho de verdade vem das auras das ondas
-      { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
+      { width: 0.1, alpha: 0.3 }, // núcleo: preenche o espaço entre as ondas da trança
     ],
     thickness: 1.2, // espessura geral de todos os feixes (multiplica as larguras das linhas)
-    white: { width: 1.15, amp: 1.15 }, // feixe branco (as três cores juntas): mais grosso (largura) e ondas mais abertas (amplitude)
+    white: { width: 1.15, amp: 1.15, core: { width: 0.17, alpha: 0.55 } }, // feixe branco (3 cores): mais grosso, ondas mais abertas e núcleo cheio (sem espaço entre as ondas)
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
     speed: 12, // ao abrir a fase
     easePow: 2, // desaceleração no fim do crescimento (3 = cúbica, cauda longa; 1 = sem desacelerar)
@@ -112,7 +112,7 @@ export const CONFIG = {
       // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
       // cores no feixe: 1 cor sem deriva, 2 cores média, branco (3) a mais grossa.
       driftByColors: [0, 0, 1, 1.25],
-      blueBoost: 1.25, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
+      blueBoost: 1.45, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
