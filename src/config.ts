@@ -96,12 +96,10 @@ export const CONFIG = {
       // nas cores puras (mais grossas que numa cor só) sobre um miolo e um brilho fracos na cor da mistura.
       pairWidth: 1.4, // largura das ondas componentes numa mistura de duas cores
       pairAlpha: 1,
-      pairPhase: 1.2, // defasagem entre as duas ondas (rad, ~70°): ficam quase juntas e se sobrepõem, sem "barrigas"
-      blueBoost: 1.3, // onda azul mais grossa nas misturas: o azul é escuro e some ao lado do verde e do vermelho
       // Ajustes por mistura (vazio = todas iguais).
       comp: {} as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
-      mixCore: { width: 0.04, alpha: 0.4 },
-      mixGlow: { width: 0.22, alpha: 0.12 },
+      mixCore: { width: 0.03, alpha: 0.25 },
+      mixGlow: { width: 0.22, alpha: 0.09 },
       mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,

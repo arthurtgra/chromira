@@ -294,9 +294,9 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
             const pair = comps.length === 2; // amarelo, rosa, ciano: mesmo desenho para os três
             return {
               color: o?.color ?? mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
-              // Duas cores: ondas pouco defasadas (pairPhase), quase sobrepostas: a cor da mistura aparece.
-              ph: pair ? k * W.pairPhase : (COMPONENTS.indexOf(c) * TAU) / 3,
-              width: o?.width ?? (pair ? W.pairWidth * (c === 4 ? W.blueBoost : 1) : 1),
+              // Duas cores: ondas opostas (0° e 180°), trança simétrica igual nas três misturas.
+              ph: pair ? k * Math.PI : (COMPONENTS.indexOf(c) * TAU) / 3,
+              width: o?.width ?? (pair ? W.pairWidth : 1),
               alpha: o?.alpha ?? (pair ? W.pairAlpha : W.alpha),
             };
           });
