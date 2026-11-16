@@ -71,6 +71,9 @@ export class Game {
   onLoad: (() => void) | null = null;
   unlockAll = false; // modo desenvolvedor: todas as fases liberadas
   skip = new Set<number>(); // fases cortadas no playtest: o avanço automático pula
+  editing = false; // editor de fases (desenvolvedor): toques vão para o Editor, sem vitória
+  editMark: { x: number; y: number } | null = null; // célula destacada no editor (peça sendo arrastada)
+  private size = { w: 1, h: 1 };
 
   constructor(levels: Level[]) {
     this.levels = levels;
@@ -81,14 +84,7 @@ export class Game {
     this.bgAt = this.now;
     this.index = ((index % this.levels.length) + this.levels.length) % this.levels.length;
     this.level = this.levels[this.index]!;
-    this.rots = startRots(this.level);
-    this.pieceCells = pieces(this.level);
-    this.anims = this.rots.map((r, i) => {
-      const c = this.pieceCells[i]!;
-      const v = c.t === 'filter' ? rotOf(c, r) : rotOf(c, r) === 0 ? -QUARTER / 2 : QUARTER / 2;
-      return { from: v, to: v, at: -Infinity };
-    });
-    this.slide = this.rots.map((r, i) => posOf(this.pieceCells[i]!, r));
+    this.initPieces();
     this.drag = null;
     this.result = trace(this.level, this.rots);
     this.prismAngle = new Map();
@@ -107,6 +103,47 @@ export class Game {
     this.fx.clear();
     this.persist();
     this.onLoad?.();
+  }
+
+  // Peças móveis no estado inicial da fase, sem animação.
+  private initPieces(): void {
+    this.rots = startRots(this.level);
+    this.pieceCells = pieces(this.level);
+    this.anims = this.rots.map((r, i) => {
+      const c = this.pieceCells[i]!;
+      const v = c.t === 'filter' ? rotOf(c, r) : rotOf(c, r) === 0 ? -QUARTER / 2 : QUARTER / 2;
+      return { from: v, to: v, at: -Infinity };
+    });
+    this.slide = this.rots.map((r, i) => posOf(this.pieceCells[i]!, r));
+  }
+
+  // Editor: a fase atual, editada no lugar (os objetos de levels são os mesmos).
+  get editLevel(): Level {
+    return this.level;
+  }
+
+  // Entrar/sair do editor recomeça a fase no estado inicial.
+  setEditing(on: boolean): void {
+    this.editing = on;
+    this.load(this.index);
+  }
+
+  // Depois de cada edição: peças voltam ao estado inicial e a luz se refaz a partir do que mudou.
+  editChanged(): void {
+    this.initPieces();
+    this.prismAngle = new Map();
+    const targets = new Set(this.level.cells.flatMap((c) => (c.t === 'target' ? [key(c.x, c.y)] : [])));
+    for (const k of [...this.litAt.keys()]) if (!targets.has(k)) this.litAt.delete(k);
+    this.retrace();
+  }
+
+  hitCell(px: number, py: number): { x: number; y: number } | null {
+    return cellAt(this.layout, px, py, this.level.w, this.level.h);
+  }
+
+  // Recalcula o layout (ex.: a barra do editor muda o espaço livre embaixo).
+  relayout(): void {
+    this.resize(this.size.w, this.size.h);
   }
 
   // Próxima fase não cortada depois de i (se todas cortadas, a seguinte).
@@ -145,6 +182,7 @@ export class Game {
   }
 
   resize(w: number, h: number): void {
+    this.size = { w, h };
     this.layout = computeLayout(w, h, this.level.w, this.level.h);
   }
 
@@ -157,7 +195,7 @@ export class Game {
   // célula (nunca fica entre duas) e a luz acompanha; toque sem arrastar gira (espelho).
   press(px: number, py: number): void {
     this.synth.unlock();
-    if (this.wonAt !== null) return;
+    if (this.wonAt !== null || this.editing) return;
     const c = cellAt(this.layout, px, py, this.level.w, this.level.h);
     if (!c) return;
     const placed = placeCells(this.level, this.rots).filter(isPiece);
@@ -284,7 +322,7 @@ export class Game {
     if (down && !this.quiet) this.synth.down();
     if (front >= this.plan.to) {
       this.quiet = false;
-      if (this.result.solved && this.wonAt === null) this.win();
+      if (this.result.solved && this.wonAt === null && !this.editing) this.win();
     }
 
   }
@@ -327,6 +365,7 @@ export class Game {
     });
     drawImpacts(ctx, l, this.hits, this.plan, front, style);
     this.fx.draw(ctx, l.w, l.h);
+    if (this.editing) this.drawEditOverlay(ctx);
     drawHud(ctx, l, {
       level: this.index + 1,
       difficulty: this.level.difficulty ?? 1,
@@ -337,6 +376,38 @@ export class Game {
       accent: this.accent(),
     });
     if (this.debug) drawDebug(ctx, l, this.level.w, this.level.h, this.fps);
+  }
+
+  // Editor: contorno tracejado da grade, linhas das células e destaque da peça sendo arrastada.
+  private drawEditOverlay(ctx: CanvasRenderingContext2D): void {
+    const l = this.layout;
+    const { w, h } = this.level;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 1; x < w; x++) {
+      ctx.moveTo(l.ox + x * l.cell + 0.5, l.oy);
+      ctx.lineTo(l.ox + x * l.cell + 0.5, l.oy + h * l.cell);
+    }
+    for (let y = 1; y < h; y++) {
+      ctx.moveTo(l.ox, l.oy + y * l.cell + 0.5);
+      ctx.lineTo(l.ox + w * l.cell, l.oy + y * l.cell + 0.5);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.setLineDash([6, 6]);
+    ctx.strokeRect(l.ox + 0.5, l.oy + 0.5, w * l.cell - 1, h * l.cell - 1);
+    const m = this.editMark;
+    if (m) {
+      ctx.setLineDash([]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(l.ox + m.x * l.cell + 3, l.oy + m.y * l.cell + 3, l.cell - 6, l.cell - 6, 8);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Cor de fundo atual: transição suave da fase anterior para a desta.

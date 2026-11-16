@@ -5,10 +5,13 @@ import { CONFIG } from './config.ts';
 import levelsJson from './levels/levels.json';
 import { Feedback, feedbackEnabled, setupDev, setupFeedback } from './feedback.ts';
 import { setupMenu } from './menu.ts';
+import { applyEdits, EDIT_ICON, setupEditor } from './editor.ts';
 import { loadSave } from './save.ts';
 import './style.css';
 
 const levels = levelsJson as unknown as Level[];
+const original = structuredClone(levels); // versão gerada, para "Revert" no editor
+applyEdits(levels, feedbackEnabled());
 const canvas = document.querySelector<HTMLCanvasElement>('#game')!;
 const muteBtn = document.querySelector<HTMLButtonElement>('#mute')!;
 const ctx = canvas.getContext('2d')!;
@@ -33,9 +36,26 @@ if (fb) (CONFIG.layout as { bottom: number }).bottom = 80; // espaço para a bar
 game.load(fromUrl ? urlLevel - 1 : save.level);
 setupMenu(game, !fromUrl, fb ? (i) => fb.vote(i) : undefined);
 setupDev(game);
-if (fb) {
+const ed = fb
+  ? setupEditor(game, original, (on) => {
+      // A barra do editor ocupa mais espaço embaixo: a grade encolhe enquanto ele está aberto.
+      (CONFIG.layout as { bottom: number }).bottom = on ? 170 : 80;
+      game.relayout();
+    })
+  : null;
+if (fb && ed) {
   const { refresh } = setupFeedback(game, fb);
   game.onLoad = refresh;
+  // Lápis na barra do desenvolvedor: entra no modo de edição da fase atual.
+  const edit = document.createElement('button');
+  edit.setAttribute('aria-label', 'Edit level');
+  edit.innerHTML = EDIT_ICON;
+  edit.addEventListener('pointerdown', (e) => e.stopPropagation());
+  edit.addEventListener('click', () => {
+    game.synth.uiTap();
+    ed.toggle();
+  });
+  document.querySelector('#fb')!.prepend(edit);
 }
 
 function resize(): void {
@@ -65,9 +85,9 @@ muteBtn.addEventListener('click', () => {
 renderMute();
 
 onPointer(canvas, {
-  down: (x, y) => game.press(x, y),
-  move: (x, y) => game.dragTo(x, y),
-  up: () => game.release(),
+  down: (x, y) => (game.editing && ed ? ed.editor.press(x, y) : game.press(x, y)),
+  move: (x, y) => (game.editing && ed ? ed.editor.dragTo(x, y) : game.dragTo(x, y)),
+  up: () => (game.editing && ed ? ed.editor.release() : game.release()),
 });
 
 // Em tela de toque, pointerdown não conta como gesto para liberar áudio; pointerup/touchend contam.

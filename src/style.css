@@ -542,3 +542,81 @@ body:not([data-screen='game']) #fb {
   font-size: 12px;
 }
 
+/* ---------- editor de fases (modo desenvolvedor) ---------- */
+body.editing #fb,
+body:not([data-screen='game']) #editor {
+  display: none;
+}
+#editor {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--glass);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--ink);
+  font-family: var(--font);
+}
+#editor[hidden] {
+  display: none;
+}
+#editor .ed-status {
+  min-height: 16px;
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+}
+#editor .ed-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+#editor .ed-actions button {
+  flex: 1;
+  max-width: 120px;
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  touch-action: manipulation;
+}
+#editor .ed-actions button:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+#editor .ed-tools {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  justify-content: safe center;
+}
+#editor .ed-tools button {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 9px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  opacity: 0.5;
+  touch-action: manipulation;
+}
+#editor .ed-tools button svg {
+  width: 100%;
+  height: 100%;
+}
+#editor .ed-tools button.on {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}

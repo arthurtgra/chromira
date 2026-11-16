@@ -26,6 +26,22 @@ npm run icons          # regenera public/icon-*.png
 Se o celular não abrir o endereço, libere a porta 5173 no firewall do Windows.
 `check-levels` e `gen-levels` rodam TypeScript direto no Node (>= 23.6).
 
+## Editor de fases (modo desenvolvedor)
+
+Com o modo Developer ligado (menu → Developer → senha), o lápis na barra de baixo abre o editor da fase atual:
+
+- **Mover / girar** (padrão): arraste uma peça para outra célula vazia (a luz acompanha); toque para girar
+  (espelho, divisor, dicroico, lançador), trocar a cor do filtro ou do alvo. Soltar fora da grade apaga.
+- **Lançador, espelho, divisor, filtro, prisma, dicroico, parede, alvo**: toque numa célula vazia para adicionar.
+- **Cor**: toque num lançador, alvo, dicroico ou filtro para trocar a cor. **Apagar**: toque para remover.
+- A fase começa exatamente como aparece no editor (as rotações viram o `start`).
+- **Save** grava em `src/levels/edits.json` (precisa do `npm run dev`; funciona pelo celular na rede também)
+  e mostra quantas soluções a fase tem. Sem servidor, fica salvo no aparelho e o JSON vai para a área de transferência.
+- **Revert** volta a fase para a versão gerada. **Done** sai do editor.
+
+`edits.json` substitui a fase na mesma posição (número da fase), por cima de `levels.json`, e o
+`check-levels` também usa as edições. Se o `gen-levels` mudar a ordem das fases, confira as edições.
+
 Atalhos de URL: `?level=12` abre direto numa fase; `?debug=1` mostra coordenadas e FPS.
 
 ## Estrutura

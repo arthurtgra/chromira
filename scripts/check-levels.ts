@@ -5,6 +5,9 @@ import { startRots, trace } from '../src/core/trace.ts';
 import type { Level } from '../src/core/types.ts';
 
 const levels = JSON.parse(readFileSync(new URL('../src/levels/levels.json', import.meta.url), 'utf8')) as Level[];
+// Fases editadas no jogo (editor do modo desenvolvedor) substituem a gerada na mesma posição.
+const edits = JSON.parse(readFileSync(new URL('../src/levels/edits.json', import.meta.url), 'utf8')) as Record<string, Level>;
+for (const [k, lv] of Object.entries(edits)) if (levels[Number(k) - 1]) levels[Number(k) - 1] = lv;
 let bad = 0;
 for (const [i, lv] of levels.entries()) {
   const { count, first } = countSolutions(lv);
