@@ -53,9 +53,9 @@ export const CONFIG = {
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
-    speed: 15, // ao abrir a fase
-    turnSpeed: 7.5, // ao girar uma peça: mais devagar, vira transição
-    growMs: [300, 1300], // duração mínima e máxima de um crescimento
+    speed: 12, // ao abrir a fase
+    turnSpeed: 6, // ao girar uma peça: mais devagar, vira transição
+    growMs: [360, 1600], // duração mínima e máxima de um crescimento
     impact: { radius: 0.14, alpha: 0.6 }, // clarão onde a luz bate em parede/lançador
     // Faíscas na colisão: traços curtos na cor do feixe, ricocheteando para trás em leque.
     sparks: { perSec: 30, spread: 1.45, speed: [90, 230], lifeMs: [200, 450], len: 8, width: 1.6, drag: 4.5 },
