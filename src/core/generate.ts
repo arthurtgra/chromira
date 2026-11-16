@@ -1,7 +1,10 @@
 import { MAX_SPACE, countSolutions, searchSpace } from './solver.ts';
 import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, placeCells, posOf, reflect, trace } from './trace.ts';
 import type { Cell, Color, Dir, Level, Rots } from './types.ts';
+import { GRID, recenter } from './grid.ts';
 
+// O gerador monta as fases numa área 6x8 (as mesmas fases de antes da grade 7x9) e no fim
+// centraliza o resultado na grade GRID.
 const W = 6;
 const H = 8;
 const MAX_ATTEMPTS = 20000;
@@ -244,7 +247,7 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     (slider !== null && posOf(slider.cell, start[sl]!) === slider.pos)
   );
 
-  const level: Level = { id, w: W, h: H, cells: d.cells, start };
+  const level: Level = { id, w: GRID.w, h: GRID.h, cells: d.cells, start };
   if (!trace(level, sol).solved || trace(level, start).solved) return null;
   if (searchSpace(level) > MAX_SPACE || countSolutions(level, 2).count !== 1) return null;
   const ends = new Set(trace(level, sol).segments.map((s) => key(s.x2, s.y2)));
@@ -258,7 +261,7 @@ export function generate(seed: number, opts: GenOptions | number, id: number = s
   const r = mulberry32(seed);
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const level = tryBuild(r, id, o);
-    if (level) return level;
+    if (level) return recenter(level);
   }
   throw new Error(`generate: nenhuma fase válida (seed ${seed}, ${JSON.stringify(o)})`);
 }

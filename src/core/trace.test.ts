@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { reflect, trace } from './trace.ts';
 import type { Cell, Dir, Level, Segment } from './types.ts';
 
-const level = (cells: Cell[]): Level => ({ id: 0, w: 6, h: 8, cells });
+const level = (cells: Cell[]): Level => ({ id: 0, w: 7, h: 9, cells });
 const geo = ({ d0: _, ...s }: Segment): Omit<Segment, 'd0'> => s;
 
 describe('reflect', () => {
@@ -41,7 +41,7 @@ describe('trace', () => {
     ]);
     const r = trace(lv, [1]);
     expect(r.solved).toBe(false);
-    expect(r.segments.at(-1)).toEqual({ x1: 3, y1: 3, x2: 3, y2: 7.5, color: 7, d0: 3 });
+    expect(r.segments.at(-1)).toEqual({ x1: 3, y1: 3, x2: 3, y2: 8.5, color: 7, d0: 3 });
   });
 
   it.each<[Dir, 0 | 1, Dir]>([
@@ -79,7 +79,7 @@ describe('trace', () => {
 
   it('beam leaves the grid', () => {
     const r = trace(level([{ x: 0, y: 0, t: 'emitter', dir: 'S', color: 2 }]), []);
-    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 7.5, color: 2 }]);
+    expect(r.segments.map(geo)).toEqual([{ x1: 0, y1: 0, x2: 0, y2: 8.5, color: 2 }]);
   });
 
   it('stops after the step limit', () => {
@@ -240,7 +240,7 @@ describe('dichroic and rail', () => {
       { x: 2, y: 1, t: 'mirror', rail: { axis: 'y', len: 3 } },
       { x: 2, y: 0, t: 'target', color: 7 },
     ]);
-    expect(trace(lv, [0 + 2 * 2]).solved).toBe(true); // '/' na posição 2 = (2,3)
+    expect(trace(lv, [0 + 2 * 2]).solved).toBe(true); // '/' na posiÃ§Ã£o 2 = (2,3)
     expect(trace(lv, [0 + 2 * 1]).solved).toBe(false);
   });
 });

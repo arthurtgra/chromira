@@ -23,8 +23,8 @@ export interface Rail {
 // difficulty = 1..5, calculada pelo script gen-levels
 export interface Level {
   id: number;
-  w: 6;
-  h: 8;
+  w: 7; // GRID em grid.ts: ímpar para ter coluna e linha do meio
+  h: 9;
   cells: Cell[];
   start?: Rots;
   difficulty?: number;

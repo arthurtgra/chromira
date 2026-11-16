@@ -6,8 +6,8 @@ import type { Level } from './types.ts';
 
 const simple: Level = {
   id: 1,
-  w: 6,
-  h: 8,
+  w: 7,
+  h: 9,
   cells: [
     { x: 0, y: 3, t: 'emitter', dir: 'E', color: 7 },
     { x: 3, y: 3, t: 'mirror' },
@@ -31,8 +31,8 @@ describe('solver', () => {
   it('handles filters with 3 states', () => {
     const lv: Level = {
       id: 2,
-      w: 6,
-      h: 8,
+      w: 7,
+      h: 9,
       cells: [
         { x: 0, y: 3, t: 'emitter', dir: 'E', color: 7 },
         { x: 1, y: 3, t: 'filter' },
