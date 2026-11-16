@@ -1,1 +1,220 @@
-{}
+{
+  "6": {
+    "id": 6,
+    "w": 7,
+    "h": 9,
+    "cells": [
+      {
+        "x": 1,
+        "y": 3,
+        "t": "emitter",
+        "dir": "E",
+        "color": 2
+      },
+      {
+        "x": 6,
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 6,
+        "t": "mirror"
+      },
+      {
+        "x": 4,
+        "y": 0,
+        "t": "emitter",
+        "dir": "S",
+        "color": 4
+      },
+      {
+        "x": 4,
+        "y": 8,
+        "t": "mirror"
+      },
+      {
+        "x": 1,
+        "y": 8,
+        "t": "mirror"
+      },
+      {
+        "x": 1,
+        "y": 6,
+        "t": "target",
+        "color": 6
+      }
+    ],
+    "start": [
+      0,
+      1,
+      1,
+      0
+    ],
+    "difficulty": 2
+  },
+  "7": {
+    "id": 7,
+    "w": 7,
+    "h": 9,
+    "start": [
+      1,
+      1,
+      0,
+      0
+    ],
+    "cells": [
+      {
+        "x": 1,
+        "y": 3,
+        "t": "emitter",
+        "dir": "S",
+        "color": 7
+      },
+      {
+        "x": 3,
+        "y": 5,
+        "t": "prism"
+      },
+      {
+        "x": 3,
+        "y": 1,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 5,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 1,
+        "t": "target",
+        "color": 3
+      },
+      {
+        "x": 3,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 7,
+        "t": "target",
+        "color": 4
+      },
+      {
+        "x": 1,
+        "y": 5,
+        "t": "mirror"
+      }
+    ],
+    "difficulty": 2
+  },
+  "8": {
+    "id": 8,
+    "w": 7,
+    "h": 9,
+    "start": [
+      1,
+      0,
+      0,
+      0,
+      0
+    ],
+    "cells": [
+      {
+        "x": 1,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 7
+      },
+      {
+        "x": 1,
+        "y": 6,
+        "t": "mirror"
+      },
+      {
+        "x": 4,
+        "y": 6,
+        "t": "prism"
+      },
+      {
+        "x": 4,
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 1,
+        "y": 3,
+        "t": "target",
+        "color": 1
+      },
+      {
+        "x": 5,
+        "y": 6,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 8,
+        "t": "target",
+        "color": 2
+      },
+      {
+        "x": 4,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 2,
+        "y": 1,
+        "t": "emitter",
+        "dir": "E",
+        "color": 1
+      },
+      {
+        "x": 6,
+        "y": 1,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 7,
+        "t": "target",
+        "color": 5
+      }
+    ],
+    "difficulty": 3
+  },
+  "9": {
+    "id": 9,
+    "w": 7,
+    "h": 9,
+    "start": [
+      2
+    ],
+    "cells": [
+      {
+        "x": 1,
+        "y": 4,
+        "t": "emitter",
+        "dir": "E",
+        "color": 7
+      },
+      {
+        "x": 3,
+        "y": 4,
+        "t": "filter"
+      },
+      {
+        "x": 5,
+        "y": 4,
+        "t": "target",
+        "color": 2
+      }
+    ],
+    "difficulty": 1
+  }
+}
