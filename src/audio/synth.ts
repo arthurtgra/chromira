@@ -310,67 +310,99 @@ export class Synth {
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
 
-  // Luz passando pelo prisma: zumbido de sabre de luz ligando. Duas serras desafinadas sobem de tom
-  // (ignição), um vibrato lento dá o "hum", o filtro abre e fecha (o brilho do whoosh) e o tom cai um
-  // pouco no fim, como o efeito Doppler do golpe. Um estalo de ruído agudo marca a ignição.
+  // Luz passando pelo prisma: "vrum" eletromagnético que se abre em três e se dissipa.
+  // Começa como um tom só (luz branca) e em splitMs se separa em três vozes (vermelho mais grave à
+  // esquerda, verde no centro, azul mais agudo à direita). Cada voz é FM: o índice começa alto (zumbido
+  // elétrico, chiado de campo) e cai até virar tom puro, como a luz se desfazendo. Um tremolo rápido que
+  // desacelera dá a vibração eletromagnética, e um sopro de ruído com filtro subindo faz o "vrum".
   prism(): void {
     const ctx = this.ready();
-    if (!ctx || !this.echo || !this.noise) return;
+    if (!ctx || !this.echo) return;
     const P = A.prism;
     const t0 = ctx.currentTime;
-    const ign = t0 + P.ignitionMs / 1000;
+    const split = t0 + P.splitMs / 1000;
     const end = t0 + P.ms / 1000;
 
     const out = ctx.createGain();
-    out.gain.setValueAtTime(0, t0);
-    out.gain.linearRampToValueAtTime(A.volume * P.volume, t0 + 0.03);
-    out.gain.setValueAtTime(A.volume * P.volume, ign);
+    out.gain.setValueAtTime(0.0001, t0);
+    out.gain.exponentialRampToValueAtTime(A.volume * P.volume, t0 + P.attackMs / 1000);
+    out.gain.setValueAtTime(A.volume * P.volume, split);
     out.gain.exponentialRampToValueAtTime(0.0001, end);
     out.connect(this.bus!);
     out.connect(this.echo);
 
-    const lp = ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.Q.value = 6;
-    const [fLo, fHi, fEnd] = P.filterHz;
-    lp.frequency.setValueAtTime(fLo, t0);
-    lp.frequency.exponentialRampToValueAtTime(fHi, ign);
-    lp.frequency.exponentialRampToValueAtTime(fEnd, end);
-    lp.connect(out);
+    // Tremolo: ganho oscila em volta de 1 - depth/2, rápido no começo e mais lento ao dissipar.
+    const trem = ctx.createGain();
+    trem.gain.value = 1 - P.tremDepth / 2;
+    const tremLfo = ctx.createOscillator();
+    tremLfo.frequency.setValueAtTime(P.tremHz[0], t0);
+    tremLfo.frequency.exponentialRampToValueAtTime(P.tremHz[1], end);
+    const tremAmt = ctx.createGain();
+    tremAmt.gain.value = P.tremDepth / 2;
+    tremLfo.connect(tremAmt).connect(trem.gain);
+    tremLfo.start(t0);
+    tremLfo.stop(end + 0.05);
+    trem.connect(out);
 
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = P.lfoHz;
-    const depth = ctx.createGain();
-    depth.gain.value = P.lfoDepth;
-    lfo.connect(depth);
-    lfo.start(t0);
-    lfo.stop(end + 0.05);
+    P.spread.forEach((ratio, k) => {
+      const f1 = P.hz * ratio;
+      const car = ctx.createOscillator();
+      car.type = 'sine';
+      car.frequency.setValueAtTime(P.hz, t0);
+      car.frequency.exponentialRampToValueAtTime(f1, split);
+      car.frequency.exponentialRampToValueAtTime(f1 * P.sink, end);
+      const mod = ctx.createOscillator();
+      mod.type = 'sine';
+      mod.frequency.setValueAtTime(P.hz * P.fmRatio, t0);
+      mod.frequency.exponentialRampToValueAtTime(f1 * P.fmRatio, split);
+      mod.frequency.exponentialRampToValueAtTime(f1 * P.fmRatio * P.sink, end);
+      const idx = ctx.createGain();
+      idx.gain.setValueAtTime(P.fmIndex[0] * P.hz, t0);
+      idx.gain.exponentialRampToValueAtTime(P.fmIndex[1] * f1, end);
+      mod.connect(idx).connect(car.frequency);
 
-    for (const det of [-P.detune, P.detune]) {
-      const osc = ctx.createOscillator();
-      osc.type = 'sawtooth';
-      osc.detune.value = det;
-      osc.frequency.setValueAtTime(P.fromHz, t0);
-      osc.frequency.exponentialRampToValueAtTime(P.hz, ign);
-      osc.frequency.setValueAtTime(P.hz, end - (P.ms - P.ignitionMs) / 2000);
-      osc.frequency.exponentialRampToValueAtTime(P.hz * P.dropTo, end);
-      depth.connect(osc.frequency);
-      osc.connect(lp);
-      osc.start(t0);
-      osc.stop(end + 0.05);
-    }
+      const g = ctx.createGain();
+      g.gain.value = 1 / P.spread.length;
+      const pan = ctx.createStereoPanner?.();
+      if (pan) {
+        pan.pan.setValueAtTime(0, t0);
+        pan.pan.linearRampToValueAtTime((k - (P.spread.length - 1) / 2) * P.pan, split);
+        car.connect(g).connect(pan).connect(trem);
+      } else car.connect(g).connect(trem);
+      for (const o of [car, mod]) {
+        o.start(t0);
+        o.stop(end + 0.05);
+      }
+    });
 
-    const crack = ctx.createBufferSource();
-    crack.buffer = this.noise;
+    // Sopro: ruído com passa-banda subindo (o "vrum") e sumindo junto com a luz.
+    const W = P.whoosh;
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.whooshNoise(ctx);
     const bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = 3200;
-    bp.Q.value = 1.2;
-    const cg = ctx.createGain();
-    cg.gain.setValueAtTime(P.crackVolume, t0);
-    cg.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.06);
-    crack.connect(bp).connect(cg).connect(out);
-    crack.start(t0);
+    bp.Q.value = W.q;
+    bp.frequency.setValueAtTime(W.fromHz, t0);
+    bp.frequency.exponentialRampToValueAtTime(W.toHz, split);
+    bp.frequency.exponentialRampToValueAtTime(W.endHz, end);
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(0.0001, t0);
+    ng.gain.exponentialRampToValueAtTime(W.volume, split);
+    ng.gain.exponentialRampToValueAtTime(0.0001, end);
+    noise.connect(bp).connect(ng).connect(out);
+    noise.start(t0);
+    noise.stop(end + 0.05);
+  }
+
+  private longNoise: AudioBuffer | null = null;
+  private whooshNoise(ctx: AudioContext): AudioBuffer {
+    if (!this.longNoise) {
+      const len = Math.ceil(ctx.sampleRate * 2);
+      this.longNoise = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = this.longNoise.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    }
+    return this.longNoise;
   }
 
   chord(big = false): void {

@@ -178,19 +178,21 @@ export const CONFIG = {
       tickMs: 8,
       tickVolume: 0.14,
     },
-    // Luz atravessando o prisma: sabre de luz ligando (serra grave que sobe, vibrato, filtro que abre).
+    // Luz atravessando o prisma: "vrum" eletromagnético que se abre em três vozes e se dissipa.
     prism: {
-      fromHz: 55, // tom no início da ignição
-      hz: 98, // zumbido
-      ignitionMs: 180,
-      ms: 950,
-      dropTo: 0.82, // queda de tom no fim (Doppler)
-      detune: 9, // cents entre as duas serras: batimento do zumbido
-      lfoHz: 5.5,
-      lfoDepth: 3, // Hz de vibrato
-      filterHz: [350, 2600, 700], // início, pico na ignição, fim
-      volume: 0.75,
-      crackVolume: 0.5,
+      hz: 392, // tom único do começo (luz branca): sol
+      spread: [0.75, 1, 1.5], // as três vozes depois de abrir: ré, sol, ré acima (vermelho, verde, azul)
+      splitMs: 280, // tempo até as três vozes se separarem
+      attackMs: 40,
+      ms: 1300, // duração total (dissipação)
+      sink: 0.96, // tom afunda levemente enquanto some
+      fmRatio: 2.01, // modulador: dá o timbre metálico/elétrico
+      fmIndex: [2.4, 0.08], // índice FM: zumbido no começo → tom puro no fim
+      tremHz: [22, 5], // vibração eletromagnética: rápida → lenta
+      tremDepth: 0.45,
+      pan: 0.55, // vozes se espalham: vermelho à esquerda, azul à direita
+      whoosh: { fromHz: 500, toHz: 3800, endHz: 1800, q: 1.6, volume: 0.6 },
+      volume: 0.55,
       minGapMs: 250,
     },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
