@@ -258,6 +258,18 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 
 // Névoa e miolo na cor do feixe, miolo de mistura, e as ondas (uma por componente R/G/B, fases a 120°;
 // cor pura vira trança de duas ondas). Cada onda tem aura que a acompanha e uma deriva lenta mais aberta.
+// Traço com borda em degradê: várias passadas da mais larga para a mais fina, cada uma fraca. Somadas
+// ('lighter'), o centro fica forte e a borda some aos poucos, como brilho, sem contorno marcado.
+function soft(ctx: Ctx, width: number, alpha: number, draw: () => void): void {
+  const n = CONFIG.beam.softSteps;
+  const a = (alpha * CONFIG.beam.softCenter) / n;
+  for (let k = 0; k < n; k++) {
+    ctx.lineWidth = Math.max(1, width * (1 - k / n));
+    ctx.globalAlpha = a;
+    draw();
+  }
+}
+
 function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number): void {
   const B = CONFIG.beam;
   const W = B.waves;
@@ -271,10 +283,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       const core = li === B.layers.length - 1;
       const pair = r.color === 3 || r.color === 5 || r.color === 6;
       const L = core && r.color === 7 ? B.white.core : core && pair ? B.pairCore : layer;
-      ctx.globalAlpha = L.alpha * alphaMul;
-      ctx.lineWidth = Math.max(1, L.width * (L === layer ? thick(r) : 1) * cell);
       ctx.strokeStyle = CONFIG.colors[r.color];
-      strokeRun(ctx, l, r);
+      soft(ctx, L.width * (L === layer ? thick(r) : 1) * cell, L.alpha * alphaMul, () => strokeRun(ctx, l, r));
     }
   });
   for (const r of runs) {
@@ -282,9 +292,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     ctx.strokeStyle = CONFIG.colors[r.color];
     const mx = W.mix[r.color];
     for (const m of mx ? [mx.glow, mx.core] : [W.mixGlow, W.mixCore]) {
-      ctx.globalAlpha = m.alpha * alphaMul;
-      ctx.lineWidth = Math.max(1, m.width * cell);
-      strokeRun(ctx, l, r);
+      soft(ctx, m.width * cell, m.alpha * alphaMul, () => strokeRun(ctx, l, r));
     }
   }
   for (const r of runs) {
@@ -310,19 +318,16 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const drift = W.driftByColors[comps.length] ?? 0;
     if (drift > 0) {
       ctx.strokeStyle = CONFIG.colors[r.color];
-      ctx.lineWidth = W.driftWidth * drift * cell;
-      ctx.globalAlpha = W.driftAlpha * alphaMul;
-      strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
+      soft(ctx, W.driftWidth * drift * cell, W.driftAlpha * alphaMul, () =>
+        strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed),
+      );
     }
     for (const w of waves) {
       const bw = w.blue ? W.blueBoost : 1;
       ctx.strokeStyle = w.color;
-      ctx.lineWidth = W.glowWidth * tw * bw * cell;
-      ctx.globalAlpha = W.glowAlpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph, st, ta);
-      ctx.lineWidth = Math.max(1, W.width * w.width * tw * bw * cell);
-      ctx.globalAlpha = w.alpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph, st, ta);
+      soft(ctx, W.glowWidth * tw * bw * cell, W.glowAlpha * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
+      // A própria onda também em degradê (mais larga, centro forte, borda sumindo): brilho, não tubo contornado.
+      soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
     }
   }
   if (st.rainbow > 0) {

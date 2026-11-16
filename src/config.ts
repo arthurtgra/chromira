@@ -69,6 +69,8 @@ export const CONFIG = {
       { width: 0.1, alpha: 0.3 }, // núcleo: preenche o espaço entre as ondas da trança
     ],
     thickness: 1.2, // espessura geral de todos os feixes (multiplica as larguras das linhas)
+    softSteps: 4, // brilhos (névoa, núcleo, auras) em degradê: passadas sobrepostas, da larga para a fina
+    softCenter: 1.6, // força no centro do degradê em relação à opacidade configurada (a borda fica bem fraca)
     white: { width: 1.15, amp: 1.15, core: { width: 0.14, alpha: 0.28 } }, // feixe branco (3 cores): mais grosso, ondas mais abertas e núcleo que fecha os espaços sem esconder as cores
     pairCore: { width: 0.1, alpha: 0.12 }, // núcleo das misturas de 2 cores: fraco, para não virar branco ao somar com as ondas
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
@@ -106,6 +108,7 @@ export const CONFIG = {
       mixCore: { width: 0.05, alpha: 0.18 }, // miolo na cor da mistura (fraco: com as ondas por cima, forte vira branco)
       mixGlow: { width: 0.22, alpha: 0.08 },
       mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
+      lineSoft: 1.7, // largura da onda em degradê relativa a "width" (a borda some, o centro mantém a força)
       glowWidth: 0.15,
       glowAlpha: 0.13,
       driftAmp: 1.5, // multiplica amp (abre um pouco mais que o feixe)
