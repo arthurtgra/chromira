@@ -57,6 +57,8 @@ export class Game {
   private beamMs = 1;
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
+  private prismHit = new Set<string>(); // prismas que a frente de luz já alcançou (som toca ao chegar)
+  private prismSoundAt = -Infinity;
   private prismAngle = new Map<number, { cur: number; to: number }>(); // por índice em level.cells; // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
   private waves: WaveOrigin[] = [];
@@ -91,6 +93,7 @@ export class Game {
     this.prismAngle = new Map();
     this.aimPrisms(true);
     this.litAt = new Map();
+    this.prismHit = new Set();
     this.quiet = true;
     this.plan = planBeams([], this.beamSegments());
     this.fades = [];
@@ -321,6 +324,23 @@ export class Game {
       }
     }
     if (down && !this.quiet) this.synth.down();
+
+    // Som do prisma quando a frente de luz chega nele (inclusive ao abrir a fase); um intervalo mínimo
+    // evita rajada ao arrastar um prisma em trilho.
+    const atCenter = arrived(this.plan, front);
+    for (const c of placeCells(this.level, this.rots)) {
+      if (c.t !== 'prism') continue;
+      const k = key(c.x, c.y);
+      if (atCenter[k] === undefined) {
+        this.prismHit.delete(k);
+      } else if (!this.prismHit.has(k)) {
+        this.prismHit.add(k);
+        if (this.now - this.prismSoundAt >= CONFIG.audio.prism.minGapMs) {
+          this.prismSoundAt = this.now;
+          this.synth.prism();
+        }
+      }
+    }
     if (front >= this.plan.to) {
       this.quiet = false;
       if (this.result.solved && this.wonAt === null && !this.editing) this.win();

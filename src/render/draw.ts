@@ -753,7 +753,6 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         };
         const tipX = x + Math.cos(a) * s;
         const tipY = y + Math.sin(a) * s;
-        // Contorno vazio como antes, só com um reflexo claro curto ao longo de uma face, perto da ponta.
         const t1 = a + (2 * Math.PI) / 3;
         const ex = x + Math.cos(t1) * s;
         const ey = y + Math.sin(t1) * s;
@@ -763,23 +762,15 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         const ox = x + Math.cos(t2) * s;
         const oy = y + Math.sin(t2) * s;
         const glass = ctx.createLinearGradient((tipX + ex) / 2, (tipY + ey) / 2, ox, oy);
-        // Lado oposto escurece um pouco: dá volume e faz o vidro aparecer mesmo sobre o brilho do prisma aceso.
-        glass.addColorStop(0, 'rgba(255,255,255,0.55)');
-        glass.addColorStop(0.28, 'rgba(255,255,255,0.12)');
-        glass.addColorStop(0.45, 'rgba(255,255,255,0.35)');
-        glass.addColorStop(0.6, 'rgba(20,22,34,0.2)');
-        glass.addColorStop(1, 'rgba(20,22,34,0.55)');
+        // Sempre claro até o vértice oposto (sem trecho escuro, que sumia no fundo e parecia faltar a ponta).
+        glass.addColorStop(0, 'rgba(255,255,255,0.5)');
+        glass.addColorStop(0.3, 'rgba(255,255,255,0.16)');
+        glass.addColorStop(0.5, 'rgba(255,255,255,0.32)');
+        glass.addColorStop(0.7, 'rgba(255,255,255,0.14)');
+        glass.addColorStop(1, 'rgba(255,255,255,0.22)');
         tri(s);
         ctx.fillStyle = glass;
         ctx.fill();
-        ctx.globalAlpha = 0.75;
-        ctx.lineWidth = 1.4;
-        ctx.beginPath();
-        ctx.moveTo(tipX + (ex - tipX) * 0.18 + (x - tipX) * 0.12, tipY + (ey - tipY) * 0.18 + (y - tipY) * 0.12);
-        ctx.lineTo(tipX + (ex - tipX) * 0.5 + (x - tipX) * 0.12, tipY + (ey - tipY) * 0.5 + (y - tipY) * 0.12);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-        ctx.lineWidth = p.stroke;
         tri(s);
         ctx.stroke();
         break;

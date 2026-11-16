@@ -310,6 +310,36 @@ export class Synth {
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
 
+  // Luz passando pelo prisma: três notas de vidro em sequência rápida, com um parcial agudo de brilho.
+  prism(): void {
+    const ctx = this.ready();
+    if (!ctx || !this.echo) return;
+    const P = A.prism;
+    const out = ctx.createGain();
+    out.gain.value = A.volume * P.volume;
+    out.connect(this.bus!);
+    out.connect(this.echo);
+    P.steps.forEach((step, k) => {
+      const t0 = ctx.currentTime + (k * P.stepMs) / 1000;
+      const f = this.freq(step);
+      for (const [ratio, vol, ms] of [
+        [1, 1, P.ms],
+        [P.shimmer, 0.22, P.ms * 0.45],
+      ] as const) {
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.value = f * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(vol, t0 + 0.006);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+        osc.connect(g).connect(out);
+        osc.start(t0);
+        osc.stop(t0 + ms / 1000 + 0.02);
+      }
+    });
+  }
+
   chord(big = false): void {
     const ms = big ? A.bigChordMs : A.chordMs;
     const steps = big ? [0, 2, 4, 5, 7, 10] : [0, 2, 4, 5];
