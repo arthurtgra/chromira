@@ -91,22 +91,16 @@ export const CONFIG = {
       step: 0.05, // resolução da curva, em células
       // Aura: cada onda repetida larga e fraca (segue a onda) + uma deriva lenta, mais aberta, que respira.
       // Quanto as ondas de cada mistura puxam para a cor da mistura (0 = cores puras, 1 = tudo da mistura).
-      // Magenta (vermelho + azul) fica indefinido com as duas puras; puxa para o rosa.
       tint: {} as Partial<Record<Color, number>>,
-      // Tons das ondas componentes dentro de cada mistura. Amarelo: vermelho e verde nítidos e mais grossos
-      // sobre um brilho amarelo (dá para ver as duas cores e o resultado). Rosa: azul saturado
-      // e grosso, miolo rosa fraco — com 'lighter' muita camada clara vira branco e o azul some.
-      comp: {
-        3: { 1: { color: '#ff3b3b', width: 1.4, alpha: 1 }, 2: { color: '#3dff5a', width: 1.4, alpha: 1 } },
-        5: { 1: { color: '#ff2f6e' }, 4: { color: '#3f5cff', width: 1.7, alpha: 1 } },
-      } as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
-      // Misturas (2+ componentes): miolo liso + brilho na cor da mistura entre as ondas.
-      mixCore: { width: 0.05, alpha: 0.6 },
-      mixGlow: { width: 0.2, alpha: 0.12 },
-      mix: {
-        3: { core: { width: 0.03, alpha: 0.22 }, glow: { width: 0.24, alpha: 0.1 } }, // só um tom amarelado
-        5: { core: { width: 0.035, alpha: 0.3 }, glow: { width: 0.2, alpha: 0.07 } },
-      } as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
+      // Misturas de duas cores (amarelo, rosa, ciano): todas iguais em largura e disposição. Duas ondas
+      // nas cores puras (mais grossas que numa cor só) sobre um miolo e um brilho fracos na cor da mistura.
+      pairWidth: 1.4, // largura das ondas componentes numa mistura de duas cores
+      pairAlpha: 1,
+      // Ajustes por mistura (vazio = todas iguais).
+      comp: {} as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
+      mixCore: { width: 0.03, alpha: 0.25 },
+      mixGlow: { width: 0.22, alpha: 0.09 },
+      mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,
       driftAmp: 2.1, // multiplica amp

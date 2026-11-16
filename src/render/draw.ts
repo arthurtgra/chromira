@@ -289,13 +289,15 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const waves =
       comps.length === 1
         ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number }))
-        : comps.map((c) => {
+        : comps.map((c, k) => {
             const o = W.comp[r.color]?.[c];
+            const pair = comps.length === 2; // amarelo, rosa, ciano: mesmo desenho para os três
             return {
               color: o?.color ?? mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
-              ph: (COMPONENTS.indexOf(c) * TAU) / 3,
-              width: o?.width ?? 1,
-              alpha: o?.alpha ?? W.alpha,
+              // Duas cores: ondas opostas (0° e 180°), trança simétrica igual nas três misturas.
+              ph: pair ? k * Math.PI : (COMPONENTS.indexOf(c) * TAU) / 3,
+              width: o?.width ?? (pair ? W.pairWidth : 1),
+              alpha: o?.alpha ?? (pair ? W.pairAlpha : W.alpha),
             };
           });
     for (const w of waves) {
