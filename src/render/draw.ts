@@ -288,7 +288,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const ta = spread(r);
     const waves =
       comps.length === 1
-        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number }))
+        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number, blue: comps[0] === 4 }))
         : comps.map((c, k) => {
             const o = W.comp[r.color]?.[c];
             const pair = comps.length === 2; // amarelo, rosa, ciano: mesmo desenho para os três
@@ -298,21 +298,24 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
               ph: pair ? k * Math.PI : (COMPONENTS.indexOf(c) * TAU) / 3,
               width: o?.width ?? (pair ? W.pairWidth : 1),
               alpha: o?.alpha ?? (pair ? W.pairAlpha : W.alpha),
+              blue: c === 4,
             };
           });
-    const drift = W.driftByColors[comps.length] ?? 0; // 1 cor: sem deriva; 2: média; branco: a mais grossa
+    // Deriva: uma só onda larga por feixe, na cor combinada (1 cor: nenhuma; branco: a mais grossa).
+    const drift = W.driftByColors[comps.length] ?? 0;
+    if (drift > 0) {
+      ctx.strokeStyle = CONFIG.colors[r.color];
+      ctx.lineWidth = W.driftWidth * drift * l.cell;
+      ctx.globalAlpha = W.driftAlpha * alphaMul;
+      strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
+    }
     for (const w of waves) {
-      if (drift > 0) {
-        ctx.strokeStyle = comps.length === 2 ? mix(w.color, CONFIG.colors[r.color], W.driftTint) : w.color;
-        ctx.lineWidth = W.driftWidth * drift * l.cell;
-        ctx.globalAlpha = W.driftAlpha * alphaMul;
-        strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
-      }
+      const bw = w.blue ? W.blueBoost : 1;
       ctx.strokeStyle = w.color;
-      ctx.lineWidth = W.glowWidth * tw * l.cell;
+      ctx.lineWidth = W.glowWidth * tw * bw * l.cell;
       ctx.globalAlpha = W.glowAlpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st, ta);
-      ctx.lineWidth = Math.max(1, W.width * w.width * tw * l.cell);
+      ctx.lineWidth = Math.max(1, W.width * w.width * tw * bw * l.cell);
       ctx.globalAlpha = w.alpha * alphaMul;
       strokeWave(ctx, l, r, w.ph, st, ta);
     }

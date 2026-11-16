@@ -27,7 +27,7 @@ export const CONFIG = {
     1: '#ff3358',
     2: '#29f58a',
     3: '#ffe23d', // amarelo limão: lê amarelo, não laranja
-    4: '#4c7dff',
+    4: '#5c8fff', // azul mais claro: o azul escuro sumia no fundo e ao lado das outras cores
     5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
     7: '#f4f6ff',
@@ -68,7 +68,7 @@ export const CONFIG = {
       { width: 0.3, alpha: 0.035 }, // névoa bem fraca; o brilho de verdade vem das auras das ondas
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
-    white: { width: 1.35, amp: 1.3 }, // feixe branco (as três cores juntas): mais grosso (largura) e ondas mais abertas (amplitude)
+    white: { width: 1.15, amp: 1.15 }, // feixe branco (as três cores juntas): mais grosso (largura) e ondas mais abertas (amplitude)
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
     speed: 12, // ao abrir a fase
     easePow: 2, // desaceleração no fim do crescimento (3 = cúbica, cauda longa; 1 = sem desacelerar)
@@ -107,11 +107,11 @@ export const CONFIG = {
       driftLength: 1.7, // multiplica length
       driftSpeed: -0.45, // multiplica speed (negativo: anda contra o feixe)
       driftWidth: 0.11,
-      driftAlpha: 0.09,
-      // Deriva (a onda larga que corre contra o feixe) por número de cores no feixe: 1 cor sem deriva,
-      // 2 cores média, branco (3) a mais grossa. Assim dá para ver quantas cores o feixe junta.
-      driftByColors: [0, 0, 1, 1.6],
-      driftTint: 0.6, // nas misturas de 2 cores a deriva puxa para a cor combinada (0 = cores puras)
+      driftAlpha: 0.13,
+      // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
+      // cores no feixe: 1 cor sem deriva, 2 cores média, branco (3) a mais grossa.
+      driftByColors: [0, 0, 1, 1.25],
+      blueBoost: 1.25, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
