@@ -633,8 +633,9 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
     const y = cy(l, cell.y);
     switch (cell.t) {
       case 'mirror': {
-        // Espelho minimalista: placa fina de vidro azulado (cantos quase retos, degradê claro → azul)
-        // e um único tracinho diagonal de reflexo mostrando que é vidro. Referencial da peça: x = comprimento.
+        // Espelho de vidro, como o prisma: placa fina e transparente com cantos quase retos, preenchida
+        // por um degradê claro ao longo do comprimento (faixas mais e menos brilhantes, levemente azuladas)
+        // e contorno fino. Referencial da peça: x = comprimento.
         const a = view.mirrorAngle(pi++);
         const M = CONFIG.mirror;
         const hl = (p.mirrorLen * c) / 2;
@@ -644,18 +645,13 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.rotate(a);
         ctx.beginPath();
         ctx.roundRect(-hl, -ht, hl * 2, ht * 2, M.corner * c);
-        const body = ctx.createLinearGradient(0, -ht, 0, ht);
-        body.addColorStop(0, M.face);
-        body.addColorStop(1, M.back);
-        ctx.fillStyle = body;
+        const glass = ctx.createLinearGradient(-hl, -ht, hl, ht);
+        for (const [at, alpha] of M.glass) glass.addColorStop(at, `rgba(${M.tint},${alpha})`);
+        ctx.fillStyle = glass;
         ctx.fill();
-        ctx.clip();
-        ctx.strokeStyle = '#ffffff';
-        ctx.globalAlpha = M.glint.alpha;
-        ctx.lineWidth = M.glint.width * c;
-        ctx.beginPath();
-        ctx.moveTo(M.glint.at * hl - ht * 1.2, ht * 1.5);
-        ctx.lineTo(M.glint.at * hl + ht * 1.2, -ht * 1.5);
+        ctx.globalAlpha = M.edgeAlpha;
+        ctx.strokeStyle = `rgb(${M.tint})`;
+        ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
         ctx.globalAlpha = 1;

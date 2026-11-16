@@ -34,13 +34,20 @@ export const CONFIG = {
   } satisfies Record<Color, string>,
 
   piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
-  // Espelho: placa fina de vidro azulado (frações da célula).
+  // Espelho: placa fina de vidro transparente, mesmo estilo de degradê do prisma (frações da célula).
   mirror: {
     thick: 0.085, // espessura
     corner: 0.015, // raio dos cantos: quase reto
-    face: '#eef6ff', // face espelhada (clara)
-    back: '#6f93c8', // verso (azulado)
-    glint: { at: 0, width: 0.04, alpha: 0.9 }, // tracinho de reflexo: posição ao longo da placa (-1..1, 0 = meio)
+    tint: '225,238,255', // branco levemente azulado (RGB)
+    // Degradê ao longo da placa: [posição 0..1, opacidade]. Claro numa ponta, faixa de brilho no meio.
+    glass: [
+      [0, 0.6],
+      [0.3, 0.22],
+      [0.5, 0.5],
+      [0.7, 0.2],
+      [1, 0.35],
+    ],
+    edgeAlpha: 0.8, // contorno fino
   },
 
   // Lançador de luz, medidas em fração da célula.
