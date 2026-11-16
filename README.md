@@ -41,7 +41,7 @@ Com o modo Developer ligado (menu → Developer → senha), o lápis na barra de
     Precisa de um token no painel Developer: GitHub → Settings → Developer settings → Fine-grained tokens,
     só o repositório `chromira`, permissão **Contents: Read and write**. O token fica só no aparelho.
   - Fase sem solução (ou que já começa resolvida) fica só no aparelho: o deploy roda `check-levels` e falharia.
-- **Publish device edits** (painel Developer) publica de uma vez as fases que ficaram só no aparelho.
+- Ao colar o token, as fases que tinham ficado só no aparelho são publicadas automaticamente.
 - **Revert** volta a fase para a versão gerada (também publica). **Done** sai do editor.
 
 Como o celular faz commits na `main`, rode `git pull` antes de mexer no código no PC.

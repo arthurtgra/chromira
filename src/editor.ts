@@ -309,8 +309,8 @@ async function devServer(n: number, level: Level | null): Promise<boolean> {
 
 const publishable = (check: string): boolean => /^\d+\+? solutions?$/.test(check);
 
-// Publica de uma vez todas as fases guardadas só no aparelho (as válidas).
-export async function publishDeviceEdits(): Promise<string> {
+// Publica de uma vez as fases guardadas só no aparelho (as válidas); roda ao salvar o token.
+async function publishDeviceEdits(): Promise<string> {
   const local = readLocal();
   const ok = Object.entries(local).filter(([, lv]) => publishable(checkLevel(lv)));
   const skipped = Object.keys(local).length - ok.length;
@@ -320,8 +320,6 @@ export async function publishDeviceEdits(): Promise<string> {
   }, `Edit levels ${ok.map(([k]) => k).join(', ')} (in-game editor)`);
   return `Published ${ok.length} level(s)${skipped ? `, ${skipped} skipped (no solution)` : ''} · site updates in ~1 min`;
 }
-
-export const deviceEditCount = (): number => Object.keys(readLocal()).length;
 
 const svg = (body: string): string =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
@@ -342,9 +340,9 @@ const TOOL_ICONS: Record<Tool, [string, string]> = {
 
 export const EDIT_ICON = svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>');
 
-// No painel Developer: token do GitHub (guardado só neste aparelho) e botão para publicar as fases
-// que ficaram só no aparelho.
-function setupPublishPanel(game: Game): void {
+// No painel Developer: só o token do GitHub (guardado neste aparelho). Com ele, cada Save publica sozinho.
+// Ao salvar o token, as fases que tinham ficado só no aparelho são publicadas automaticamente.
+function setupPublishPanel(): void {
   const dev = document.querySelector<HTMLFormElement>('#dev-panel')!;
   const box = document.createElement('div');
   box.className = 'dev-publish';
@@ -358,6 +356,8 @@ function setupPublishPanel(game: Game): void {
   token.setAttribute('autocapitalize', 'off');
   token.setAttribute('autocorrect', 'off');
   token.name = 'chromira-github-token';
+  const msg = document.createElement('p');
+  msg.className = 'dev-note';
   const showSaved = (): void => {
     const t = githubToken();
     token.value = '';
@@ -371,7 +371,7 @@ function setupPublishPanel(game: Game): void {
       token.blur();
     }
   });
-  token.addEventListener('change', () => {
+  token.addEventListener('change', async () => {
     const raw = token.value.trim();
     if (!raw) return;
     // Pega só o token, mesmo se vier texto junto, espaço ou quebra de linha no meio.
@@ -383,35 +383,18 @@ function setupPublishPanel(game: Game): void {
     }
     setGithubToken(found[0]);
     showSaved();
-    msg.textContent = 'Token saved on this device';
-    render();
-  });
-  const publish = document.createElement('button');
-  publish.type = 'button';
-  const msg = document.createElement('p');
-  msg.className = 'dev-note';
-  publish.addEventListener('click', async () => {
-    game.synth.uiTap();
-    if (!githubToken()) {
-      msg.textContent = 'Add a GitHub token first';
-      token.focus();
+    if (Object.keys(readLocal()).length === 0) {
+      msg.textContent = 'Token saved · every Save now publishes';
       return;
     }
-    msg.textContent = 'Publishing…';
+    msg.textContent = 'Token saved · publishing levels saved on this device…';
     try {
-      msg.textContent = await publishDeviceEdits();
+      msg.textContent = `Token saved · ${await publishDeviceEdits()}`;
     } catch (e) {
-      msg.textContent = `Publish failed (${(e as Error).message})`;
+      msg.textContent = `Token saved, but publishing failed (${(e as Error).message})`;
     }
-    render();
   });
-  function render(): void {
-    const n = deviceEditCount();
-    publish.textContent = `Publish device edits (${n})`;
-    publish.hidden = n === 0;
-  }
-  render();
-  box.append(token, publish, msg);
+  box.append(token, msg);
   dev.insertBefore(box, dev.querySelector('button[type=submit]'));
 }
 
@@ -474,7 +457,7 @@ export function setupEditor(
   bar.append(status, actions, tools);
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   document.body.append(bar);
-  setupPublishPanel(game);
+  setupPublishPanel();
 
   function render(): void {
     for (const b of toolButtons) b.classList.toggle('on', b.dataset.tool === editor.tool);
