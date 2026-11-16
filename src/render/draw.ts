@@ -267,8 +267,10 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
   const spread = (r: Run): number => (r.color === 7 ? B.white.amp : 1);
   B.layers.forEach((layer, li) => {
     for (const r of runs) {
-      // Branco: núcleo próprio, largo e forte, para não sobrar espaço entre as três ondas.
-      const L = r.color === 7 && li === B.layers.length - 1 ? B.white.core : layer;
+      // Núcleo: branco tem o seu (fecha os espaços entre as três ondas); misturas de 2 cores, um fraco.
+      const core = li === B.layers.length - 1;
+      const pair = r.color === 3 || r.color === 5 || r.color === 6;
+      const L = core && r.color === 7 ? B.white.core : core && pair ? B.pairCore : layer;
       ctx.globalAlpha = L.alpha * alphaMul;
       ctx.lineWidth = Math.max(1, L.width * (L === layer ? thick(r) : 1) * cell);
       ctx.strokeStyle = CONFIG.colors[r.color];
@@ -291,12 +293,12 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const ta = spread(r);
     const waves =
       comps.length === 1
-        ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number, blue: comps[0] === 4 }))
+        ? [0, Math.PI].map((ph) => ({ color: W.pure[comps[0] as 1 | 2 | 4], ph, width: 1, alpha: W.alpha as number, blue: comps[0] === 4 }))
         : comps.map((c, k) => {
             const o = W.comp[r.color]?.[c];
             const pair = comps.length === 2; // amarelo, rosa, ciano: mesmo desenho para os três
             return {
-              color: o?.color ?? mix(CONFIG.colors[c], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
+              color: o?.color ?? mix(W.pure[c as 1 | 2 | 4], CONFIG.colors[r.color], W.tint[r.color] ?? 0),
               // Duas cores: ondas opostas (0° e 180°), trança simétrica igual nas três misturas.
               ph: pair ? k * Math.PI : (COMPONENTS.indexOf(c) * TAU) / 3,
               width: o?.width ?? (pair ? W.pairWidth : 1),

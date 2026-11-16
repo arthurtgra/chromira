@@ -27,7 +27,7 @@ export const CONFIG = {
     1: '#ff3358',
     2: '#29f58a',
     3: '#ffe23d', // amarelo limão: lê amarelo, não laranja
-    4: '#3d8eff', // azul vivo e claro: o azul escuro sumia no fundo e ao lado das outras cores
+    4: '#3f74ff', // azul vivo (sem puxar para o ciano)
     5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
     7: '#f4f6ff',
@@ -69,7 +69,8 @@ export const CONFIG = {
       { width: 0.1, alpha: 0.3 }, // núcleo: preenche o espaço entre as ondas da trança
     ],
     thickness: 1.2, // espessura geral de todos os feixes (multiplica as larguras das linhas)
-    white: { width: 1.15, amp: 1.15, core: { width: 0.17, alpha: 0.55 } }, // feixe branco (3 cores): mais grosso, ondas mais abertas e núcleo cheio (sem espaço entre as ondas)
+    white: { width: 1.15, amp: 1.15, core: { width: 0.14, alpha: 0.28 } }, // feixe branco (3 cores): mais grosso, ondas mais abertas e núcleo que fecha os espaços sem esconder as cores
+    pairCore: { width: 0.1, alpha: 0.12 }, // núcleo das misturas de 2 cores: fraco, para não virar branco ao somar com as ondas
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
     speed: 12, // ao abrir a fase
     easePow: 2, // desaceleração no fim do crescimento (3 = cúbica, cauda longa; 1 = sem desacelerar)
@@ -96,11 +97,14 @@ export const CONFIG = {
       // Misturas de duas cores (amarelo, rosa, ciano): todas iguais em largura e disposição. Duas ondas
       // nas cores puras (mais grossas que numa cor só) sobre um miolo e um brilho fracos na cor da mistura.
       pairWidth: 1.4, // largura das ondas componentes numa mistura de duas cores
+      // Cores das ondas: vermelho, verde e azul puros. Somadas dão exatamente a mistura (amarelo, ciano, rosa,
+      // branco); com as cores do jogo, que têm um pouco das outras, a soma clareava até o branco.
+      pure: { 1: '#ff2b3a', 2: '#22ff5e', 4: '#2f6bff' } as Record<1 | 2 | 4, string>,
       pairAlpha: 1,
       // Ajustes por mistura (vazio = todas iguais).
       comp: {} as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
-      mixCore: { width: 0.055, alpha: 0.4 }, // miolo na cor da mistura: mais grosso para a cor combinada aparecer
-      mixGlow: { width: 0.22, alpha: 0.09 },
+      mixCore: { width: 0.05, alpha: 0.18 }, // miolo na cor da mistura (fraco: com as ondas por cima, forte vira branco)
+      mixGlow: { width: 0.22, alpha: 0.08 },
       mix: {} as Partial<Record<Color, { core: { width: number; alpha: number }; glow: { width: number; alpha: number } }>>,
       glowWidth: 0.15,
       glowAlpha: 0.13,
@@ -112,7 +116,7 @@ export const CONFIG = {
       // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
       // cores no feixe: 1 cor sem deriva, 2 cores média, branco (3) a mais grossa.
       driftByColors: [0, 0, 1, 1.25],
-      blueBoost: 1.45, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
+      blueBoost: 1.3, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
