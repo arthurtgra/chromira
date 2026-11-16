@@ -68,6 +68,7 @@ export const CONFIG = {
       { width: 0.3, alpha: 0.035 }, // névoa bem fraca; o brilho de verdade vem das auras das ondas
       { width: 0.035, alpha: 0.25 }, // núcleo fraco: o corpo do feixe são as ondas
     ],
+    white: { width: 1.35, amp: 1.3 }, // feixe branco (as três cores juntas): mais grosso (largura) e ondas mais abertas (amplitude)
     // Crescimento da luz (células/s), com desaceleração no fim. Só o trecho que mudou cresce; o resto fica aceso.
     speed: 12, // ao abrir a fase
     turnSpeed: 6, // ao girar uma peça: mais devagar, vira transição

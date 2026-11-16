@@ -261,10 +261,13 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: number, fa
 function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number): void {
   const B = CONFIG.beam;
   const W = B.waves;
+  // Feixe branco (as três cores juntas) um pouco mais grosso que os outros: ondas mais largas e abertas.
+  const thick = (r: Run): number => (r.color === 7 ? B.white.width : 1);
+  const spread = (r: Run): number => (r.color === 7 ? B.white.amp : 1);
   for (const layer of B.layers) {
     ctx.globalAlpha = layer.alpha * alphaMul;
-    ctx.lineWidth = Math.max(1, layer.width * l.cell);
     for (const r of runs) {
+      ctx.lineWidth = Math.max(1, layer.width * thick(r) * l.cell);
       ctx.strokeStyle = CONFIG.colors[r.color];
       strokeRun(ctx, l, r);
     }
@@ -281,6 +284,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
   }
   for (const r of runs) {
     const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
+    const tw = thick(r);
+    const ta = spread(r);
     const waves =
       comps.length === 1
         ? [0, Math.PI].map((ph) => ({ color: CONFIG.colors[comps[0]!], ph, width: 1, alpha: W.alpha as number }))
@@ -295,22 +300,22 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
           });
     for (const w of waves) {
       ctx.strokeStyle = w.color;
-      ctx.lineWidth = W.driftWidth * l.cell;
+      ctx.lineWidth = W.driftWidth * tw * l.cell;
       ctx.globalAlpha = W.driftAlpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp, W.driftLength, W.driftSpeed);
-      ctx.lineWidth = W.glowWidth * l.cell;
+      strokeWave(ctx, l, r, w.ph * 1.7, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
+      ctx.lineWidth = W.glowWidth * tw * l.cell;
       ctx.globalAlpha = W.glowAlpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph, st);
-      ctx.lineWidth = Math.max(1, W.width * w.width * l.cell);
+      strokeWave(ctx, l, r, w.ph, st, ta);
+      ctx.lineWidth = Math.max(1, W.width * w.width * tw * l.cell);
       ctx.globalAlpha = w.alpha * alphaMul;
-      strokeWave(ctx, l, r, w.ph, st);
+      strokeWave(ctx, l, r, w.ph, st, ta);
     }
   }
   if (st.rainbow > 0) {
     const R = CONFIG.rainbow;
-    ctx.lineWidth = Math.max(1, W.width * 0.7 * l.cell);
+    ctx.lineWidth = Math.max(1, W.width * 0.7 * B.white.width * l.cell);
     ctx.globalAlpha = R.alpha * st.rainbow * alphaMul;
-    const ampMul = 1 + (R.ampMul - 1) * st.rainbow;
+    const ampMul = (1 + (R.ampMul - 1) * st.rainbow) * B.white.amp;
     for (const r of runs) {
       if (r.color !== 7) continue;
       R.hues.forEach((h, i) => {
