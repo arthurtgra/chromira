@@ -38,6 +38,7 @@ export const CONFIG = {
   mirror: {
     thick: 0.085, // espessura
     corner: 0.015, // raio dos cantos: quase reto
+    base: '#1c2436', // cor sólida por baixo do vidro: esconde as ondas dentro do espelho
     tint: '225,238,255', // branco levemente azulado (RGB)
     // Degradê ao longo da placa: [posição 0..1, opacidade]. Claro numa ponta, faixa de brilho no meio.
     glass: [

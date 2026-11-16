@@ -645,6 +645,9 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.rotate(a);
         ctx.beginPath();
         ctx.roundRect(-hl, -ht, hl * 2, ht * 2, M.corner * c);
+        // Fundo sólido: o vidro do espelho não deixa ver o feixe por dentro.
+        ctx.fillStyle = M.base;
+        ctx.fill();
         const glass = ctx.createLinearGradient(-hl, -ht, hl, ht);
         for (const [at, alpha] of M.glass) glass.addColorStop(at, `rgba(${M.tint},${alpha})`);
         ctx.fillStyle = glass;
