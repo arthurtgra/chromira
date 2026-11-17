@@ -7,20 +7,34 @@ import { cx, cy, type Layout } from './layout.ts';
 type Ctx = CanvasRenderingContext2D;
 const TAU = Math.PI * 2;
 
+// Fundo e pontos da grade não mudam durante a fase: desenhados uma vez numa imagem guardada e copiados.
+let bgCache: { key: string; img: HTMLCanvasElement } | null = null;
+
 export function drawBackground(ctx: Ctx, l: Layout, colors: readonly [string, string], cols: number, rows: number): void {
-  const g = ctx.createRadialGradient(l.w / 2, l.h * 0.45, 0, l.w / 2, l.h * 0.45, Math.max(l.w, l.h) * 0.75);
-  g.addColorStop(0, colors[0]);
-  g.addColorStop(1, colors[1]);
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, l.w, l.h);
-  ctx.fillStyle = `rgba(255,255,255,${CONFIG.gridDotAlpha})`;
-  for (let y = 0; y < rows; y++) {
-    for (let x = 0; x < cols; x++) {
-      ctx.beginPath();
-      ctx.arc(cx(l, x), cy(l, y), CONFIG.gridDotRadius, 0, TAU);
-      ctx.fill();
+  const dpr = ctx.getTransform().a || 1;
+  const key = `${l.w}x${l.h}@${dpr}:${l.ox},${l.oy},${l.cell}:${colors.join()}:${cols}x${rows}`;
+  if (bgCache?.key !== key) {
+    const img = document.createElement('canvas');
+    img.width = Math.round(l.w * dpr);
+    img.height = Math.round(l.h * dpr);
+    const c = img.getContext('2d')!;
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = c.createRadialGradient(l.w / 2, l.h * 0.45, 0, l.w / 2, l.h * 0.45, Math.max(l.w, l.h) * 0.75);
+    g.addColorStop(0, colors[0]);
+    g.addColorStop(1, colors[1]);
+    c.fillStyle = g;
+    c.fillRect(0, 0, l.w, l.h);
+    c.fillStyle = `rgba(255,255,255,${CONFIG.gridDotAlpha})`;
+    for (let y = 0; y < rows; y++) {
+      for (let x = 0; x < cols; x++) {
+        c.beginPath();
+        c.arc(cx(l, x), cy(l, y), CONFIG.gridDotRadius, 0, TAU);
+        c.fill();
+      }
     }
+    bgCache = { key, img };
   }
+  ctx.drawImage(bgCache.img, 0, 0, l.w, l.h);
 }
 
 export interface WaveOrigin {

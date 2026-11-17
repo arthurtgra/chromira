@@ -60,7 +60,8 @@ if (fb && ed) {
 }
 
 function resize(): void {
-  const dpr = window.devicePixelRatio || 1;
+  // Densidade limitada: iPhone tem 3x; 2x é quase igual na tela e desenha ~55% menos pixels.
+  const dpr = Math.min(CONFIG.maxDpr, window.devicePixelRatio || 1);
   const w = window.innerWidth;
   const h = window.innerHeight;
   canvas.width = Math.round(w * dpr);
@@ -130,6 +131,11 @@ for (const ev of ['pointerup', 'touchend', 'click', 'keydown'] as const) {
 
 let last = performance.now();
 function frame(t: number): void {
+  // Parado (luz assentada, sem toque recente): desenha a 30 quadros por segundo em vez de 60/120.
+  if (!game.busy() && t - last < 1000 / CONFIG.idleFps) {
+    requestAnimationFrame(frame);
+    return;
+  }
   game.update(Math.min(100, t - last));
   last = t;
   game.render(ctx);
