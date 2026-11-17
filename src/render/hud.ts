@@ -46,6 +46,8 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
     fill.addColorStop(1, s.accent);
   }
   ctx.globalAlpha = k;
+  ctx.shadowColor = s.accent;
+  ctx.shadowBlur = 14;
   ctx.fillStyle = fill;
   ctx.fillText(text, 0, 0);
   ctx.restore();
