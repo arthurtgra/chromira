@@ -284,7 +284,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       const pair = r.color === 3 || r.color === 5 || r.color === 6;
       const L = core && r.color === 7 ? B.white.core : core && pair ? B.pairCore : layer;
       ctx.strokeStyle = CONFIG.colors[r.color];
-      soft(ctx, L.width * (L === layer ? thick(r) : 1) * cell, L.alpha * alphaMul, () => strokeRun(ctx, l, r));
+      const f = W.fill[r.color] ?? 1;
+      soft(ctx, L.width * (L === layer ? thick(r) : 1) * cell, L.alpha * f * alphaMul, () => strokeRun(ctx, l, r));
     }
   });
   for (const r of runs) {
@@ -292,7 +293,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     ctx.strokeStyle = CONFIG.colors[r.color];
     const mx = W.mix[r.color];
     for (const m of mx ? [mx.glow, mx.core] : [W.mixGlow, W.mixCore]) {
-      soft(ctx, m.width * cell, m.alpha * alphaMul, () => strokeRun(ctx, l, r));
+      soft(ctx, m.width * cell, m.alpha * (W.fill[r.color] ?? 1) * alphaMul, () => strokeRun(ctx, l, r));
     }
   }
   for (const r of runs) {
@@ -318,7 +319,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     const drift = W.driftByColors[comps.length] ?? 0;
     if (drift > 0) {
       ctx.strokeStyle = CONFIG.colors[r.color];
-      soft(ctx, W.driftWidth * drift * cell, W.driftAlpha * alphaMul, () =>
+      soft(ctx, W.driftWidth * drift * cell, W.driftAlpha * (W.fill[r.color] ?? 1) * alphaMul, () =>
         strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed),
       );
     }

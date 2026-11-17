@@ -117,6 +117,9 @@ export const CONFIG = {
       // Deriva (a onda larga que corre contra o feixe): uma só, na cor combinada. Grossura pelo número de
       // cores no feixe: 1 cor sem deriva, 2 cores média, branco (3) a mais grossa.
       driftByColors: [0, 0, 1, 1.25],
+      // Recheio entre as ondas (névoa, miolos e deriva na cor da mistura) por cor. Ciano: verde + azul somam um
+      // ciano muito claro que enchia o vão da trança e as ondas viravam só contorno; mais fraco, a trança aparece.
+      fill: { 6: 0.35 } as Partial<Record<Color, number>>,
       blueBoost: 1.3, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
