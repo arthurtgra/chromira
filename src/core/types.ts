@@ -41,7 +41,6 @@ export interface Segment {
   y2: number;
   color: Color;
   d0?: number; // distância do lançador até (x1, y1), pelo caminho da própria luz
-  src?: number; // de qual lançador vem (animação: cada lançador cresce no seu tempo)
 }
 
 export interface TraceResult {

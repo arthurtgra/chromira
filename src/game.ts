@@ -3,7 +3,7 @@ import { CONFIG } from './config.ts';
 import { baseStates, isPiece, key, pieces, placeCells, posOf, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
-import { arrived, cut, extendToObstacles, planBeams, segLen, visibleSegments, type BeamPiece, type BeamPlan } from './render/beams.ts';
+import { arrived, cut, extendToObstacles, planBeams, reachedEnd, segLen, visibleSegments, type BeamPiece, type BeamPlan } from './render/beams.ts';
 import {
   drawBackground,
   drawBeams,
@@ -55,7 +55,7 @@ export class Game {
   private fades: { seg: Segment; at: number; off: number }[] = [];
   // Crescimento da luz por lançador: cada um tem a sua frente e o seu tempo. Mexer num espelho só
   // reinicia o lançador cujo caminho mudou; os outros continuam de onde estavam.
-  private grow = new Map<number, { from: number; to: number; at: number; ms: number; key: string }>();
+  private beamV = 0; // velocidade da luz em crescimento, células por ms
   private quiet = true; // sem notas enquanto a fase abre
   private litAt = new Map<string, number>();
   private prismHit = new Set<string>(); // prismas que a frente de luz já alcançou (som toca ao chegar)
@@ -96,7 +96,6 @@ export class Game {
     this.litAt = new Map();
     this.prismHit = new Set();
     this.quiet = true;
-    this.grow = new Map();
     this.plan = this.planAll([], this.beamSegments(), CONFIG.beam.speed);
     this.fades = [];
     this.loadedAt = this.now;
@@ -266,54 +265,33 @@ export class Game {
     }
   }
 
-  // Plano da luz por lançador. Lançador cujo caminho não mudou mantém trechos e tempo (continua
-  // crescendo de onde estava); os que mudaram recomeçam do ponto alterado, cada um no seu tempo.
+  // Cada trecho tem o seu tempo: o que já estava aceso continua crescendo de onde estava, agora; o que
+  // está apagado começa quando a ponta do trecho anterior chega nele. Assim mexer numa peça só refaz a luz
+  // depois dela; feixes ainda crescendo em outros lugares (outro lançador ou outro ramo) não param.
   private planAll(before: Segment[], next: Segment[], speed: number): BeamPlan {
-    const srcs = new Set([...before, ...next].map((s) => s.src ?? 0));
-    const pieces: BeamPiece[] = [];
-    const fading: Segment[] = [];
-    const grow = new Map<number, { from: number; to: number; at: number; ms: number; key: string }>();
-    for (const src of srcs) {
-      const nx = next.filter((s) => (s.src ?? 0) === src);
-      const key = nx.map((s) => `${s.x1},${s.y1},${s.x2},${s.y2},${s.color}`).join(';');
-      const old = this.grow.get(src);
-      if (old && old.key === key) {
-        pieces.push(...this.plan.pieces.filter((p) => (p.src ?? 0) === src));
-        grow.set(src, old);
-        continue;
-      }
-      const p = planBeams(before.filter((s) => (s.src ?? 0) === src), nx);
-      pieces.push(...p.pieces);
-      fading.push(...p.fading);
-      const [lo, hi] = CONFIG.beam.growMs;
-      const ms = Math.min(hi, Math.max(lo, ((p.to - p.from) / speed) * 1000));
-      grow.set(src, { from: p.from, to: p.to, at: this.now, ms, key });
+    const plan = planBeams(before, next);
+    this.beamV = speed / 1000;
+    const done: BeamPiece[] = [];
+    for (const p of plan.pieces) {
+      const prev =
+        p.known > 0 || p.d0 === 0
+          ? undefined
+          : done.find((q) => q.x2 === p.x1 && q.y2 === p.y1 && Math.abs(q.d0 + q.len - p.d0) < 1e-9);
+      p.at = prev ? prev.at + (prev.len - prev.known) / this.beamV : this.now;
+      done.push(p);
     }
-    this.grow = grow;
-    const g = [...grow.values()];
-    return {
-      pieces,
-      fading,
-      from: Math.min(...g.map((x) => x.from), Infinity),
-      to: Math.max(0, ...g.map((x) => x.to)),
-    };
+    return plan;
   }
 
-  // Frente de luz de um lançador: rápida no começo, desacelera suave no fim.
-  private frontOf(src: number): number {
-    const g = this.grow.get(src);
-    if (!g) return Infinity;
-    return g.from + (g.to - g.from) * (1 - (1 - clamp01((this.now - g.at) / g.ms)) ** CONFIG.beam.easePow);
-  }
-
-  // Frente por trecho (cada um segue o seu lançador), com uma folga opcional.
+  // Frente de luz de cada trecho (distância da fonte até onde a luz chegou nele), com folga opcional.
   private fronts(extra = 0): (p: BeamPiece) => number {
-    return (p) => this.frontOf(p.src ?? 0) + extra;
+    return (p) => p.d0 + p.known + (this.now - p.at) * this.beamV + extra;
   }
 
-  // Ainda tem luz crescendo em algum lançador.
+  // Ainda tem luz crescendo em algum trecho.
   private growing(): boolean {
-    return [...this.grow.entries()].some(([src, g]) => this.frontOf(src) < g.to);
+    const f = this.fronts();
+    return this.plan.pieces.some((p) => !reachedEnd(p, f));
   }
 
   update(dtMs: number): void {
@@ -562,7 +540,7 @@ export class Game {
   private beamSegments(): Segment[] {
     const E = CONFIG.emitter.body;
     const W = CONFIG.piece.wallSize / 2;
-    const { segs, hits } = extendToObstacles(withSources(this.result.segments), this.level.cells, (c) =>
+    const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
       c.t === 'wall' ? W : c.t === 'emitter' ? E : 0.5,
     );
     this.hits = segs.flatMap((s, i) =>
@@ -570,23 +548,4 @@ export class Game {
     );
     return segs;
   }
-}
-
-// Lançador de origem de cada trecho do trace: trecho com d0 = 0 sai de um lançador (chave = sua posição);
-// os outros continuam um trecho anterior que termina no seu começo, à mesma distância da fonte.
-function withSources(segs: Segment[]): Segment[] {
-  const out: Segment[] = [];
-  const ids = new Map<string, number>();
-  for (const s of segs) {
-    let src: number | undefined;
-    if ((s.d0 ?? 0) === 0) {
-      const k = `${s.x1},${s.y1}`;
-      if (!ids.has(k)) ids.set(k, ids.size);
-      src = ids.get(k);
-    } else {
-      src = out.find((p) => p.x2 === s.x1 && p.y2 === s.y1 && Math.abs((p.d0 ?? 0) + segLen(p) - s.d0!) < 1e-9)?.src;
-    }
-    out.push({ ...s, src: src ?? 0 });
-  }
-  return out;
 }

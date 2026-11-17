@@ -7,6 +7,7 @@ export interface BeamPiece extends Segment {
   d0: number;
   len: number;
   known: number;
+  at: number; // ms em que a luz começa a crescer neste trecho, a partir de known
 }
 
 export interface BeamPlan {
@@ -37,9 +38,7 @@ export function cut(s: Segment, a: number, b: number): Segment {
   const n = segLen(s) || 1;
   const ux = (s.x2 - s.x1) / n;
   const uy = (s.y2 - s.y1) / n;
-  const out: Segment = { x1: s.x1 + ux * a, y1: s.y1 + uy * a, x2: s.x1 + ux * b, y2: s.y1 + uy * b, color: s.color };
-  if (s.src !== undefined) out.src = s.src;
-  return out;
+  return { x1: s.x1 + ux * a, y1: s.y1 + uy * a, x2: s.x1 + ux * b, y2: s.y1 + uy * b, color: s.color };
 }
 
 export function planBeams(prev: Segment[], next: Segment[]): BeamPlan {
@@ -56,7 +55,7 @@ export function planBeams(prev: Segment[], next: Segment[]): BeamPlan {
     if (!reach.has(end)) reach.set(end, d0 + len);
     if (known < len) from = Math.min(from, d0 + known);
     to = Math.max(to, d0 + len);
-    return { ...s, d0, len, known };
+    return { ...s, d0, len, known, at: 0 };
   });
   const fading = prev.flatMap((s) => {
     const k = covered(s, next);
