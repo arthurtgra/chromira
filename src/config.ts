@@ -215,33 +215,24 @@ export const CONFIG = {
       toneVolume: 0.35,
       volume: 0.7,
     },
-    // Luz atravessando o prisma: impacto no vidro → acorde branco que se abre em três → cascata de cristais.
+    // Luz atravessando o prisma: tom macio que se abre devagar num acorde menor, com eco espacial.
     prism: {
-      impact: { fromHz: 150, toHz: 42, ms: 260, volume: 0.9, crackHz: 3200, crackMs: 55, crackVolume: 0.5 },
-      hz: 392, // acorde branco: sol (três vozes juntas)
-      unison: [0.994, 1, 1.006], // desafinação de cada voz: brilho de luz branca
-      spread: [0.5, 1, 2], // depois de abrir: vermelho oitava abaixo, verde, azul oitava acima
-      splitMs: 170, // instante em que a luz se divide
-      glideMs: 110, // tempo das notas se afastando
-      attackMs: 8,
-      ms: 1500,
-      filterHz: [900, 5200, 700], // filtro abre no impacto e fecha ao dissipar
-      filterQ: 2.5,
-      bodyVolume: 0.5,
-      pan: 0.7, // vermelho à esquerda, azul à direita
-      // Cascata: pentatônica de sol subindo, ~35 ms entre pings.
-      cascade: {
-        notes: [783.99, 880, 987.77, 1174.66, 1318.51, 1567.98, 1760, 1975.53, 2349.32],
-        stepMs: 34,
-        decayMs: 420,
-        partials: [
-          [1, 1],
-          [2.76, 0.25],
-        ],
-        volume: 0.16,
-      },
-      whoosh: { fromHz: 600, toHz: 5000, q: 1.4, volume: 0.35 },
-      volume: 0.6,
+      hz: 329.63, // luz branca: mi
+      notes: [220, 329.63, 523.25], // depois de abrir (Lá menor): vermelho lá, verde mi, azul dó
+      detune: [0.997, 1.003], // par de senos levemente desafinados por voz (batimento lento)
+      bloomMs: 220, // tom único antes de começar a se abrir
+      glideMs: 700, // notas deslizando até o acorde
+      attackMs: 260,
+      sustain: 0.6,
+      ms: 3200,
+      sink: 0.985, // afundam um pouco ao sumir
+      vibratoHz: 4.2,
+      vibrato: 0.004,
+      shimmer: 0.22, // volume do brilho uma oitava acima
+      filterHz: [700, 2600, 500],
+      pan: 0.75,
+      space: { leftMs: 340, rightMs: 510, feedback: 0.5, toneHz: 1800, wet: 0.55, tailMs: 2500 },
+      volume: 0.75,
       minGapMs: 250,
     },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },

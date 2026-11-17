@@ -310,126 +310,109 @@ export class Synth {
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
 
-  // Luz atravessando o prisma, em três tempos:
-  // 1. Impacto: soco grave (seno caindo) + estalo de vidro (ruído agudo curtíssimo) — a luz bate no vidro.
-  // 2. Divisão: um acorde branco (três vozes em uníssono, levemente desafinadas, filtro abrindo) que em
-  //    splitMs se abre em três notas — vermelho desce e vai para a esquerda, azul sobe e vai para a
-  //    direita, verde fica no meio — e some devagar.
-  // 3. Dispersão: cascata rápida de pings de cristal subindo pelo espectro, da esquerda para a direita,
-  //    como o leque de cores saindo do prisma. Um sopro de ruído subindo costura tudo.
+  // Luz atravessando o prisma: som espacial e melancólico. Um tom só e macio (luz branca) cresce devagar
+  // e se abre em três notas de um acorde menor — vermelho grave à esquerda, verde no meio, azul agudo à
+  // direita — deslizando sem pressa. Cada voz é um par de senos desafinados com vibrato lento; um brilho
+  // uma oitava acima entra atrasado, como poeira de luz. Tudo passa por um eco pingue-pongue longo e
+  // escuro (espaço) e, no fim, as notas afundam um pouco enquanto somem.
   prism(): void {
     const ctx = this.ready();
-    if (!ctx || !this.echo) return;
+    if (!ctx) return;
     const P = A.prism;
     const t0 = ctx.currentTime;
-    const split = t0 + P.splitMs / 1000;
+    const bloom = t0 + P.bloomMs / 1000;
+    const split = bloom + P.glideMs / 1000;
     const end = t0 + P.ms / 1000;
+
     const out = ctx.createGain();
     out.gain.value = A.volume * P.volume;
     out.connect(this.bus!);
-    out.connect(this.echo);
-    const stop = (n: AudioScheduledSourceNode, at: number): void => {
-      n.start(t0);
-      n.stop(at + 0.05);
-    };
-    const panned = (x: number): AudioNode => {
-      const pan = ctx.createStereoPanner?.();
-      if (!pan) return out;
-      pan.pan.value = x;
-      pan.connect(out);
-      return pan;
-    };
+    out.connect(this.space(ctx, t0, end));
 
-    // 1. Impacto.
-    const I = P.impact;
-    const thump = ctx.createOscillator();
-    thump.frequency.setValueAtTime(I.fromHz, t0);
-    thump.frequency.exponentialRampToValueAtTime(I.toHz, t0 + I.ms / 1000);
-    const tg = ctx.createGain();
-    tg.gain.setValueAtTime(I.volume, t0);
-    tg.gain.exponentialRampToValueAtTime(0.0001, t0 + I.ms / 1000);
-    thump.connect(tg).connect(out);
-    stop(thump, t0 + I.ms / 1000);
-    const crack = ctx.createBufferSource();
-    crack.buffer = this.whooshNoise(ctx);
-    const hp = ctx.createBiquadFilter();
-    hp.type = 'highpass';
-    hp.frequency.value = I.crackHz;
-    const cg = ctx.createGain();
-    cg.gain.setValueAtTime(I.crackVolume, t0);
-    cg.gain.exponentialRampToValueAtTime(0.0001, t0 + I.crackMs / 1000);
-    crack.connect(hp).connect(cg).connect(out);
-    stop(crack, t0 + I.crackMs / 1000);
-
-    // 2. Divisão.
     const lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.Q.value = P.filterQ;
+    lp.Q.value = 0.7;
     lp.frequency.setValueAtTime(P.filterHz[0], t0);
     lp.frequency.exponentialRampToValueAtTime(P.filterHz[1], split);
     lp.frequency.exponentialRampToValueAtTime(P.filterHz[2], end);
-    const body = ctx.createGain();
-    body.gain.setValueAtTime(0.0001, t0);
-    body.gain.exponentialRampToValueAtTime(P.bodyVolume, t0 + P.attackMs / 1000);
-    body.gain.setValueAtTime(P.bodyVolume, split);
-    body.gain.exponentialRampToValueAtTime(0.0001, end);
-    lp.connect(body);
-    P.spread.forEach((ratio, k) => {
-      const x = (k - (P.spread.length - 1) / 2) * P.pan;
+    lp.connect(out);
+
+    const env = (g: GainNode, peak: number, from: number): void => {
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.setValueAtTime(0.0001, from);
+      g.gain.exponentialRampToValueAtTime(peak, from + P.attackMs / 1000);
+      g.gain.exponentialRampToValueAtTime(peak * P.sustain, split + 0.2);
+      g.gain.exponentialRampToValueAtTime(0.0001, end);
+    };
+
+    P.notes.forEach((hz, k) => {
+      const x = (k - (P.notes.length - 1) / 2) * P.pan;
       const pan = ctx.createStereoPanner?.();
-      const g = ctx.createGain();
-      g.gain.value = 1 / P.spread.length;
-      for (const det of P.unison) {
-        const o = ctx.createOscillator();
-        o.type = 'sawtooth';
-        o.frequency.setValueAtTime(P.hz * det, t0);
-        o.frequency.setValueAtTime(P.hz * det, split - P.glideMs / 1000);
-        o.frequency.exponentialRampToValueAtTime(P.hz * ratio * det, split);
-        o.connect(g);
-        stop(o, end);
-      }
+      const dest: AudioNode = pan ?? lp;
       if (pan) {
         pan.pan.setValueAtTime(0, t0);
-        pan.pan.setValueAtTime(0, split - P.glideMs / 1000);
+        pan.pan.setValueAtTime(0, bloom);
         pan.pan.linearRampToValueAtTime(x, split);
-        g.connect(pan).connect(lp);
-      } else g.connect(lp);
-    });
-    body.connect(out);
-
-    // 3. Dispersão: pings de cristal (seno + parcial inarmônico) em cascata.
-    const C = P.cascade;
-    C.notes.forEach((hz, i) => {
-      const t = split + (i * C.stepMs) / 1000;
-      const x = (i / (C.notes.length - 1) - 0.5) * 2 * P.pan;
-      const dest = panned(x);
-      for (const [ratio, vol] of C.partials) {
-        const o = ctx.createOscillator();
-        o.frequency.value = hz * ratio;
-        const g = ctx.createGain();
-        g.gain.setValueAtTime(0.0001, t0);
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(C.volume * vol, t + 0.004);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + C.decayMs / 1000);
-        o.connect(g).connect(dest);
-        stop(o, t + C.decayMs / 1000);
+        pan.connect(lp);
       }
+      const vib = ctx.createOscillator();
+      vib.frequency.value = P.vibratoHz * (1 + k * 0.13);
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = hz * P.vibrato;
+      vib.connect(vibAmt);
+      vib.start(t0);
+      vib.stop(end + 0.05);
+      const voice = (mul: number, peak: number, from: number): void => {
+        for (const det of P.detune) {
+          const o = ctx.createOscillator();
+          o.frequency.setValueAtTime(P.hz * mul * det, t0);
+          o.frequency.setValueAtTime(P.hz * mul * det, bloom);
+          o.frequency.exponentialRampToValueAtTime(hz * mul * det, split);
+          o.frequency.exponentialRampToValueAtTime(hz * mul * det * P.sink, end);
+          vibAmt.connect(o.frequency);
+          const g = ctx.createGain();
+          env(g, peak / P.detune.length / P.notes.length, from);
+          o.connect(g).connect(dest);
+          o.start(t0);
+          o.stop(end + 0.05);
+        }
+      };
+      voice(1, 1, t0);
+      voice(2, P.shimmer, bloom); // brilho uma oitava acima, entrando atrasado
     });
+  }
 
-    const W = P.whoosh;
-    const noise = ctx.createBufferSource();
-    noise.buffer = this.whooshNoise(ctx);
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.Q.value = W.q;
-    bp.frequency.setValueAtTime(W.fromHz, t0);
-    bp.frequency.exponentialRampToValueAtTime(W.toHz, end);
-    const ng = ctx.createGain();
-    ng.gain.setValueAtTime(0.0001, t0);
-    ng.gain.exponentialRampToValueAtTime(W.volume, split);
-    ng.gain.exponentialRampToValueAtTime(0.0001, end);
-    noise.connect(bp).connect(ng).connect(out);
-    stop(noise, end);
+  // Espaço do prisma: eco pingue-pongue longo, escurecendo a cada volta. Criado por som e desligado no fim.
+  private space(ctx: AudioContext, t0: number, end: number): AudioNode {
+    const S = A.prism.space;
+    const input = ctx.createGain();
+    const wet = ctx.createGain();
+    wet.gain.value = S.wet;
+    const merge = ctx.createChannelMerger(2);
+    const dl = ctx.createDelay(2);
+    const dr = ctx.createDelay(2);
+    dl.delayTime.value = S.leftMs / 1000;
+    dr.delayTime.value = S.rightMs / 1000;
+    const fb = ctx.createGain();
+    fb.gain.value = S.feedback;
+    const dark = ctx.createBiquadFilter();
+    dark.type = 'lowpass';
+    dark.frequency.value = S.toneHz;
+    input.connect(dl);
+    dl.connect(dr);
+    dl.connect(merge, 0, 0);
+    dr.connect(merge, 0, 1);
+    dr.connect(dark).connect(fb).connect(dl);
+    merge.connect(wet).connect(this.bus!);
+    const off = end + S.tailMs / 1000;
+    wet.gain.setValueAtTime(S.wet, off - 0.3);
+    wet.gain.linearRampToValueAtTime(0, off);
+    window.setTimeout(() => {
+      input.disconnect();
+      fb.disconnect();
+      wet.disconnect();
+    }, (off - t0) * 1000 + 100);
+    return input;
   }
 
   // Trocar a cor do filtro: roda de filtros de lente girando até o próximo encaixe. Dois cliques
