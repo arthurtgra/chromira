@@ -7,6 +7,7 @@ import { Feedback, feedbackEnabled, setupDev, setupFeedback } from './feedback.t
 import { setupMenu } from './menu.ts';
 import { applyEdits, EDIT_ICON, setupEditor } from './editor.ts';
 import { loadSave } from './save.ts';
+import '@fontsource-variable/outfit';
 import './style.css';
 
 const levels = levelsJson as unknown as Level[];
@@ -98,6 +99,31 @@ const lockPortrait = (): void => {
 };
 window.addEventListener('pointerup', lockPortrait, { once: true });
 
+// Setas ao lado do número: anterior sempre que houver; seguinte só se já estiver liberada (no modo
+// desenvolvedor todas estão). Escondidas durante a edição.
+const prev = document.querySelector<HTMLButtonElement>('#prev')!;
+const next = document.querySelector<HTMLButtonElement>('#next')!;
+document.documentElement.style.setProperty('--hud-y', `${CONFIG.hud.y}px`);
+document.documentElement.style.setProperty('--step-dx', `${CONFIG.hud.stepDx}px`);
+for (const [btn, d] of [
+  [prev, -1],
+  [next, 1],
+] as const) {
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+  btn.addEventListener('click', () => {
+    const i = game.current + d;
+    if (i < 0 || i > game.unlocked) return;
+    game.synth.uiTap();
+    game.load(i);
+  });
+}
+function updateSteps(): void {
+  const busy = game.editing || game.won;
+  prev.hidden = busy || game.current <= 0;
+  next.hidden = busy || game.current >= game.unlocked;
+}
+void document.fonts.load(`${CONFIG.hud.numberWeight} ${CONFIG.hud.numberPx}px "Outfit Variable"`);
+
 for (const ev of ['pointerup', 'touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => game.synth.unlock(), { capture: true, passive: true });
 }
@@ -107,6 +133,7 @@ function frame(t: number): void {
   game.update(Math.min(100, t - last));
   last = t;
   game.render(ctx);
+  updateSteps();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

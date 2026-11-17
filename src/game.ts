@@ -162,6 +162,10 @@ export class Game {
     return this.level.id;
   }
 
+  get won(): boolean {
+    return this.wonAt !== null;
+  }
+
   get current(): number {
     return this.index;
   }

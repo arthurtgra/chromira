@@ -43,6 +43,38 @@ body {
   display: inline;
 }
 
+/* Setas ao lado do número da fase (centro em hud.y do canvas). */
+.step {
+  position: fixed;
+  top: calc(var(--hud-y) - 22px);
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  padding: 11px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  opacity: 0.45;
+  touch-action: manipulation;
+  transition: opacity 0.2s;
+}
+.step:active {
+  opacity: 0.9;
+}
+.step[hidden] {
+  display: none;
+}
+.step svg {
+  width: 100%;
+  height: 100%;
+}
+#prev {
+  transform: translateX(calc(-50% - var(--step-dx)));
+}
+#next {
+  transform: translateX(calc(-50% + var(--step-dx)));
+}
+
 /* ---------- menus ---------- */
 :root {
   --ink: #f2f2f5;

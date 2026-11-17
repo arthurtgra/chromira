@@ -277,9 +277,10 @@ export const CONFIG = {
 
   layout: { pad: 16, top: 116, bottom: 28 },
   hud: {
-    family: '"SF Pro Display", system-ui, -apple-system, "Segoe UI", sans-serif',
-    numberPx: 58,
-    numberWeight: 250,
+    family: '"Outfit Variable", "SF Pro Display", system-ui, sans-serif',
+    numberPx: 60,
+    numberWeight: 200,
+    stepDx: 74, // distância das setas (fase anterior/seguinte) ao centro do número
     y: 50,
     appearMs: 650,
     winScale: 0.08,
