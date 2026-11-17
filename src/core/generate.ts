@@ -1,4 +1,4 @@
-import { MAX_SPACE, countSolutions, searchSpace } from './solver.ts';
+import { MAX_SPACE, countEssential, litCells, searchSpace } from './solver.ts';
 import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, placeCells, posOf, reflect, trace } from './trace.ts';
 import type { Cell, Color, Dir, Level, Rots } from './types.ts';
 import { expand, GRID } from './grid.ts';
@@ -18,6 +18,8 @@ export interface GenOptions {
   beams?: number;
   filters?: number; // feixes que terminam num alvo de uma cor só, escolhida por um filtro
   prism?: boolean; // o primeiro feixe é branco e passa por um prisma
+  prisms?: number; // quantos feixes (os primeiros) são brancos e passam por um prisma; substitui prism
+  decoys?: number; // peças distratoras: fora da luz na solução, perto do caminho, só para confundir
   merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
   mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
   splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
@@ -174,7 +176,7 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     const k = b === nBeams - 1 ? left : Math.max(1, Math.round(o.mirrors / nBeams) + int(r, -1, 1));
     left -= k;
     if (k < 0) return null;
-    const prism = b === 0 && o.prism === true;
+    const prism = b < (o.prisms ?? (o.prism ? 1 : 0));
     const filter = !prism && filters > 0;
     if (filter) filters--;
     let x: number;
@@ -226,6 +228,37 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     c.y -= before * dy;
     c.rail = { axis, len };
     slider = { cell: c, pos: before };
+    for (let p = 0; p < len; p++) d.used.add(key(c.x + p * dx, c.y + p * dy));
+  }
+
+  // Distratoras: espelhos, divisores, dicroicos e prismas fixos ao lado do caminho, mas fora da luz.
+  // O estado delas não importa (a unicidade ignora peças apagadas); só não podem abrir outra solução.
+  const decoys = new Set<Cell>();
+  const near = (x: number, y: number): boolean =>
+    DIRS.some((dd) => {
+      const k = key(x + DELTA[dd][0], y + DELTA[dd][1]);
+      return d.path.has(k) || d.used.has(k);
+    });
+  for (let i = 0; i < (o.decoys ?? 0); i++) {
+    const free: [number, number][] = [];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) if (!d.used.has(key(x, y)) && !d.path.has(key(x, y)) && near(x, y)) free.push([x, y]);
+    }
+    if (free.length === 0) return null;
+    const [x, y] = pick(r, free);
+    const roll = r();
+    const c: Cell =
+      roll < 0.5
+        ? { x, y, t: 'mirror' }
+        : roll < 0.7
+          ? { x, y, t: 'splitter' }
+          : roll < 0.85
+            ? { x, y, t: 'dichroic', color: pick(r, [1, 2, 4] as const) }
+            : { x, y, t: 'prism' };
+    d.cells.push(c);
+    d.used.add(key(x, y));
+    decoys.add(c);
+    if (c.t !== 'prism') d.sol.push(int(r, 0, 1));
   }
 
   // d.sol está na ordem de colocação; a ordem de rots é a de level.cells. Prisma em trilho não está em d.sol.
@@ -238,20 +271,28 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   });
   const states = order.map(pieceStates);
   const sl = slider ? order.indexOf(slider.cell) : -1;
-  const minMoves = Math.min(o.minMoves ?? 3, sol.length);
+  const real = order.map((c) => !decoys.has(c));
+  const minMoves = Math.min(o.minMoves ?? 3, real.filter(Boolean).length);
   let start: Rots;
   do {
-    start = sol.map((v, i) => (r() < 0.6 ? (v + int(r, 1, states[i]! - 1)) % states[i]! : v));
+    start = sol.map((v, i) => (!real[i] || r() < 0.6 ? (v + int(r, 1, states[i]! - 1)) % states[i]! : v));
   } while (
-    start.filter((v, i) => v !== sol[i]).length < minMoves ||
+    start.filter((v, i) => real[i] && v !== sol[i]).length < minMoves ||
     (slider !== null && posOf(slider.cell, start[sl]!) === slider.pos)
   );
 
   const level: Level = { id, w: GRID.w, h: GRID.h, cells: d.cells, start };
   if (!trace(level, sol).solved || trace(level, start).solved) return null;
-  if (searchSpace(level) > MAX_SPACE || countSolutions(level, 2).count !== 1) return null;
   const ends = new Set(trace(level, sol).segments.map((s) => key(s.x2, s.y2)));
-  if (!placeCells(level, sol).every((c) => (c.t !== 'mirror' && c.t !== 'splitter' && c.t !== 'dichroic') || ends.has(key(c.x, c.y)))) return null;
+  const placed = placeCells(level, sol);
+  const lit = litCells(level, sol);
+  const ok = level.cells.every((c, i) => {
+    const p = placed[i]!;
+    if (decoys.has(c)) return !lit.has(key(p.x, p.y));
+    return (c.t !== 'mirror' && c.t !== 'splitter' && c.t !== 'dichroic') || ends.has(key(p.x, p.y));
+  });
+  if (!ok) return null;
+  if (searchSpace(level) > MAX_SPACE || countEssential(level, 2) !== 1) return null;
   return level;
 }
 

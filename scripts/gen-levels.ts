@@ -13,116 +13,166 @@ interface Tier {
 
 const lerp = (a: number, b: number, k: number): number => Math.round(a + (b - a) * k);
 
+// Playtest 2026-11-16 (fases 1–50): as curtidas ficaram em kept.json; as outras eram simples demais. Todas
+// as faixas ganharam mais peças especiais e distratoras (decoys: peças fora da luz, perto do caminho).
 const TIERS: Tier[] = [
-  // Playtest: fases de um feixe só foram fracas; agora dois feixes, mais espelhos e metade com alvo misturado.
+  // Mistura de dois feixes; metade com alvo de cor combinada.
   {
-    count: 11,
-    seed: 20000,
-    options: (k) =>
-      k > 0.45
-        ? { mirrors: lerp(5, 7, k), beams: 1, merge: 1, mergeMirrors: 3, minMoves: lerp(5, 7, k) }
-        : { mirrors: lerp(5, 7, k), beams: 2, minMoves: lerp(5, 6, k) },
-  },
-  {
-    count: 8,
-    seed: 20100,
-    options: (k) => ({ mirrors: lerp(6, 9, k), filters: 1, prism: k > 0.3, beams: 2, minMoves: lerp(5, 7, k) }),
-  },
-  {
-    count: 8,
-    seed: 9119,
-    options: (k) => ({ mirrors: lerp(6, 9, k), filters: k > 0.5 ? 2 : 1, prism: true, beams: 3, minMoves: lerp(5, 7, k) }),
-  },
-  // 41+: trilho — um espelho ou o prisma desliza de célula em célula; a luz acompanha enquanto arrasta.
-  {
-    count: 10,
-    seed: 20200,
-    options: (k) => {
-      const prism = Math.round(k * 9) % 2 === 1;
-      return {
-        mirrors: lerp(4, 7, k),
-        beams: 2,
-        prism,
-        slider: prism ? ('prism' as const) : ('mirror' as const),
-        minMoves: lerp(3, 6, k),
-      };
-    },
-  },
-  // 51+: divisor de feixe — reflete e deixa passar ao mesmo tempo; um feixe abastece dois caminhos.
-  {
-    count: 10,
-    seed: 9137,
+    count: 6,
+    seed: 30000,
     options: (k) => ({
       mirrors: lerp(6, 8, k),
       beams: 2,
-      splitters: k > 0.4 ? 2 : 1,
-      merge: 1,
+      merge: k > 0.3 ? 1 : 0,
       mergeMirrors: 2,
+      decoys: k > 0.5 ? 2 : 1,
+      minMoves: lerp(5, 7, k),
+    }),
+  },
+  // Filtro + prisma, às vezes com divisor.
+  {
+    count: 8,
+    seed: 30100,
+    options: (k) => ({
+      mirrors: lerp(7, 9, k),
+      filters: 1,
+      prism: true,
+      beams: k > 0.5 ? 3 : 2,
+      splitters: k > 0.5 ? 1 : 0,
+      decoys: k > 0.5 ? 2 : 1,
       minMoves: lerp(6, 8, k),
     }),
   },
-  // 61+: espelho dicroico — reflete só a sua cor e deixa as outras passarem (separa um feixe misturado).
+  // Dois prismas (dois feixes brancos) e um terceiro feixe com filtro.
   {
-    count: 10,
-    seed: 20300,
-    options: (k) => ({
-      mirrors: lerp(5, 8, k),
-      beams: 2,
-      dichroics: k > 0.5 ? 2 : 1,
-      minMoves: lerp(4, 7, k),
-    }),
+    count: 8,
+    seed: 30200,
+    options: (k) => ({ mirrors: lerp(7, 9, k), prisms: 2, filters: 1, beams: 3, decoys: k > 0.5 ? 2 : 1, minMoves: lerp(6, 8, k) }),
   },
-  // 71+: alvos de cor combinada — só acendem quando feixes de lançadores diferentes chegam juntos.
+  // Trilho, com divisor ou dicroico.
   {
-    count: 10,
-    seed: 9127,
+    count: 6,
+    seed: 30300,
+    options: (k) => {
+      const i = Math.round(k * 5);
+      const prism = i % 2 === 1;
+      return {
+        mirrors: lerp(6, 8, k),
+        beams: 2,
+        prism,
+        slider: prism ? ('prism' as const) : ('mirror' as const),
+        splitters: i % 3 === 0 ? 1 : 0,
+        dichroics: i % 3 === 0 ? 0 : 1,
+        decoys: 1,
+        minMoves: lerp(5, 7, k),
+      };
+    },
+  },
+  // Alvos combinados + filtro, depois com dicroico.
+  {
+    count: 8,
+    seed: 30400,
     options: (k) => ({
-      mirrors: lerp(5, 7, k),
+      mirrors: lerp(6, 8, k),
       beams: 2,
       merge: k > 0.4 ? 2 : 1,
-      mergeMirrors: k > 0.4 ? 2 : 3,
+      mergeMirrors: 2,
       filters: 1,
+      dichroics: k > 0.5 ? 1 : 0,
+      decoys: k > 0.5 ? 2 : 1,
       minMoves: lerp(6, 8, k),
     }),
   },
-  // 81+: tudo junto — divisor, espelho, filtro e prisma na mesma fase (um feixe para cada peça especial).
+  // Dicroico (o espelho com filtro): um ou dois, com filtro.
   {
-    count: 10,
-    seed: 9147,
+    count: 6,
+    seed: 30500,
     options: (k) => ({
-      mirrors: lerp(6, 7, k),
-      beams: 3,
-      prism: true,
+      mirrors: lerp(6, 8, k),
+      beams: k > 0.4 ? 3 : 2,
+      dichroics: k > 0.4 ? 2 : 1,
       filters: 1,
-      splitters: 1,
-      minMoves: lerp(7, 9, k),
+      decoys: 1,
+      minMoves: lerp(5, 7, k),
     }),
   },
-  // 91–100: final — todas as mecânicas juntas: prisma, filtro, alvo combinado, trilho e divisor ou dicroico.
+  // Divisor + prisma + alvo combinado.
+  {
+    count: 8,
+    seed: 30600,
+    options: (k) => ({
+      mirrors: lerp(7, 8, k),
+      beams: k > 0.5 ? 3 : 2,
+      prism: true,
+      splitters: k > 0.5 ? 2 : 1,
+      merge: 1,
+      mergeMirrors: 2,
+      decoys: k > 0.5 ? 2 : 1,
+      minMoves: lerp(6, 8, k),
+    }),
+  },
+  // Tudo junto: prisma, filtro e divisor ou dicroico (cada peça especial no seu feixe).
+  {
+    count: 8,
+    seed: 30700,
+    options: (k) => {
+      const i = Math.round(k * 7);
+      return {
+        mirrors: lerp(7, 8, k),
+        beams: 3,
+        prism: true,
+        filters: 1,
+        splitters: i % 2,
+        dichroics: 1 - (i % 2),
+        decoys: 2,
+        minMoves: lerp(7, 9, k),
+      };
+    },
+  },
+  // 91–100: final — dois prismas, alvo combinado, trilho, divisor ou dicroico e distratoras.
   {
     count: 10,
-    seed: 20400,
+    seed: 30800,
     finale: true,
     options: (k) => {
       const i = Math.round(k * 9);
       return {
         mirrors: lerp(7, 9, k),
         beams: 3,
-        prism: true,
-        filters: 1,
-        merge: 1,
+        prisms: i % 2 === 0 ? 2 : 1,
+        filters: i % 2 === 0 ? 0 : 1,
+        merge: i % 2 === 0 ? 0 : 1, // dois prismas já enchem a grade: sem alvo combinado
         mergeMirrors: 2,
-        splitters: i % 2 === 0 ? 1 : 0,
-        dichroics: i % 2 === 1 ? 1 : 0,
+        splitters: i % 2 === 0 ? 0 : 1,
+        dichroics: i % 2 === 1 ? 0 : 1,
         slider: i % 3 === 0 ? ('prism' as const) : ('mirror' as const),
+        decoys: 2,
         minMoves: lerp(9, 11, k),
+      };
+    },
+  },
+  // Dupla difração: dois prismas e um divisor ou dicroico, com trilho.
+  {
+    count: 8,
+    seed: 30900,
+    options: (k) => {
+      const i = Math.round(k * 7);
+      return {
+        mirrors: lerp(7, 9, k),
+        beams: 3,
+        prisms: 2,
+        splitters: i % 2,
+        dichroics: 1 - (i % 2),
+        slider: 'mirror' as const,
+        decoys: 2,
+        minMoves: lerp(7, 9, k),
       };
     },
   },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.
-const THRESHOLDS = [4.5, 8, 12, 16];
+const THRESHOLDS = [6, 11, 16, 21];
 const pips = (score: number): number => 1 + THRESHOLDS.filter((t) => score >= t).length;
 
 // Seed sem fase válida (comum nas faixas com muitas mecânicas): tenta seeds derivadas, deterministicamente.

@@ -4,7 +4,7 @@ import type { Game } from './game.ts';
 
 export type Vote = 'up' | 'down' | 'cut';
 
-const KEY = 'chromira.feedback.v2';
+const KEY = 'chromira.feedback.v3';
 const FLAG = 'chromira.feedback.on';
 
 type Store = Record<string, { vote: Vote; id: number }>; // chave = número da fase (1-based)
