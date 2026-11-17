@@ -74,8 +74,8 @@ export const CONFIG = {
     white: { width: 1.15, amp: 1.15, core: { width: 0.14, alpha: 0.28 } }, // feixe branco (3 cores): mais grosso, ondas mais abertas e núcleo que fecha os espaços sem esconder as cores
     pairCore: { width: 0.1, alpha: 0.12 }, // núcleo das misturas de 2 cores: fraco, para não virar branco ao somar com as ondas
     // Crescimento da luz (células/s), constante. Só o trecho que mudou cresce; o resto fica aceso.
-    speed: 12, // ao abrir a fase
-    turnSpeed: 6, // ao girar uma peça: mais devagar, vira transição
+    speed: 15, // ao abrir a fase
+    turnSpeed: 8, // ao girar uma peça: mais devagar, vira transição
     impact: { radius: 0.14, alpha: 0.6 }, // clarão onde a luz bate em parede/lançador
     // Faíscas na colisão: traços curtos na cor do feixe, ricocheteando para trás em leque.
     sparks: { lead: 0.15, perSec: 30, spread: 1.45, speed: [90, 230], lifeMs: [200, 450], len: 8, width: 1.6, drag: 4.5 },
@@ -86,7 +86,7 @@ export const CONFIG = {
     waves: {
       amp: 0.066, // fração da célula
       length: 0.95, // comprimento de onda, em células
-      speed: 1.4, // ciclos por segundo
+      speed: 2.1, // ciclos por segundo
       width: 0.04,
       alpha: 0.95,
       taper: 0.38, // células até a amplitude cheia, a partir do começo e do fim do feixe
