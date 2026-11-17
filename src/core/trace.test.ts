@@ -177,15 +177,17 @@ describe('trace', () => {
     expect(r.segments).toHaveLength(1);
   });
 
-  it('prism only emits components present in the beam', () => {
-    const r = trace(
-      level([
-        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 5 },
-        { x: 2, y: 3, t: 'prism' },
-      ]),
-      [],
-    );
-    expect(r.segments.map((s) => s.color).sort()).toEqual([1, 4, 5]);
+  it('colored light passes straight through a prism, unchanged', () => {
+    for (const color of [1, 2, 4, 5] as const) {
+      const r = trace(
+        level([
+          { x: 0, y: 3, t: 'emitter', dir: 'E', color },
+          { x: 2, y: 3, t: 'prism' },
+        ]),
+        [],
+      );
+      expect(r.segments.map((s) => [s.color, s.y1, s.y2])).toEqual([[color, 3, 3]]);
+    }
   });
 
   it('splitter reflects and lets the beam through at the same time', () => {

@@ -41,6 +41,19 @@ export const CONFIG = {
   combiner: { radius: 0.3 },
   shifter: { radius: 0.3, spin: 0.8 },
   diode: { size: 0.22, half: 0.2 },
+  well: { radius: 0.36, color: '#b9a6ff', speed: 0.35 },
+  fiber: {
+    mouth: 0.18,
+    color: 'rgba(255,255,255,0.85)',
+    tube: 'rgba(255,255,255,0.12)',
+    width: 0.16,
+    bend: 1.6, // quanto o tubo sai reto de cada ponta antes de curvar (células)
+    glow: [
+      [0.22, 0.25],
+      [0.08, 0.8],
+    ] as [number, number][],
+  },
+  auto: { periodMs: 1800, ring: 0.44, color: '#ffd36b' }, // espelho automático: período e anel do tempo
   piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
   // Espelho: placa fina de vidro transparente, mesmo estilo de degradê do prisma (frações da célula).
   mirror: {

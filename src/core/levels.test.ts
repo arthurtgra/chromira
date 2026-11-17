@@ -22,8 +22,9 @@ function checkTrail(level: Level, rots: Rots): void {
     }
     // Portal: o trecho que sai continua o que entrou no outro portal do par.
     const pair = (x: number, y: number): string | undefined => {
-      const c = level.cells.find((q) => q.t === 'portal' && q.x === x && q.y === y);
-      const q = c?.t === 'portal' ? level.cells.find((o) => o !== c && o.t === 'portal' && o.pair === c.pair) : undefined;
+      const c = level.cells.find((q) => (q.t === 'portal' || q.t === 'fiber') && q.x === x && q.y === y);
+      const q =
+        c?.t === 'portal' || c?.t === 'fiber' ? level.cells.find((o) => o !== c && o.t === c.t && o.pair === c.pair) : undefined;
       return q && `${q.x},${q.y}`;
     };
     const prev = segments.some(

@@ -28,6 +28,10 @@ export interface GenOptions {
   combiners?: number; // alvo combinado vira lente que funde; o alvo vai para depois dela
   shifters?: number; // cristais no caminho: as cores dos alvos seguem o que chega
   diodes?: number; // diodos no caminho, no sentido da luz da solução
+  wells?: number; // lentes gravitacionais no lugar de curvas (a luz passa de raspão e curva para ela)
+  fibers?: number; // feixes que entram numa fibra óptica e saem em outro ponto, noutra direção
+  autos?: number; // espelhos que giram sozinhos
+  charges?: number; // alvos que precisam ficar acesos um tempo (não dependem dos espelhos automáticos)
   merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
   mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
   splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
@@ -61,6 +65,7 @@ interface Draft {
   used: Set<string>;
   path: Set<string>;
   benders: number;
+  wells: number;
 }
 
 // Caminha um feixe: espelho em cada curva, prisma opcional, divisor opcional, filtro opcional, alvo no fim.
@@ -80,6 +85,7 @@ function walk(
   dichroic = false,
   portalAt = -1,
   sensorGate = -1, // >= 0: o feixe termina num sensor que abre a porta desse número
+  fiberAt = -1,
 ): boolean {
   const fresh: string[] = [];
   for (let m = 0; m <= mirrors; m++) {
@@ -102,6 +108,31 @@ function walk(
     y += dy * run;
     d.used.add(key(x, y));
 
+    if (m === fiberAt && m < mirrors) {
+      // Fibra: a boca fica aqui (virada para a luz que chega); a outra ponta, numa célula livre longe,
+      // solta a luz numa direção com espaço à frente.
+      const outs: [number, number, Dir][] = [];
+      for (let by = 0; by < H; by++) {
+        for (let bx = 0; bx < W; bx++) {
+          const k = key(bx, by);
+          if (d.used.has(k) || d.path.has(k) || Math.abs(bx - x) + Math.abs(by - y) < 3) continue;
+          for (const e of DIRS) {
+            const nx = bx + DELTA[e][0];
+            const ny = by + DELTA[e][1];
+            if (inside(nx, ny) && !d.used.has(key(nx, ny)) && !d.path.has(key(nx, ny))) outs.push([bx, by, e]);
+          }
+        }
+      }
+      if (outs.length === 0) return false;
+      const [bx, by, e] = pick(d.r, outs);
+      const pair = d.cells.filter((c) => c.t === 'fiber').length / 2;
+      d.cells.push({ x, y, t: 'fiber', pair, dir: OPP[dir] }, { x: bx, y: by, t: 'fiber', pair, dir: e });
+      d.used.add(key(bx, by));
+      x = bx;
+      y = by;
+      dir = e;
+      continue;
+    }
     if (m === portalAt && m < mirrors) {
       // Portal no lugar desta curva: a luz salta para o outro portal, numa célula livre, e segue reto.
       const [ddx, ddy] = DELTA[dir];
@@ -174,6 +205,21 @@ function walk(
       const k = int(d.r, 0, left);
       return walk(d, x, y, dir, color, k, -1, false) && walk(d, x, y, next, color, left - k, -1, false);
     }
+    if (d.wells > 0 && d.r() < 0.5) {
+      // Lente gravitacional na célula seguinte à curva: a luz passa de raspão aqui, curva para ela,
+      // atravessa e segue dali.
+      const wx = x + DELTA[next][0];
+      const wy = y + DELTA[next][1];
+      if (inside(wx, wy) && !d.used.has(key(wx, wy)) && !d.path.has(key(wx, wy))) {
+        d.wells--;
+        d.cells.push({ x: wx, y: wy, t: 'well' });
+        d.used.add(key(wx, wy));
+        x = wx;
+        y = wy;
+        dir = next;
+        continue;
+      }
+    }
     if (d.benders > 0 && d.r() < 0.5) {
       d.benders--;
       d.cells.push({ x, y, t: 'bender' });
@@ -189,13 +235,14 @@ function walk(
 
 function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   const nBeams = o.beams ?? (o.mirrors >= 9 ? 3 : o.mirrors >= 6 ? 2 : 1);
-  const d: Draft = { r, cells: [], sol: [], used: new Set(), path: new Set(), benders: o.benders ?? 0 };
+  const d: Draft = { r, cells: [], sol: [], used: new Set(), path: new Set(), benders: o.benders ?? 0, wells: o.wells ?? 0 };
   const merges: { cell: Extract<Cell, { t: 'target' }>; sides: Dir[] }[] = [];
   let left = o.mirrors;
   let filters = o.filters ?? 0;
   let splitters = o.splitters ?? 0;
   let dichroics = o.dichroics ?? 0;
   let portals = o.portals ?? 0;
+  let fibers = o.fibers ?? 0;
 
   // Alvos combinados primeiro: cada componente sai do alvo por um lado diferente até seu lançador.
   for (let i = 0; i < (o.merge ?? 0); i++) {
@@ -240,9 +287,12 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     const portal = !prism && portals > 0 && k >= 2;
     if (portal) portals--;
     const portalAt = portal ? int(r, 0, k - 1) : -1;
-    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter, 'target', splitAt, dich, portalAt)) return null;
+    const fiber = !prism && !portal && !split && fibers > 0 && k >= 2;
+    if (fiber) fibers--;
+    const fiberAt = fiber ? int(r, 0, k - 1) : -1;
+    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter, 'target', splitAt, dich, portalAt, -1, fiberAt)) return null;
   }
-  if (filters > 0 || splitters > 0 || dichroics > 0 || portals > 0) return null;
+  if (filters > 0 || splitters > 0 || dichroics > 0 || portals > 0 || fibers > 0 || d.wells > 0) return null;
 
   // Sensor e porta: um feixe extra acende um sensor; a porta dele fica num trecho reto de outro feixe.
   for (let g = 0; g < (o.gates ?? 0); g++) {
@@ -409,7 +459,14 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     }
   }
   const sl = slider ? order.indexOf(slider.cell) : -1;
-  const real = order.map((c) => !decoys.has(c));
+  // Espelhos automáticos: giram sozinhos, então não contam como toques do jogador.
+  const autoIdx = order.flatMap((c, i) => (c.t === 'mirror' && !c.rail && !decoys.has(c) ? [i] : []));
+  for (let i = 0; i < (o.autos ?? 0); i++) {
+    if (autoIdx.length === 0) return null;
+    const a = autoIdx.splice(int(r, 0, autoIdx.length - 1), 1)[0]!;
+    (order[a] as Extract<Cell, { t: 'mirror' }>).auto = true;
+  }
+  const real = order.map((c) => !decoys.has(c) && !(c.t === 'mirror' && c.auto));
   const minMoves = Math.min(o.minMoves ?? 3, real.filter(Boolean).length);
   let start: Rots;
   do {
@@ -418,6 +475,21 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     start.filter((v, i) => real[i] && v !== sol[i]).length < minMoves ||
     (slider !== null && posOf(slider.cell, start[sl]!) === slider.pos)
   );
+
+  // Alvos com carga: só os que continuam acesos com os espelhos automáticos em qualquer posição
+  // (senão piscariam e nunca carregariam).
+  if (o.charges) {
+    const probe = { id, w: W, h: H, cells: d.cells, start } as unknown as Level;
+    const flipped = sol.map((v, i) => (order[i]!.t === 'mirror' && (order[i] as { auto?: boolean }).auto ? (v + 1) % 2 : v));
+    const a = trace(probe, sol).received;
+    const b = trace(probe, flipped).received;
+    const steady = d.cells.filter(
+      (c): c is Extract<Cell, { t: 'target' }> => c.t === 'target' && a[key(c.x, c.y)] === c.color && b[key(c.x, c.y)] === c.color,
+    );
+    const flicker = d.cells.some((c) => c.t === 'target' && b[key(c.x, c.y)] !== c.color);
+    if (steady.length < o.charges || (o.autos && !flicker)) return null;
+    for (let i = 0; i < o.charges; i++) steady.splice(int(r, 0, steady.length - 1), 1)[0]!.charge = 1500;
+  }
 
   // Espelhos ligados (pares): começam ambos certos ou ambos errados, senão a solução seria inalcançável.
   const free = order.flatMap((c, i) => (c.t === 'mirror' && !c.rail && real[i] ? [i] : []));

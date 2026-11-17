@@ -491,6 +491,8 @@ export interface PieceView {
   prismAngle: (ci: number) => number; // ci = índice da célula; direção da ponta (radianos, y para baixo)
   gateOpen: (id: number) => boolean;
   bender: (i: number) => { from: number; to: number; k: number }; // polaridade do ímã (0/1) animando
+  charge: (x: number, y: number, ms: number) => number; // 0..1, carga do alvo
+  autoPhase: number; // 0..1 até o próximo giro dos espelhos automáticos
   darkHit: (x: number, y: number) => boolean; // anti-alvo recebendo luz proibida
   time: number; // segundos
 }
@@ -659,6 +661,53 @@ export function drawLinks(ctx: Ctx, l: Layout, cells: Cell[]): void {
   ctx.restore();
 }
 
+// Fibra óptica: tubo curvo entre as duas pontas; com luz passando, brilha na cor dela.
+export function drawFibers(ctx: Ctx, l: Layout, cells: Cell[], plan: BeamPlan, front: Front): void {
+  const F = CONFIG.fiber;
+  const pairs = new Map<number, Extract<Cell, { t: 'fiber' }>[]>();
+  for (const c of cells) if (c.t === 'fiber') pairs.set(c.pair, [...(pairs.get(c.pair) ?? []), c]);
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const [, ends] of pairs) {
+    const [a, b] = ends;
+    if (!a || !b) continue;
+    const k = F.bend * l.cell;
+    const back = (c: Extract<Cell, { t: 'fiber' }>): [number, number] => [-DELTA[c.dir][0], -DELTA[c.dir][1]];
+    const [ax, ay] = [cx(l, a.x), cy(l, a.y)];
+    const [bx, by] = [cx(l, b.x), cy(l, b.y)];
+    const [abx, aby] = back(a);
+    const [bbx, bby] = back(b);
+    const curve = (): void => {
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.bezierCurveTo(ax + abx * k, ay + aby * k, bx + bbx * k, by + bby * k, bx, by);
+    };
+    ctx.strokeStyle = F.tube;
+    ctx.lineWidth = F.width * l.cell;
+    curve();
+    ctx.stroke();
+    // Luz dentro: cor de quem chegou à boca (trecho terminando numa das pontas, já alcançado pela frente).
+    let lit = 0;
+    for (const p of plan.pieces) {
+      if (!reachedEnd(p, front)) continue;
+      if ((p.x2 === a.x && p.y2 === a.y) || (p.x2 === b.x && p.y2 === b.y)) lit |= p.color;
+    }
+    if (lit) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = CONFIG.colors[lit as Color];
+      for (const [w, al] of F.glow) {
+        ctx.globalAlpha = al;
+        ctx.lineWidth = w * l.cell;
+        curve();
+        ctx.stroke();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 1;
+    }
+  }
+  ctx.restore();
+}
+
 export function drawRails(ctx: Ctx, l: Layout, cells: Cell[]): void {
   const R = CONFIG.rail;
   ctx.save();
@@ -726,6 +775,21 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.lineWidth = 1;
         ctx.stroke();
         ctx.restore();
+        if (cell.auto) {
+          // Automático: anel fino em volta que vai se fechando até o próximo giro.
+          const A = CONFIG.auto;
+          ctx.globalAlpha = 0.25;
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(x, y, A.ring * c, 0, TAU);
+          ctx.stroke();
+          ctx.globalAlpha = 0.85;
+          ctx.strokeStyle = A.color;
+          ctx.beginPath();
+          ctx.arc(x, y, A.ring * c, -Math.PI / 2, -Math.PI / 2 + TAU * view.autoPhase);
+          ctx.stroke();
+        }
         ctx.globalAlpha = 1;
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.stroke;
@@ -1067,7 +1131,79 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
       }
       case 'target': {
         drawTarget(ctx, x, y, p.ringRadius * c, cell.color, view.targetReceived(cell.x, cell.y), view.targetFill(cell.x, cell.y), view.time);
+        if (cell.charge) {
+          // Carga: quatro tracinhos em volta (marca de alvo que precisa de tempo) e um arco que enche.
+          const R = p.ringRadius * c * 1.35;
+          const col = CONFIG.colors[cell.color];
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.5;
+          for (let k = 0; k < 4; k++) {
+            const t = (k * Math.PI) / 2 + Math.PI / 4;
+            ctx.beginPath();
+            ctx.moveTo(x + Math.cos(t) * R, y + Math.sin(t) * R);
+            ctx.lineTo(x + Math.cos(t) * R * 1.15, y + Math.sin(t) * R * 1.15);
+            ctx.stroke();
+          }
+          const k = view.charge(cell.x, cell.y, cell.charge);
+          if (k > 0) {
+            ctx.globalAlpha = 0.9;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+          ctx.lineWidth = p.stroke;
+        }
         ctx.strokeStyle = p.color;
+        break;
+      }
+      case 'well': {
+        // Lente gravitacional: miolo escuro com anéis finos que se apertam para o centro (puxa a luz).
+        const W2 = CONFIG.well;
+        const r = W2.radius * c;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(0,0,0,1)');
+        g.addColorStop(0.55, 'rgba(10,6,24,0.9)');
+        g.addColorStop(1, 'rgba(120,90,255,0.0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = W2.color;
+        ctx.lineWidth = 1;
+        for (let k = 1; k <= 3; k++) {
+          const pulse = (view.time * W2.speed + k / 3) % 1; // anéis encolhendo devagar até o centro
+          ctx.globalAlpha = 0.5 * pulse;
+          ctx.beginPath();
+          ctx.arc(x, y, r * (1 - pulse * 0.7), 0, TAU);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'fiber': {
+        // Ponta da fibra: boca em U aberta para a direção dir (por onde a luz entra e sai).
+        const [ddx, ddy] = DELTA[cell.dir];
+        const a = Math.atan2(ddy, ddx);
+        const r = CONFIG.fiber.mouth * c;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a);
+        ctx.strokeStyle = CONFIG.fiber.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(r, -r);
+        ctx.lineTo(-r * 0.6, -r);
+        ctx.arc(-r * 0.6, 0, r, -Math.PI / 2, Math.PI / 2, true);
+        ctx.lineTo(r, r);
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
         break;
       }
       case 'emitter':

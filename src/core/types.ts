@@ -4,13 +4,15 @@ export type Color = 1 | 2 | 3 | 4 | 5 | 6 | 7; // bitmask R=1 G=2 B=4
 export type Cell =
   | { x: number; y: number; t: 'emitter'; dir: Dir; color: Color }
   // link: peças com o mesmo número giram juntas (um toque gira todas).
-  | { x: number; y: number; t: 'mirror'; rail?: Rail; link?: number } // estado fica em rots
+  // auto: gira sozinho de tempos em tempos (o jogador não mexe nele).
+  | { x: number; y: number; t: 'mirror'; rail?: Rail; link?: number; auto?: boolean } // estado fica em rots
   | { x: number; y: number; t: 'filter' } // estado fica em rots
   | { x: number; y: number; t: 'splitter'; link?: number } // vidro semi-espelhado: reflete e deixa passar; estado em rots
   // Espelho dicroico: reflete só a sua cor (componente R, G ou B) e deixa o resto atravessar; estado em rots.
   | { x: number; y: number; t: 'dichroic'; color: 1 | 2 | 4; link?: number }
   | { x: number; y: number; t: 'wall' }
-  | { x: number; y: number; t: 'target'; color: Color }
+  // charge: precisa ficar aceso esse tanto de ms seguidos para contar.
+  | { x: number; y: number; t: 'target'; color: Color; charge?: number }
   | { x: number; y: number; t: 'prism'; rail?: Rail }
   // Portal: a luz que entra sai pelo outro portal do mesmo par, na mesma direção.
   | { x: number; y: number; t: 'portal'; pair: number }
@@ -26,7 +28,13 @@ export type Cell =
   // Cristal: troca a cor da luz que passa (vermelho → verde → azul → vermelho).
   | { x: number; y: number; t: 'shifter' }
   // Diodo: deixa a luz passar só no sentido dir; nos outros é parede.
-  | { x: number; y: number; t: 'diode'; dir: Dir };
+  | { x: number; y: number; t: 'diode'; dir: Dir }
+  // Lente gravitacional: luz passando ao lado (numa célula vizinha, de raspão) curva na direção dela,
+  // atravessa e segue. Fica fixa.
+  | { x: number; y: number; t: 'well' }
+  // Fibra óptica: duas pontas ligadas por um tubo curvo. A luz entra pela boca (vindo na direção oposta a
+  // dir) e sai pela outra ponta na direção dir dela. Por outro lado, a ponta é parede.
+  | { x: number; y: number; t: 'fiber'; pair: number; dir: Dir };
 
 // Trilho: a peça desliza de célula em célula a partir de (x, y) na direção do eixo, len posições.
 // Estado da peça = rotação + base * posição (base = estados de rotação: espelho 2, prisma 1).

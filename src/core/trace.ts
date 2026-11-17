@@ -92,6 +92,8 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
 function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>): TraceResult {
   const grid = new Map<string, Cell>();
   const portals = new Map<number, Cell[]>();
+  const fibers = new Map<number, Extract<Cell, { t: 'fiber' }>[]>();
+  const isWell = (x: number, y: number): boolean => grid.get(key(x, y))?.t === 'well';
   const dark: string[] = [];
   const pieceIdx = new Map<string, number>();
   const received: Record<string, number> = {};
@@ -103,6 +105,7 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
     if (isPiece(c)) pieceIdx.set(k, pi++);
     else if (c.t === 'target' || c.t === 'sensor') received[k] = 0;
     else if (c.t === 'portal') portals.set(c.pair, [...(portals.get(c.pair) ?? []), c]);
+    else if (c.t === 'fiber') fibers.set(c.pair, [...(fibers.get(c.pair) ?? []), c]);
     else if (c.t === 'emitter') queue.push({ x: c.x, y: c.y, dir: c.dir, color: c.color, d: 0 });
   }
 
@@ -147,8 +150,37 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
       }
       const k = key(x, y);
       const c = grid.get(k);
-      if (!c) continue;
+      if (!c) {
+        // Lente gravitacional ao lado (de raspão): curva na direção dela. Duas, uma de cada lado, se anulam.
+        const l = LEFT[dir];
+        const rr = RIGHT[dir];
+        const wl = isWell(x + DELTA[l][0], y + DELTA[l][1]);
+        const wr = isWell(x + DELTA[rr][0], y + DELTA[rr][1]);
+        if (wl !== wr) {
+          push(x, y);
+          dir = wl ? l : rr;
+        }
+        continue;
+      }
       switch (c.t) {
+        case 'well':
+          break;
+        case 'fiber': {
+          const q = fibers.get(c.pair)!.find((p) => p !== c);
+          if (dir !== OPP[c.dir] || !q) {
+            push(x - dx * 0.5, y - dy * 0.5);
+            ended = true;
+            break;
+          }
+          push(x, y);
+          x = q.x;
+          y = q.y;
+          sx = x;
+          sy = y;
+          sd = dist;
+          dir = q.dir;
+          break;
+        }
         case 'mirror':
           push(x, y);
           dir = reflect(dir, (rots[pieceIdx.get(k)!] ?? 0) % 2);
@@ -236,6 +268,8 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
           ended = true;
           break;
         case 'prism':
+          // Só a luz branca se abre nas três cores; luz colorida atravessa reto, sem mudar.
+          if (color !== 7) break;
           push(x, y);
           if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1, d: dist });
           if (color & 2) queue.push({ x, y, dir, color: 2, d: dist });

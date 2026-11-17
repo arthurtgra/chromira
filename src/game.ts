@@ -13,6 +13,7 @@ import {
   drawPrismGlow,
   drawRails,
   drawLinks,
+  drawFibers,
   drawWinWave,
   mix,
   type BeamStyle,
@@ -63,6 +64,7 @@ export class Game {
   private prismSoundAt = -Infinity;
   private prismAngle = new Map<number, { cur: number; to: number }>(); // por índice em level.cells; // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
+  private autoAt = 0; // último giro dos espelhos automáticos
   private waves: WaveOrigin[] = [];
   private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
   private pulseAt = Infinity;
@@ -101,6 +103,7 @@ export class Game {
     this.fades = [];
     this.loadedAt = this.now;
     this.wonAt = null;
+    this.autoAt = this.now;
     this.replayAt = Infinity;
     this.pulseAt = Infinity;
     this.nextAt = Infinity;
@@ -216,7 +219,9 @@ export class Game {
     const placed = placeCells(this.level, this.rots).filter(isPiece);
     const i = placed.findIndex((m) => m.x === c.x && m.y === c.y);
     if (i < 0) return;
-    if (railOf(this.pieceCells[i]!)) this.drag = { i, px, py, moved: false };
+    const cell = this.pieceCells[i]!;
+    if (cell.t === 'mirror' && cell.auto) return; // gira sozinho
+    if (railOf(cell)) this.drag = { i, px, py, moved: false };
     else this.rotate(i);
   }
 
@@ -247,6 +252,26 @@ export class Game {
   private rotate(i: number): void {
     const link = linkOf(this.pieceCells[i]!);
     const group = link === undefined ? [i] : this.pieceCells.flatMap((c, j) => (linkOf(c) === link ? [j] : []));
+    this.turn(group);
+    const cell = this.pieceCells[i]!;
+    if (cell.t !== 'filter') this.synth.turn();
+    else this.synth.filter(rotOf(cell, this.rots[i]!));
+    navigator.vibrate?.(CONFIG.vibrateMs);
+    this.retrace();
+  }
+
+  // Espelhos automáticos: viram juntos a cada período, sem som de toque.
+  private flipAutos(): void {
+    const autos = this.pieceCells.flatMap((c, j) => (c.t === 'mirror' && c.auto ? [j] : []));
+    if (autos.length === 0 || this.wonAt !== null || this.editing) return;
+    if (this.now - this.autoAt < CONFIG.auto.periodMs) return;
+    this.autoAt = this.now;
+    this.turn(autos);
+    this.retrace();
+  }
+
+  // Avança o estado (e a animação) das peças.
+  private turn(group: number[]): void {
     for (const j of group) {
       const cell = this.pieceCells[j]!;
       const s = this.rots[j]!;
@@ -261,11 +286,6 @@ export class Game {
         this.anims[j] = { from: a.to, to: this.rots[j]!, at: this.now };
       }
     }
-    const cell = this.pieceCells[i]!;
-    if (cell.t !== 'filter') this.synth.turn();
-    else this.synth.filter(rotOf(cell, this.rots[i]!));
-    navigator.vibrate?.(CONFIG.vibrateMs);
-    this.retrace();
   }
 
   private retrace(): void {
@@ -324,6 +344,7 @@ export class Game {
     const sk = 1 - Math.exp((-CONFIG.slideRate * dtMs) / 1000);
     this.slide = this.slide.map((v, i) => v + (posOf(this.pieceCells[i]!, this.rots[i]!) - v) * sk);
     this.fades = this.fades.filter((f) => this.retracted(f) < segLen(f.seg));
+    this.flipAutos();
 
     // Faíscas: onde a luz já chegou num obstáculo, ricocheteiam de volta (contra a direção do feixe).
     // Faísca assim que a ponta da luz encosta no obstáculo (um pouco antes do fim exato do trecho,
@@ -394,7 +415,13 @@ export class Game {
     // Vitória assim que o último alvo acende: não espera o resto da luz (ramos indo para paredes ou
     // para fora da grade) terminar de crescer.
     const targets = this.level.cells.filter((c) => c.t === 'target');
-    const allLit = targets.length > 0 && targets.every((t) => this.litAt.has(key(t.x, t.y)));
+    // Alvo com carga precisa estar aceso há charge ms seguidos.
+    const allLit =
+      targets.length > 0 &&
+      targets.every((t) => {
+        const at = this.litAt.get(key(t.x, t.y));
+        return at !== undefined && (t.t !== 'target' || !t.charge || this.now - at >= t.charge);
+      });
     if (this.result.solved && allLit && this.wonAt === null && !this.editing) this.win();
 
   }
@@ -422,6 +449,7 @@ export class Game {
     const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
     drawRails(ctx, l, this.level.cells);
     drawLinks(ctx, l, this.drawnCells());
+    drawFibers(ctx, l, this.level.cells, this.plan, this.fronts());
     drawPieces(ctx, l, this.drawnCells(), {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
       filterColor: (i) => {
@@ -433,6 +461,11 @@ export class Game {
         return at === undefined ? 0 : easeOut(clamp01((this.now - at) / CONFIG.targetFillMs));
       },
       targetReceived: (x, y) => got[key(x, y)] ?? 0,
+      charge: (x, y, ms) => {
+        const at = this.litAt.get(key(x, y));
+        return at === undefined ? 0 : clamp01((this.now - at) / ms);
+      },
+      autoPhase: clamp01((this.now - this.autoAt) / CONFIG.auto.periodMs),
       prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
       gateOpen: (id) => this.result.open.includes(id),
       bender: (i) => {
@@ -568,9 +601,9 @@ export class Game {
 
   // Outro portal do par do portal em (x, y), como "x,y".
   private portalPair(x: number, y: number): string | undefined {
-    const c = this.level.cells.find((q) => q.t === 'portal' && q.x === x && q.y === y);
-    if (c?.t !== 'portal') return undefined;
-    const q = this.level.cells.find((o) => o !== c && o.t === 'portal' && o.pair === c.pair);
+    const c = this.level.cells.find((q) => (q.t === 'portal' || q.t === 'fiber') && q.x === x && q.y === y);
+    if (c?.t !== 'portal' && c?.t !== 'fiber') return undefined;
+    const q = this.level.cells.find((o) => o !== c && o.t === c.t && o.pair === c.pair);
     return q && key(q.x, q.y);
   }
 

@@ -228,6 +228,35 @@ const TIERS: Tier[] = [
     epilogue: true,
     options: () => ({ mirrors: 8, beams: 3, splitters: 1, diodes: 3, benders: 1, minMoves: 8 }),
   },
+  // 109–112: lente gravitacional, espelho automático, fibra óptica e alvo com carga.
+  // Lente gravitacional: a luz que passa de raspão curva para ela, atravessa e segue.
+  {
+    count: 1,
+    seed: 60000,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, wells: 2, filters: 1, decoys: 1, minMoves: 6 }),
+  },
+  // Espelho automático: gira sozinho; o resto tem de estar pronto para quando ele passar pela posição certa.
+  {
+    count: 1,
+    seed: 60100,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, autos: 1, splitters: 1, decoys: 1, minMoves: 6 }),
+  },
+  // Fibra óptica: dois feixes entram num tubo e saem noutro ponto, noutra direção.
+  {
+    count: 1,
+    seed: 60200,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, fibers: 2, decoys: 1, minMoves: 7 }),
+  },
+  // Alvo com carga: precisa de luz contínua; o feixe dele não pode depender do espelho automático.
+  {
+    count: 1,
+    seed: 60300,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 3, autos: 1, charges: 1, prism: true, minMoves: 7 }),
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.
