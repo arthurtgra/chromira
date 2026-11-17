@@ -326,9 +326,9 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     for (const w of waves) {
       const bw = w.blue ? W.blueBoost : 1;
       ctx.strokeStyle = w.color;
-      soft(ctx, W.glowWidth * tw * bw * cell, W.glowAlpha * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
+      soft(ctx, W.glowWidth * tw * bw * cell, W.glowAlpha * (w.blue ? W.blueGlow : 1) * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
       // A própria onda também em degradê (mais larga, centro forte, borda sumindo): brilho, não tubo contornado.
-      soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
+      soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * (w.blue ? W.blueLine : 1) * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
     }
   }
   if (st.rainbow > 0) {

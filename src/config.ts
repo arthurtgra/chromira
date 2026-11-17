@@ -119,8 +119,12 @@ export const CONFIG = {
       driftByColors: [0, 0, 1, 1.25],
       // Recheio entre as ondas (névoa, miolos e deriva na cor da mistura) por cor. Ciano: verde + azul somam um
       // ciano muito claro que enchia o vão da trança e as ondas viravam só contorno; mais fraco, a trança aparece.
-      fill: { 6: 0.35 } as Partial<Record<Color, number>>,
+      fill: { 4: 0.6, 6: 0.35 } as Partial<Record<Color, number>>,
       blueBoost: 1.3, // ondas azuis mais grossas: o azul é escuro e parece mais fraco que as outras cores
+      // Azul também mais forte: o olho vê pouco o azul puro, então a aura e a onda azuis ganham opacidade
+      // e o miolo do feixe azul (na cor do jogo, que puxa para o branco) fica mais fraco, para não desbotar.
+      blueGlow: 1.9,
+      blueLine: 1.25,
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
