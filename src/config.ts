@@ -238,7 +238,7 @@ export const CONFIG = {
       attackMs: 5,
       pan: 0.7,
       ms: 3400,
-      space: { leftMs: 340, rightMs: 510, feedback: 0.42, toneHz: 2200, wet: 0.35, tailMs: 2500 },
+      space: { leftMs: 150, rightMs: 230, feedback: 0.42, toneHz: 2200, wet: 0.35, tailMs: 2500 },
       volume: 0.5,
       minGapMs: 250,
     },
