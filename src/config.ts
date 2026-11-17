@@ -137,7 +137,9 @@ export const CONFIG = {
   // Difração em arco-íris: liga a partir deste número de marcadores de dificuldade.
   rainbow: {
     fromDifficulty: 3,
-    // Feixes brancos ganham ondas extras de espectro (laranja, amarelo, ciano, violeta) entre as RGB.
+    // Feixes brancos ganhavam ondas extras de espectro (laranja, amarelo, ciano, violeta) entre as RGB nas
+    // fases difíceis; desligado: o feixe é o mesmo em todas as fases (o validado na fase 9).
+    beamWaves: false,
     hues: [30, 60, 180, 275],
     alpha: 0.55,
     ampMul: 1.35, // amplitude das ondas extras relativa às RGB, no arco-íris total

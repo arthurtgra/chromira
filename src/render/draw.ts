@@ -331,7 +331,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * (w.blue ? W.blueLine : 1) * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
     }
   }
-  if (st.rainbow > 0) {
+  if (st.rainbow > 0 && CONFIG.rainbow.beamWaves) {
     const R = CONFIG.rainbow;
     ctx.lineWidth = Math.max(1, W.width * 0.7 * B.white.width * cell);
     ctx.globalAlpha = R.alpha * st.rainbow * alphaMul;
