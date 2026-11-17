@@ -215,24 +215,28 @@ export const CONFIG = {
       toneVolume: 0.35,
       volume: 0.7,
     },
-    // Luz atravessando o prisma: tom macio que se abre devagar num acorde menor, com eco espacial.
+    // Luz atravessando o prisma: tigela de vidro grave + três taças (lá, dó, mi) se abrindo, ressoando longo.
     prism: {
-      hz: 329.63, // luz branca: mi
-      notes: [220, 329.63, 523.25], // depois de abrir (Lá menor): vermelho lá, verde mi, azul dó
-      detune: [0.997, 1.003], // par de senos levemente desafinados por voz (batimento lento)
-      bloomMs: 220, // tom único antes de começar a se abrir
-      glideMs: 700, // notas deslizando até o acorde
-      attackMs: 260,
-      sustain: 0.6,
-      ms: 3200,
-      sink: 0.985, // afundam um pouco ao sumir
-      vibratoHz: 4.2,
-      vibrato: 0.004,
-      shimmer: 0.22, // volume do brilho uma oitava acima
-      filterHz: [700, 2600, 500],
-      pan: 0.75,
-      space: { leftMs: 340, rightMs: 510, feedback: 0.5, toneHz: 1800, wet: 0.55, tailMs: 2500 },
-      volume: 0.75,
+      rootHz: 220, // tigela grave: lá (luz branca)
+      rootVolume: 0.9,
+      notes: [440, 523.25, 659.25], // as taças: vermelho lá, verde dó, azul mi (mesmos tons do giro, oitava abaixo)
+      noteVolume: 0.5,
+      splitMs: 140, // quando a primeira taça soa
+      stepMs: 90, // intervalo entre as taças
+      // Parciais de vidro (mesmas razões do giro), decaimento longo: [razão, volume, ms]
+      partials: [
+        [1, 1, 3200],
+        [2.32, 0.35, 1900],
+        [4.25, 0.12, 1000],
+        [6.63, 0.04, 500],
+      ],
+      ring: 1, // multiplica os decaimentos
+      beatHz: 1.6, // batimento entre os pares de senos: o som pulsa enquanto ressoa
+      attackMs: 5,
+      pan: 0.7,
+      ms: 3400,
+      space: { leftMs: 340, rightMs: 510, feedback: 0.42, toneHz: 2200, wet: 0.35, tailMs: 2500 },
+      volume: 0.5,
       minGapMs: 250,
     },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
