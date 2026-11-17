@@ -177,7 +177,8 @@ export const CONFIG = {
   mirrorSpinMs: 80,
   filterSwapMs: 160,
   pulse: { ms: 450, radius: 0.9 },
-  targetFillMs: 110,
+  targetFillMs: 480, // lente do receptor crescendo do centro até encher o anel
+  target: { glow: 0.38, breathe: 0.12, core: 0.14, coreAlpha: 0.5, outer: 1.32 },
 
   particles: { min: 60, max: 100, speed: [80, 320], lifeMs: [500, 1100], size: [1.5, 3.5], drag: 2.2 },
   flash: { alpha: 0.16, ms: 260 },
@@ -215,8 +216,8 @@ export const CONFIG = {
     // Girar peça: "tim" de vidro. Parciais inarmônicos de uma taça (agudos morrem antes) + estalo curtíssimo.
     // Frequência fixa com leve variação: nada de melodia, para não soar como piano.
     turn: {
-      // Três tons (lá, dó, mi: acorde menor, combinam entre si), sorteados sem repetir o anterior.
-      glassHz: [880, 1046.5, 1318.5],
+      // Quatro tons (sol, lá, dó, mi: combinam entre si), sorteados sem repetir o anterior.
+      glassHz: [783.99, 880, 1046.5, 1318.5], // sol, lá, dó, mi (Lá menor com sétima)
       filterMul: 0.75, // filtro: mesmos tons, uma quarta abaixo (vidro mais grosso)
       detune: 0.006, // ± variação aleatória por toque
       volume: 0.42,

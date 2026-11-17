@@ -502,22 +502,30 @@ const COMPONENTS = [1, 2, 4] as const;
 // Alvo: anel na cor exigida. Mistura que chega aparece como disco no meio.
 // Faltando cor: disco pequeno e calmo. Cor errada (sobra componente): disco + X e anel tracejado tremendo.
 function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got: number, fill: number, time: number): void {
+  // Receptor: anel na cor exigida com um pontinho no meio. Ao acender, uma lente de luz cresce do centro e
+  // ocupa todo o anel (sem vão entre disco e borda, onde o feixe aparecia), o anel clareia e um segundo
+  // anel fino com quatro marcas surge por fora. Aceso, a lente respira devagar.
+  const T = CONFIG.target;
   const col = CONFIG.colors[need];
   const wrong = (got & ~need) !== 0;
   const jx = wrong ? Math.sin(time * 38) * r * 0.05 : 0;
-  ctx.lineWidth = CONFIG.piece.stroke * 1.5;
+  const lw = CONFIG.piece.stroke * 1.5;
+  const k = fill;
+  const back = (t: number): number => 1 + 2.2 * (t - 1) ** 3 + 1.2 * (t - 1) ** 2; // easeOutBack
+  ctx.lineWidth = lw;
 
-  // Aceso: brilho macio na cor do alvo, para ele ler "amarelo" (ou rosa, ciano...) de longe.
-  if (fill > 0) {
-    const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 1.9);
+  if (k > 0) {
+    // Brilho em volta (respira quando aceso).
+    const breathe = 1 + T.breathe * Math.sin(time * 2.2) * k;
+    const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 2.1);
     g.addColorStop(0, col);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.35 * fill;
+    ctx.globalAlpha = T.glow * k * breathe;
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(x, y, r * 1.9, 0, TAU);
+    ctx.arc(x, y, r * 2.1, 0, TAU);
     ctx.fill();
     ctx.restore();
   }
@@ -531,38 +539,82 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
     ctx.stroke();
     ctx.setLineDash([]);
   } else {
-    ctx.strokeStyle = col;
+    // Lente: cresce do centro até encostar no anel por dentro, com um leve passo além (easeOutBack).
+    if (k > 0) {
+      const rr = (r - lw / 2) * Math.min(1.06, back(k));
+      const g = ctx.createRadialGradient(x, y - rr * 0.25, 0, x, y, rr);
+      g.addColorStop(0, mix(col, '#ffffff', 0.7));
+      g.addColorStop(0.55, mix(col, '#ffffff', 0.15));
+      g.addColorStop(1, col);
+      ctx.globalAlpha = Math.min(1, k * 1.4);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.min(rr, r - lw / 2), 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = k > 0 ? mix(col, '#ffffff', 0.35 * k) : col;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, TAU);
     ctx.stroke();
-    // Cor misturada: anel interno em arcos das cores que a formam (vermelho + verde dentro do amarelo).
-    // Some conforme o alvo enche.
+    // Cor misturada: arcos das cores que a formam; os que já estão chegando acendem. Somem ao encher.
     const comps = COMPONENTS.filter((c) => (need & c) !== 0);
-    if (comps.length > 1 && fill < 1) {
+    if (comps.length > 1 && k < 1) {
       const n = comps.length * 2;
       const gap = 0.35;
-      ctx.lineWidth = CONFIG.piece.stroke * 1.2;
-      ctx.globalAlpha = 1 - fill;
       for (let i = 0; i < n; i++) {
+        const c = comps[i % comps.length]!;
+        const on = (got & c) !== 0;
         const a0 = -Math.PI / 2 + (i * TAU) / n + gap / 2;
-        ctx.strokeStyle = CONFIG.colors[comps[i % comps.length]!];
+        ctx.globalAlpha = (1 - k) * (on ? 1 : 0.4);
+        ctx.lineWidth = CONFIG.piece.stroke * (on ? 1.8 : 1.1);
+        ctx.strokeStyle = CONFIG.colors[c];
         ctx.beginPath();
         ctx.arc(x, y, r * 0.58, a0, a0 + TAU / n - gap);
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
-      ctx.lineWidth = CONFIG.piece.stroke * 1.5;
+      ctx.lineWidth = lw;
+    }
+    // Pontinho no meio (apagado): o "olho" do receptor.
+    if (k < 1) {
+      ctx.globalAlpha = T.coreAlpha * (1 - k);
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.arc(x, y, r * T.core, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // Aceso: anel fino por fora com quatro marcas nas diagonais, surgindo um pouco depois da lente.
+    const o = Math.max(0, (k - 0.35) / 0.65);
+    if (o > 0) {
+      const R = r * (T.outer + 0.12 * (1 - o));
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = 0.55 * o;
+      ctx.beginPath();
+      ctx.arc(x, y, R, 0, TAU);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.8 * o;
+      for (let i = 0; i < 4; i++) {
+        const t = Math.PI / 4 + (i * Math.PI) / 2;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(t) * R, y + Math.sin(t) * R);
+        ctx.lineTo(x + Math.cos(t) * R * 1.14, y + Math.sin(t) * R * 1.14);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = lw;
     }
   }
-  if (got !== 0 && got !== need) {
-    ctx.globalAlpha = wrong ? 0.7 : 0.45;
+  if (wrong) {
+    ctx.globalAlpha = 0.7;
     ctx.fillStyle = CONFIG.colors[got as Color];
     ctx.beginPath();
-    ctx.arc(x + jx, y, r * (wrong ? 0.55 : 0.4), 0, TAU);
+    ctx.arc(x + jx, y, r * 0.55, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
-  }
-  if (wrong) {
     const d = r * 0.32;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = CONFIG.piece.stroke * 1.6;
@@ -572,12 +624,6 @@ function drawTarget(ctx: Ctx, x: number, y: number, r: number, need: Color, got:
     ctx.moveTo(x + jx + d, y - d);
     ctx.lineTo(x + jx - d, y + d);
     ctx.stroke();
-  }
-  if (fill > 0) {
-    ctx.fillStyle = col;
-    ctx.beginPath();
-    ctx.arc(x, y, r * fill * 0.8, 0, TAU);
-    ctx.fill();
   }
   ctx.lineWidth = CONFIG.piece.stroke;
 }
@@ -1133,7 +1179,7 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         drawTarget(ctx, x, y, p.ringRadius * c, cell.color, view.targetReceived(cell.x, cell.y), view.targetFill(cell.x, cell.y), view.time);
         if (cell.charge) {
           // Carga: quatro tracinhos em volta (marca de alvo que precisa de tempo) e um arco que enche.
-          const R = p.ringRadius * c * 1.35;
+          const R = p.ringRadius * c * 1.6;
           const col = CONFIG.colors[cell.color];
           ctx.strokeStyle = col;
           ctx.lineWidth = 1.5;
