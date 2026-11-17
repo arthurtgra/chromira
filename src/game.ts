@@ -115,7 +115,14 @@ export class Game {
     this.pieceCells = pieces(this.level);
     this.anims = this.rots.map((r, i) => {
       const c = this.pieceCells[i]!;
-      const v = c.t === 'filter' ? rotOf(c, r) : rotOf(c, r) === 0 ? -QUARTER / 2 : QUARTER / 2;
+      const v =
+        c.t === 'filter' || c.t === 'bender'
+          ? rotOf(c, r)
+          : c.t === 'combiner'
+            ? rotOf(c, r) * QUARTER
+            : rotOf(c, r) === 0
+              ? -QUARTER / 2
+              : QUARTER / 2;
       return { from: v, to: v, at: -Infinity };
     });
     this.slide = this.rots.map((r, i) => posOf(this.pieceCells[i]!, r));
@@ -246,7 +253,9 @@ export class Game {
       const r = rotOf(cell, s);
       this.rots[j] = s - r + ((r + 1) % baseStates(cell));
       const a = this.anims[j]!;
-      if (cell.t !== 'filter') {
+      if (cell.t === 'bender') {
+        this.anims[j] = { from: a.to, to: this.rots[j]!, at: this.now };
+      } else if (cell.t !== 'filter') {
         this.anims[j] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
       } else {
         this.anims[j] = { from: a.to, to: this.rots[j]!, at: this.now };
@@ -425,6 +434,10 @@ export class Game {
       targetReceived: (x, y) => got[key(x, y)] ?? 0,
       prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
       gateOpen: (id) => this.result.open.includes(id),
+      bender: (i) => {
+        const a = this.anims[i]!;
+        return { from: a.from, to: a.to, k: easeOut(clamp01((this.now - a.at) / CONFIG.filterSwapMs)) };
+      },
       darkHit: (x, y) => this.result.dark.includes(key(x, y)),
       time: this.now / 1000,
     });
@@ -564,7 +577,7 @@ export class Game {
     const E = CONFIG.emitter.body;
     const W = CONFIG.piece.wallSize / 2;
     const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
-      c.t === 'wall' || c.t === 'gate' ? W : c.t === 'emitter' ? E : 0.5,
+      c.t === 'wall' || c.t === 'gate' ? W : c.t === 'emitter' ? E : c.t === 'diode' ? CONFIG.diode.half : 0.5,
     );
     this.hits = segs.flatMap((s, i) =>
       hits[i] ? [{ x: s.x2, y: s.y2, dx: Math.sign(s.x2 - s.x1), dy: Math.sign(s.y2 - s.y1), color: s.color }] : [],

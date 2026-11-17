@@ -27,9 +27,15 @@ export const isPiece = (c: Cell): boolean =>
   c.t === 'filter' ||
   c.t === 'splitter' ||
   c.t === 'dichroic' ||
+  c.t === 'bender' ||
+  c.t === 'combiner' ||
   (c.t === 'prism' && c.rail !== undefined);
 // Estados de rotação (sem contar o trilho).
-export const baseStates = (c: Cell): number => (c.t === 'filter' ? 3 : c.t === 'prism' ? 1 : 2);
+export const baseStates = (c: Cell): number =>
+  c.t === 'filter' ? 3 : c.t === 'prism' ? 1 : c.t === 'combiner' ? 4 : 2;
+export const COMBINER_DIRS: readonly Dir[] = ['N', 'E', 'S', 'W'];
+// Cristal: cada componente vira a seguinte (R→G→B→R).
+export const shiftColor = (c: Color): Color => (((c << 1) | (c >> 2)) & 7) as Color;
 export const railOf = (c: Cell): Rail | undefined => (c.t === 'mirror' || c.t === 'prism' ? c.rail : undefined);
 export const pieceStates = (c: Cell): number => baseStates(c) * (railOf(c)?.len ?? 1);
 export const linkOf = (c: Cell): number | undefined =>
@@ -103,7 +109,11 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
   const segments: Segment[] = [];
   const seen = new Set<string>();
   let beams = 0;
+  // Lentes que fundem: juntam o que chega e só soltam o feixe somado depois que todo o resto andou.
+  const fused = new Map<string, { x: number; y: number; dir: Dir; color: number; d: number }>();
+  const released = new Set<string>();
 
+  for (;;) {
   while (queue.length > 0 && beams < MAX_BEAMS) {
     const b = queue.shift()!;
     const sig = `${b.x},${b.y},${b.dir},${b.color}`;
@@ -185,6 +195,30 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
           sd = dist;
           break;
         }
+        case 'bender':
+          push(x, y);
+          dir = (rots[pieceIdx.get(k)!] ?? 0) === 0 ? LEFT[dir] : RIGHT[dir];
+          break;
+        case 'combiner': {
+          push(x, y);
+          ended = true;
+          const out = COMBINER_DIRS[rots[pieceIdx.get(k)!] ?? 0]!;
+          if (out === OPP[dir]) break; // entrando pela saída: a luz é absorvida
+          const f = fused.get(k) ?? { x, y, dir: out, color: 0, d: 0 };
+          f.color |= color;
+          f.d = Math.max(f.d, dist);
+          fused.set(k, f);
+          break;
+        }
+        case 'shifter':
+          push(x, y);
+          color = shiftColor(color);
+          break;
+        case 'diode':
+          if (dir === c.dir) break;
+          push(x - dx * 0.5, y - dy * 0.5);
+          ended = true;
+          break;
         case 'sensor':
           push(x, y);
           received[k] = (received[k] ?? 0) | color;
@@ -214,6 +248,15 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
       }
     }
     if (!ended) push(x, y);
+  }
+  let more = false;
+  for (const [k, f] of fused) {
+    if (released.has(k)) continue;
+    released.add(k);
+    queue.push({ x: f.x, y: f.y, dir: f.dir, color: f.color as Color, d: f.d });
+    more = true;
+  }
+  if (!more) break;
   }
 
   const targets = level.cells.filter((c) => c.t === 'target');

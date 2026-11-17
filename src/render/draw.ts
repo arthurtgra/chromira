@@ -490,6 +490,7 @@ export interface PieceView {
   targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
   prismAngle: (ci: number) => number; // ci = índice da célula; direção da ponta (radianos, y para baixo)
   gateOpen: (id: number) => boolean;
+  bender: (i: number) => { from: number; to: number; k: number }; // polaridade do ímã (0/1) animando
   darkHit: (x: number, y: number) => boolean; // anti-alvo recebendo luz proibida
   time: number; // segundos
 }
@@ -831,6 +832,125 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.roundRect(x - s / 2, y - s / 2, s, s, s * 0.16);
         ctx.fill();
         ctx.stroke();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'bender': {
+        // Ímã: ferradura com polos vermelho e azul e uma seta curva mostrando para que lado a luz vira.
+        // Trocar a polaridade espelha a ferradura (a seta inverte) com uma transição curta.
+        const B = CONFIG.bender;
+        const st = view.bender(pi++);
+        const flip = st.from + (st.to - st.from) * st.k; // 0 = esquerda, 1 = direita
+        const sx = 1 - 2 * flip;
+        const r = B.radius * c;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(sx === 0 ? 0.001 : sx, 1);
+        ctx.lineCap = 'round';
+        ctx.lineWidth = B.width * c;
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath();
+        ctx.arc(0, 0, r, Math.PI * 0.75, Math.PI * 2.25);
+        ctx.stroke();
+        for (const [ang, col] of [[Math.PI * 0.75, CONFIG.colors[1]], [Math.PI * 2.25, CONFIG.colors[4]]] as const) {
+          ctx.strokeStyle = col;
+          ctx.beginPath();
+          ctx.arc(0, 0, r, ang - 0.12, ang + 0.12);
+          ctx.stroke();
+        }
+        // Seta curva (virando à esquerda no referencial da peça).
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+        const ar = r * 0.45;
+        ctx.beginPath();
+        ctx.arc(0, 0, ar, Math.PI * 0.1, Math.PI * 1.1, true);
+        ctx.stroke();
+        const ex = Math.cos(Math.PI * 1.1) * ar;
+        const ey = Math.sin(Math.PI * 1.1) * ar;
+        ctx.beginPath();
+        ctx.moveTo(ex - ar * 0.35, ey - ar * 0.05);
+        ctx.lineTo(ex, ey);
+        ctx.lineTo(ex + ar * 0.1, ey - ar * 0.4);
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'combiner': {
+        // Lente que funde: anel de vidro com uma seta apontando a saída; gira de 90° em 90°.
+        const a = view.mirrorAngle(pi++) - Math.PI / 2;
+        const r = CONFIG.combiner.radius * c;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(255,255,255,0.28)');
+        g.addColorStop(1, 'rgba(255,255,255,0.05)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a);
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.35, -r * 0.45);
+        ctx.lineTo(r * 0.55, 0);
+        ctx.lineTo(-r * 0.35, r * 0.45);
+        ctx.stroke();
+        ctx.restore();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'shifter': {
+        // Cristal: losango de vidro com três pontinhos R, G, B girando devagar (a cor muda ao passar).
+        const r = CONFIG.shifter.radius * c;
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const t = (k * TAU) / 6 + Math.PI / 6;
+          ctx.lineTo(x + Math.cos(t) * r, y + Math.sin(t) * r);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.stroke();
+        const spin = view.time * CONFIG.shifter.spin;
+        ([1, 2, 4] as const).forEach((col, k) => {
+          const t = spin + (k * TAU) / 3;
+          ctx.fillStyle = CONFIG.colors[col];
+          ctx.beginPath();
+          ctx.arc(x + Math.cos(t) * r * 0.45, y + Math.sin(t) * r * 0.45, r * 0.16, 0, TAU);
+          ctx.fill();
+        });
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'diode': {
+        // Diodo: placa fina atravessada por uma seta no sentido em que a luz pode passar.
+        const [ddx, ddy] = DELTA[cell.dir];
+        const a = Math.atan2(ddy, ddx);
+        const r = CONFIG.diode.size * c;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r);
+        ctx.lineTo(r * 0.4, 0);
+        ctx.lineTo(-r * 0.6, r);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.55, -r);
+        ctx.lineTo(r * 0.55, r);
+        ctx.stroke();
+        ctx.restore();
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.stroke;
         break;

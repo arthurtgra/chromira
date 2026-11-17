@@ -18,7 +18,15 @@ export type Cell =
   | { x: number; y: number; t: 'sensor'; color: Color; gate: number }
   | { x: number; y: number; t: 'gate'; id: number } // parede enquanto o sensor dela está apagado
   // Anti-alvo: luz da cor dele (ou qualquer luz, sem cor) não pode chegar aqui; outras cores atravessam.
-  | { x: number; y: number; t: 'dark'; color?: Color };
+  | { x: number; y: number; t: 'dark'; color?: Color }
+  // Ímã: curva a luz 90° sempre para o mesmo lado, venha de onde vier. Estado: 0 = esquerda, 1 = direita.
+  | { x: number; y: number; t: 'bender' }
+  // Lente que funde: todos os feixes que entram saem juntos (cores somadas) por um lado. Estado: N, E, S, W.
+  | { x: number; y: number; t: 'combiner' }
+  // Cristal: troca a cor da luz que passa (vermelho → verde → azul → vermelho).
+  | { x: number; y: number; t: 'shifter' }
+  // Diodo: deixa a luz passar só no sentido dir; nos outros é parede.
+  | { x: number; y: number; t: 'diode'; dir: Dir };
 
 // Trilho: a peça desliza de célula em célula a partir de (x, y) na direção do eixo, len posições.
 // Estado da peça = rotação + base * posição (base = estados de rotação: espelho 2, prisma 1).

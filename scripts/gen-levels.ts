@@ -199,6 +199,35 @@ const TIERS: Tier[] = [
     epilogue: true,
     options: () => ({ mirrors: 8, beams: 3, prism: true, darks: 3, dichroics: 1, minMoves: 8 }),
   },
+  // 105–108: ímã, lente que funde, cristal e diodo.
+  // Ímã: curva a luz sempre para o mesmo lado (tocar inverte a polaridade); três no lugar de espelhos.
+  {
+    count: 1,
+    seed: 50000,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, benders: 3, filters: 1, decoys: 1, minMoves: 7 }),
+  },
+  // Lente que funde: dois feixes entram, um sai com as cores somadas até o alvo combinado.
+  {
+    count: 1,
+    seed: 50100,
+    epilogue: true,
+    options: () => ({ mirrors: 7, beams: 2, merge: 1, mergeMirrors: 2, combiners: 1, decoys: 1, minMoves: 7 }),
+  },
+  // Cristal: troca a cor no caminho (R→G→B→R), com prisma.
+  {
+    count: 1,
+    seed: 50200,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, prism: true, shifters: 2, decoys: 1, minMoves: 7 }),
+  },
+  // Diodo: passagem de mão única, com divisor e um ímã.
+  {
+    count: 1,
+    seed: 50300,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 3, splitters: 1, diodes: 3, benders: 1, minMoves: 8 }),
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.

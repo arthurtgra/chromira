@@ -1,5 +1,5 @@
 import { MAX_SPACE, countEssential, litCells, searchSpace } from './solver.ts';
-import { DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, placeCells, posOf, reflect, trace } from './trace.ts';
+import { COMBINER_DIRS, DELTA, FILTER_COLORS, LEFT, OPP, RIGHT, isPiece, key, pieceStates, placeCells, posOf, reflect, trace } from './trace.ts';
 import type { Cell, Color, Dir, Level, Rots } from './types.ts';
 import { expand, GRID } from './grid.ts';
 
@@ -24,6 +24,10 @@ export interface GenOptions {
   gates?: number; // feixe extra até um sensor que abre uma porta no caminho de outro feixe
   darks?: number; // anti-alvos: perto do caminho ou nele, com cor que não passa ali
   links?: number; // pares de espelhos ligados (giram juntos)
+  benders?: number; // ímãs no lugar de espelhos (curvam sempre para o mesmo lado)
+  combiners?: number; // alvo combinado vira lente que funde; o alvo vai para depois dela
+  shifters?: number; // cristais no caminho: as cores dos alvos seguem o que chega
+  diodes?: number; // diodos no caminho, no sentido da luz da solução
   merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
   mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
   splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
@@ -56,6 +60,7 @@ interface Draft {
   sol: Rots;
   used: Set<string>;
   path: Set<string>;
+  benders: number;
 }
 
 // Caminha um feixe: espelho em cada curva, prisma opcional, divisor opcional, filtro opcional, alvo no fim.
@@ -169,8 +174,14 @@ function walk(
       const k = int(d.r, 0, left);
       return walk(d, x, y, dir, color, k, -1, false) && walk(d, x, y, next, color, left - k, -1, false);
     }
-    d.cells.push({ x, y, t: 'mirror' });
-    d.sol.push(reflect(dir, 0) === next ? 0 : 1);
+    if (d.benders > 0 && d.r() < 0.5) {
+      d.benders--;
+      d.cells.push({ x, y, t: 'bender' });
+      d.sol.push(next === LEFT[dir] ? 0 : 1);
+    } else {
+      d.cells.push({ x, y, t: 'mirror' });
+      d.sol.push(reflect(dir, 0) === next ? 0 : 1);
+    }
     dir = next;
   }
   return true;
@@ -178,7 +189,8 @@ function walk(
 
 function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   const nBeams = o.beams ?? (o.mirrors >= 9 ? 3 : o.mirrors >= 6 ? 2 : 1);
-  const d: Draft = { r, cells: [], sol: [], used: new Set(), path: new Set() };
+  const d: Draft = { r, cells: [], sol: [], used: new Set(), path: new Set(), benders: o.benders ?? 0 };
+  const merges: { cell: Extract<Cell, { t: 'target' }>; sides: Dir[] }[] = [];
   let left = o.mirrors;
   let filters = o.filters ?? 0;
   let splitters = o.splitters ?? 0;
@@ -197,6 +209,7 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     d.cells.push({ x: tx, y: ty, t: 'target', color });
     d.used.add(key(tx, ty));
     const sides = [...DIRS].sort(() => r() - 0.5);
+    merges.push({ cell: d.cells.at(-1) as Extract<Cell, { t: 'target' }>, sides: sides.slice(0, bits(color).length) });
     for (const [j, comp] of bits(color).entries()) {
       if (!walk(d, tx, ty, sides[j]!, comp, int(r, 1, o.mergeMirrors ?? 2), -1, false, 'emitter')) return null;
     }
@@ -261,6 +274,35 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     d.cells.push({ x, y, t: 'wall' });
   }
 
+  // Lente que funde: o alvo combinado vira lente; os feixes que chegavam nele saem juntos por um lado
+  // livre até o alvo, 1 a 3 células adiante.
+  const explicit = new Map<Cell, number>();
+  for (let i = 0; i < (o.combiners ?? 0); i++) {
+    const m = merges[i];
+    if (!m) return null;
+    const outs = DIRS.filter((dd) => !m.sides.includes(dd)).flatMap((dd) => {
+      const n: number[] = [];
+      for (let s = 1; s <= 3; s++) {
+        const k = key(m.cell.x + DELTA[dd][0] * s, m.cell.y + DELTA[dd][1] * s);
+        if (!inside(m.cell.x + DELTA[dd][0] * s, m.cell.y + DELTA[dd][1] * s) || d.used.has(k) || d.path.has(k)) break;
+        n.push(s);
+      }
+      return n.map((s) => [dd, s] as const);
+    });
+    if (outs.length === 0) return null;
+    const [dd, s] = pick(r, outs);
+    const tx = m.cell.x + DELTA[dd][0] * s;
+    const ty = m.cell.y + DELTA[dd][1] * s;
+    const color = m.cell.color;
+    const lens = m.cell as unknown as Cell;
+    Object.assign(lens, { t: 'combiner' });
+    delete (lens as { color?: Color }).color;
+    explicit.set(lens, COMBINER_DIRS.indexOf(dd));
+    for (let q = 1; q < s; q++) d.path.add(key(m.cell.x + DELTA[dd][0] * q, m.cell.y + DELTA[dd][1] * q));
+    d.cells.push({ x: tx, y: ty, t: 'target', color });
+    d.used.add(key(tx, ty));
+  }
+
   // Trilho: a peça escolhida ganha 3-4 posições livres em linha passando pela posição da solução.
   let slider: { cell: Extract<Cell, { t: 'mirror' | 'prism' }>; pos: number } | null = null;
   if (o.slider) {
@@ -318,11 +360,54 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   const order = d.cells.filter(isPiece);
   let si = 0;
   const sol = order.map((c) => {
+    if (explicit.has(c)) return explicit.get(c)!;
     if (c.t === 'prism') return slider!.pos;
     const v = d.sol[si++]!;
     return c === slider?.cell ? v + 2 * slider.pos : v;
   });
   const states = order.map(pieceStates);
+
+  // Cristais e diodos: em células vazias do caminho da solução. Cristal muda as cores dali em diante, então
+  // cada alvo passa a pedir a cor que chega nele; diodo aponta no sentido em que a luz passa ali.
+  if (o.shifters || o.diodes) {
+    const probe = (): Level => ({ id, w: W, h: H, cells: d.cells, start: sol }) as unknown as Level;
+    const passing = (): Map<string, Dir[]> => {
+      const m = new Map<string, Dir[]>();
+      for (const sg of trace(probe(), sol).segments) {
+        const len = Math.abs(sg.x2 - sg.x1) + Math.abs(sg.y2 - sg.y1);
+        const dir = DIRS.find((dd) => DELTA[dd][0] === Math.sign(sg.x2 - sg.x1) && DELTA[dd][1] === Math.sign(sg.y2 - sg.y1))!;
+        for (let t = 1; t < len; t++) {
+          const k = key(sg.x1 + Math.sign(sg.x2 - sg.x1) * t, sg.y1 + Math.sign(sg.y2 - sg.y1) * t);
+          m.set(k, [...(m.get(k) ?? []), dir]);
+        }
+      }
+      return m;
+    };
+    for (let i = 0; i < (o.shifters ?? 0); i++) {
+      const spots = [...passing()].filter(([k, ds]) => !d.used.has(k) && ds.length === 1);
+      if (spots.length === 0) return null;
+      const [x, y] = pick(r, spots)[0].split(',').map(Number) as [number, number];
+      d.cells.push({ x, y, t: 'shifter' });
+      d.used.add(key(x, y));
+    }
+    if (o.shifters) {
+      const got = trace(probe(), sol).received;
+      for (const c of d.cells) {
+        if (c.t !== 'target') continue;
+        const g = got[key(c.x, c.y)] ?? 0;
+        if (g === 0) return null;
+        c.color = g as Color;
+      }
+    }
+    for (let i = 0; i < (o.diodes ?? 0); i++) {
+      const spots = [...passing()].filter(([k, ds]) => !d.used.has(k) && ds.length === 1);
+      if (spots.length === 0) return null;
+      const [k, ds] = pick(r, spots);
+      const [x, y] = k.split(',').map(Number) as [number, number];
+      d.cells.push({ x, y, t: 'diode', dir: ds[0]! });
+      d.used.add(k);
+    }
+  }
   const sl = slider ? order.indexOf(slider.cell) : -1;
   const real = order.map((c) => !decoys.has(c));
   const minMoves = Math.min(o.minMoves ?? 3, real.filter(Boolean).length);
@@ -390,7 +475,7 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   const ok = level.cells.every((c, i) => {
     const p = placed[i]!;
     if (decoys.has(c)) return !lit.has(key(p.x, p.y));
-    return (c.t !== 'mirror' && c.t !== 'splitter' && c.t !== 'dichroic') || ends.has(key(p.x, p.y));
+    return (c.t !== 'mirror' && c.t !== 'splitter' && c.t !== 'dichroic' && c.t !== 'bender') || ends.has(key(p.x, p.y));
   });
   if (!ok) return null;
   if (searchSpace(level) > MAX_SPACE || countEssential(level, 2) !== 1) return null;
