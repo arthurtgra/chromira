@@ -215,21 +215,33 @@ export const CONFIG = {
       toneVolume: 0.35,
       volume: 0.7,
     },
-    // Luz atravessando o prisma: "vrum" eletromagnético que se abre em três vozes e se dissipa.
+    // Luz atravessando o prisma: impacto no vidro → acorde branco que se abre em três → cascata de cristais.
     prism: {
-      hz: 392, // tom único do começo (luz branca): sol
-      spread: [0.75, 1, 1.5], // as três vozes depois de abrir: ré, sol, ré acima (vermelho, verde, azul)
-      splitMs: 280, // tempo até as três vozes se separarem
-      attackMs: 40,
-      ms: 1300, // duração total (dissipação)
-      sink: 0.96, // tom afunda levemente enquanto some
-      fmRatio: 2.01, // modulador: dá o timbre metálico/elétrico
-      fmIndex: [2.4, 0.08], // índice FM: zumbido no começo → tom puro no fim
-      tremHz: [22, 5], // vibração eletromagnética: rápida → lenta
-      tremDepth: 0.45,
-      pan: 0.55, // vozes se espalham: vermelho à esquerda, azul à direita
-      whoosh: { fromHz: 500, toHz: 3800, endHz: 1800, q: 1.6, volume: 0.6 },
-      volume: 0.55,
+      impact: { fromHz: 150, toHz: 42, ms: 260, volume: 0.9, crackHz: 3200, crackMs: 55, crackVolume: 0.5 },
+      hz: 392, // acorde branco: sol (três vozes juntas)
+      unison: [0.994, 1, 1.006], // desafinação de cada voz: brilho de luz branca
+      spread: [0.5, 1, 2], // depois de abrir: vermelho oitava abaixo, verde, azul oitava acima
+      splitMs: 170, // instante em que a luz se divide
+      glideMs: 110, // tempo das notas se afastando
+      attackMs: 8,
+      ms: 1500,
+      filterHz: [900, 5200, 700], // filtro abre no impacto e fecha ao dissipar
+      filterQ: 2.5,
+      bodyVolume: 0.5,
+      pan: 0.7, // vermelho à esquerda, azul à direita
+      // Cascata: pentatônica de sol subindo, ~35 ms entre pings.
+      cascade: {
+        notes: [783.99, 880, 987.77, 1174.66, 1318.51, 1567.98, 1760, 1975.53, 2349.32],
+        stepMs: 34,
+        decayMs: 420,
+        partials: [
+          [1, 1],
+          [2.76, 0.25],
+        ],
+        volume: 0.16,
+      },
+      whoosh: { fromHz: 600, toHz: 5000, q: 1.4, volume: 0.35 },
+      volume: 0.6,
       minGapMs: 250,
     },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },

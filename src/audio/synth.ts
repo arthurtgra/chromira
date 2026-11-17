@@ -310,11 +310,13 @@ export class Synth {
     osc.stop(t0 + A.downMs / 1000 + 0.02);
   }
 
-  // Luz passando pelo prisma: "vrum" eletromagnético que se abre em três e se dissipa.
-  // Começa como um tom só (luz branca) e em splitMs se separa em três vozes (vermelho mais grave à
-  // esquerda, verde no centro, azul mais agudo à direita). Cada voz é FM: o índice começa alto (zumbido
-  // elétrico, chiado de campo) e cai até virar tom puro, como a luz se desfazendo. Um tremolo rápido que
-  // desacelera dá a vibração eletromagnética, e um sopro de ruído com filtro subindo faz o "vrum".
+  // Luz atravessando o prisma, em três tempos:
+  // 1. Impacto: soco grave (seno caindo) + estalo de vidro (ruído agudo curtíssimo) — a luz bate no vidro.
+  // 2. Divisão: um acorde branco (três vozes em uníssono, levemente desafinadas, filtro abrindo) que em
+  //    splitMs se abre em três notas — vermelho desce e vai para a esquerda, azul sobe e vai para a
+  //    direita, verde fica no meio — e some devagar.
+  // 3. Dispersão: cascata rápida de pings de cristal subindo pelo espectro, da esquerda para a direita,
+  //    como o leque de cores saindo do prisma. Um sopro de ruído subindo costura tudo.
   prism(): void {
     const ctx = this.ready();
     if (!ctx || !this.echo) return;
@@ -322,60 +324,98 @@ export class Synth {
     const t0 = ctx.currentTime;
     const split = t0 + P.splitMs / 1000;
     const end = t0 + P.ms / 1000;
-
     const out = ctx.createGain();
-    out.gain.setValueAtTime(0.0001, t0);
-    out.gain.exponentialRampToValueAtTime(A.volume * P.volume, t0 + P.attackMs / 1000);
-    out.gain.setValueAtTime(A.volume * P.volume, split);
-    out.gain.exponentialRampToValueAtTime(0.0001, end);
+    out.gain.value = A.volume * P.volume;
     out.connect(this.bus!);
     out.connect(this.echo);
+    const stop = (n: AudioScheduledSourceNode, at: number): void => {
+      n.start(t0);
+      n.stop(at + 0.05);
+    };
+    const panned = (x: number): AudioNode => {
+      const pan = ctx.createStereoPanner?.();
+      if (!pan) return out;
+      pan.pan.value = x;
+      pan.connect(out);
+      return pan;
+    };
 
-    // Tremolo: ganho oscila em volta de 1 - depth/2, rápido no começo e mais lento ao dissipar.
-    const trem = ctx.createGain();
-    trem.gain.value = 1 - P.tremDepth / 2;
-    const tremLfo = ctx.createOscillator();
-    tremLfo.frequency.setValueAtTime(P.tremHz[0], t0);
-    tremLfo.frequency.exponentialRampToValueAtTime(P.tremHz[1], end);
-    const tremAmt = ctx.createGain();
-    tremAmt.gain.value = P.tremDepth / 2;
-    tremLfo.connect(tremAmt).connect(trem.gain);
-    tremLfo.start(t0);
-    tremLfo.stop(end + 0.05);
-    trem.connect(out);
+    // 1. Impacto.
+    const I = P.impact;
+    const thump = ctx.createOscillator();
+    thump.frequency.setValueAtTime(I.fromHz, t0);
+    thump.frequency.exponentialRampToValueAtTime(I.toHz, t0 + I.ms / 1000);
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(I.volume, t0);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t0 + I.ms / 1000);
+    thump.connect(tg).connect(out);
+    stop(thump, t0 + I.ms / 1000);
+    const crack = ctx.createBufferSource();
+    crack.buffer = this.whooshNoise(ctx);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = I.crackHz;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(I.crackVolume, t0);
+    cg.gain.exponentialRampToValueAtTime(0.0001, t0 + I.crackMs / 1000);
+    crack.connect(hp).connect(cg).connect(out);
+    stop(crack, t0 + I.crackMs / 1000);
 
+    // 2. Divisão.
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = P.filterQ;
+    lp.frequency.setValueAtTime(P.filterHz[0], t0);
+    lp.frequency.exponentialRampToValueAtTime(P.filterHz[1], split);
+    lp.frequency.exponentialRampToValueAtTime(P.filterHz[2], end);
+    const body = ctx.createGain();
+    body.gain.setValueAtTime(0.0001, t0);
+    body.gain.exponentialRampToValueAtTime(P.bodyVolume, t0 + P.attackMs / 1000);
+    body.gain.setValueAtTime(P.bodyVolume, split);
+    body.gain.exponentialRampToValueAtTime(0.0001, end);
+    lp.connect(body);
     P.spread.forEach((ratio, k) => {
-      const f1 = P.hz * ratio;
-      const car = ctx.createOscillator();
-      car.type = 'sine';
-      car.frequency.setValueAtTime(P.hz, t0);
-      car.frequency.exponentialRampToValueAtTime(f1, split);
-      car.frequency.exponentialRampToValueAtTime(f1 * P.sink, end);
-      const mod = ctx.createOscillator();
-      mod.type = 'sine';
-      mod.frequency.setValueAtTime(P.hz * P.fmRatio, t0);
-      mod.frequency.exponentialRampToValueAtTime(f1 * P.fmRatio, split);
-      mod.frequency.exponentialRampToValueAtTime(f1 * P.fmRatio * P.sink, end);
-      const idx = ctx.createGain();
-      idx.gain.setValueAtTime(P.fmIndex[0] * P.hz, t0);
-      idx.gain.exponentialRampToValueAtTime(P.fmIndex[1] * f1, end);
-      mod.connect(idx).connect(car.frequency);
-
+      const x = (k - (P.spread.length - 1) / 2) * P.pan;
+      const pan = ctx.createStereoPanner?.();
       const g = ctx.createGain();
       g.gain.value = 1 / P.spread.length;
-      const pan = ctx.createStereoPanner?.();
+      for (const det of P.unison) {
+        const o = ctx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(P.hz * det, t0);
+        o.frequency.setValueAtTime(P.hz * det, split - P.glideMs / 1000);
+        o.frequency.exponentialRampToValueAtTime(P.hz * ratio * det, split);
+        o.connect(g);
+        stop(o, end);
+      }
       if (pan) {
         pan.pan.setValueAtTime(0, t0);
-        pan.pan.linearRampToValueAtTime((k - (P.spread.length - 1) / 2) * P.pan, split);
-        car.connect(g).connect(pan).connect(trem);
-      } else car.connect(g).connect(trem);
-      for (const o of [car, mod]) {
-        o.start(t0);
-        o.stop(end + 0.05);
+        pan.pan.setValueAtTime(0, split - P.glideMs / 1000);
+        pan.pan.linearRampToValueAtTime(x, split);
+        g.connect(pan).connect(lp);
+      } else g.connect(lp);
+    });
+    body.connect(out);
+
+    // 3. Dispersão: pings de cristal (seno + parcial inarmônico) em cascata.
+    const C = P.cascade;
+    C.notes.forEach((hz, i) => {
+      const t = split + (i * C.stepMs) / 1000;
+      const x = (i / (C.notes.length - 1) - 0.5) * 2 * P.pan;
+      const dest = panned(x);
+      for (const [ratio, vol] of C.partials) {
+        const o = ctx.createOscillator();
+        o.frequency.value = hz * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(C.volume * vol, t + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + C.decayMs / 1000);
+        o.connect(g).connect(dest);
+        stop(o, t + C.decayMs / 1000);
       }
     });
 
-    // Sopro: ruído com passa-banda subindo (o "vrum") e sumindo junto com a luz.
     const W = P.whoosh;
     const noise = ctx.createBufferSource();
     noise.buffer = this.whooshNoise(ctx);
@@ -383,15 +423,13 @@ export class Synth {
     bp.type = 'bandpass';
     bp.Q.value = W.q;
     bp.frequency.setValueAtTime(W.fromHz, t0);
-    bp.frequency.exponentialRampToValueAtTime(W.toHz, split);
-    bp.frequency.exponentialRampToValueAtTime(W.endHz, end);
+    bp.frequency.exponentialRampToValueAtTime(W.toHz, end);
     const ng = ctx.createGain();
     ng.gain.setValueAtTime(0.0001, t0);
     ng.gain.exponentialRampToValueAtTime(W.volume, split);
     ng.gain.exponentialRampToValueAtTime(0.0001, end);
     noise.connect(bp).connect(ng).connect(out);
-    noise.start(t0);
-    noise.stop(end + 0.05);
+    stop(noise, end);
   }
 
   // Trocar a cor do filtro: roda de filtros de lente girando até o próximo encaixe. Dois cliques
