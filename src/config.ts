@@ -25,9 +25,9 @@ export const CONFIG = {
 
   colors: {
     1: '#ff3358',
-    2: '#29f58a',
+    2: '#4cf542', // verde puxado para o lima: separa bem do azul
     3: '#ffe23d', // amarelo limão: lê amarelo, não laranja
-    4: '#3f74ff', // azul vivo (sem puxar para o ciano)
+    4: '#3a5cff', // azul profundo (longe do ciano e do verde)
     5: '#e95cf0', // rosa puxado para o azul
     6: '#33e6ff',
     7: '#f4f6ff',
@@ -99,7 +99,7 @@ export const CONFIG = {
       pairWidth: 1.4, // largura das ondas componentes numa mistura de duas cores
       // Cores das ondas: vermelho, verde e azul puros. Somadas dão exatamente a mistura (amarelo, ciano, rosa,
       // branco); com as cores do jogo, que têm um pouco das outras, a soma clareava até o branco.
-      pure: { 1: '#ff2b3a', 2: '#22ff5e', 4: '#2f6bff' } as Record<1 | 2 | 4, string>,
+      pure: { 1: '#ff2b3a', 2: '#33ff2b', 4: '#2b4fff' } as Record<1 | 2 | 4, string>,
       pairAlpha: 1,
       // Ajustes por mistura (vazio = todas iguais).
       comp: {} as Partial<Record<Color, Partial<Record<1 | 2 | 4, { color: string; width?: number; alpha?: number }>>>>,
@@ -124,7 +124,7 @@ export const CONFIG = {
       // Azul também mais forte: o olho vê pouco o azul puro, então a aura e a onda azuis ganham opacidade
       // e o miolo do feixe azul (na cor do jogo, que puxa para o branco) fica mais fraco, para não desbotar.
       blueGlow: 1.9,
-      blueLine: 1.25,
+      blueLine: 1.1,
     },
     winWidthMul: 1, // vitória não engorda o feixe inteiro: quem engorda é o pulso que caminha
     winGrowMs: 300,
