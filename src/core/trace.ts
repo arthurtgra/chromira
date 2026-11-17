@@ -32,6 +32,8 @@ export const isPiece = (c: Cell): boolean =>
 export const baseStates = (c: Cell): number => (c.t === 'filter' ? 3 : c.t === 'prism' ? 1 : 2);
 export const railOf = (c: Cell): Rail | undefined => (c.t === 'mirror' || c.t === 'prism' ? c.rail : undefined);
 export const pieceStates = (c: Cell): number => baseStates(c) * (railOf(c)?.len ?? 1);
+export const linkOf = (c: Cell): number | undefined =>
+  c.t === 'mirror' || c.t === 'splitter' || c.t === 'dichroic' ? c.link : undefined;
 export const rotOf = (c: Cell, state: number): number => state % baseStates(c);
 export const posOf = (c: Cell, state: number): number => Math.floor(state / baseStates(c));
 
@@ -68,8 +70,23 @@ interface Beam {
   d: number; // distância percorrida desde o lançador até (x, y)
 }
 
+// Sensores abrem portas, portas abertas deixam a luz chegar a outros sensores: repete até estabilizar.
+// Abrir uma porta só acrescenta luz, então o conjunto de portas abertas só cresce e termina.
 export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): TraceResult {
+  const sensors = level.cells.filter((c): c is Extract<Cell, { t: 'sensor' }> => c.t === 'sensor');
+  let open = new Set<number>();
+  for (;;) {
+    const r = traceOnce(level, rots, maxSteps, open);
+    const next = new Set(sensors.filter((s) => ((r.received[key(s.x, s.y)] ?? 0) & s.color) === s.color).map((s) => s.gate));
+    if (next.size === open.size) return r;
+    open = next;
+  }
+}
+
+function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>): TraceResult {
   const grid = new Map<string, Cell>();
+  const portals = new Map<number, Cell[]>();
+  const dark: string[] = [];
   const pieceIdx = new Map<string, number>();
   const received: Record<string, number> = {};
   const queue: Beam[] = [];
@@ -78,7 +95,8 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
     const k = key(c.x, c.y);
     grid.set(k, c);
     if (isPiece(c)) pieceIdx.set(k, pi++);
-    else if (c.t === 'target') received[k] = 0;
+    else if (c.t === 'target' || c.t === 'sensor') received[k] = 0;
+    else if (c.t === 'portal') portals.set(c.pair, [...(portals.get(c.pair) ?? []), c]);
     else if (c.t === 'emitter') queue.push({ x: c.x, y: c.y, dir: c.dir, color: c.color, d: 0 });
   }
 
@@ -155,6 +173,34 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
           received[k] = (received[k] ?? 0) | color;
           ended = true;
           break;
+        case 'portal': {
+          // Sai pelo outro portal do par, mesma direção, mesma distância (a luz não anda no salto).
+          const q = portals.get(c.pair)!.find((p) => p !== c);
+          if (!q) break;
+          push(x, y);
+          x = q.x;
+          y = q.y;
+          sx = x;
+          sy = y;
+          sd = dist;
+          break;
+        }
+        case 'sensor':
+          push(x, y);
+          received[k] = (received[k] ?? 0) | color;
+          ended = true;
+          break;
+        case 'dark':
+          if (c.color !== undefined && (color & c.color) === 0) break;
+          push(x, y);
+          dark.push(k);
+          ended = true;
+          break;
+        case 'gate':
+          if (open.has(c.id)) break;
+          push(x - dx * 0.5, y - dy * 0.5);
+          ended = true;
+          break;
         case 'prism':
           push(x, y);
           if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1, d: dist });
@@ -172,6 +218,8 @@ export function trace(level: Level, rots: Rots, maxSteps: number = MAX_STEPS): T
 
   const targets = level.cells.filter((c) => c.t === 'target');
   const solved =
-    targets.length > 0 && targets.every((t) => t.t === 'target' && received[key(t.x, t.y)] === t.color);
-  return { segments, received, solved };
+    targets.length > 0 &&
+    dark.length === 0 &&
+    targets.every((t) => t.t === 'target' && received[key(t.x, t.y)] === t.color);
+  return { segments, received, solved, open: [...open], dark };
 }

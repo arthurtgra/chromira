@@ -3,14 +3,22 @@ export type Color = 1 | 2 | 3 | 4 | 5 | 6 | 7; // bitmask R=1 G=2 B=4
 
 export type Cell =
   | { x: number; y: number; t: 'emitter'; dir: Dir; color: Color }
-  | { x: number; y: number; t: 'mirror'; rail?: Rail } // estado fica em rots
+  // link: peças com o mesmo número giram juntas (um toque gira todas).
+  | { x: number; y: number; t: 'mirror'; rail?: Rail; link?: number } // estado fica em rots
   | { x: number; y: number; t: 'filter' } // estado fica em rots
-  | { x: number; y: number; t: 'splitter' } // vidro semi-espelhado: reflete e deixa passar; estado em rots
+  | { x: number; y: number; t: 'splitter'; link?: number } // vidro semi-espelhado: reflete e deixa passar; estado em rots
   // Espelho dicroico: reflete só a sua cor (componente R, G ou B) e deixa o resto atravessar; estado em rots.
-  | { x: number; y: number; t: 'dichroic'; color: 1 | 2 | 4 }
+  | { x: number; y: number; t: 'dichroic'; color: 1 | 2 | 4; link?: number }
   | { x: number; y: number; t: 'wall' }
   | { x: number; y: number; t: 'target'; color: Color }
-  | { x: number; y: number; t: 'prism'; rail?: Rail };
+  | { x: number; y: number; t: 'prism'; rail?: Rail }
+  // Portal: a luz que entra sai pelo outro portal do mesmo par, na mesma direção.
+  | { x: number; y: number; t: 'portal'; pair: number }
+  // Sensor: acende quando recebe a sua cor e abre as portas (gate) de mesmo número; absorve a luz.
+  | { x: number; y: number; t: 'sensor'; color: Color; gate: number }
+  | { x: number; y: number; t: 'gate'; id: number } // parede enquanto o sensor dela está apagado
+  // Anti-alvo: luz da cor dele (ou qualquer luz, sem cor) não pode chegar aqui; outras cores atravessam.
+  | { x: number; y: number; t: 'dark'; color?: Color };
 
 // Trilho: a peça desliza de célula em célula a partir de (x, y) na direção do eixo, len posições.
 // Estado da peça = rotação + base * posição (base = estados de rotação: espelho 2, prisma 1).
@@ -45,6 +53,8 @@ export interface Segment {
 
 export interface TraceResult {
   segments: Segment[];
-  received: Record<string, number>; // "x,y" do alvo -> OR das cores recebidas
+  received: Record<string, number>; // "x,y" do alvo/sensor -> OR das cores recebidas
   solved: boolean;
+  open: number[]; // portas abertas (sensores acesos)
+  dark: string[]; // "x,y" dos anti-alvos atingidos
 }

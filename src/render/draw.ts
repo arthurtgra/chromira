@@ -489,6 +489,8 @@ export interface PieceView {
   targetFill: (x: number, y: number) => number; // 0..1
   targetReceived: (x: number, y: number) => number; // OR das cores chegando agora
   prismAngle: (ci: number) => number; // ci = índice da célula; direção da ponta (radianos, y para baixo)
+  gateOpen: (id: number) => boolean;
+  darkHit: (x: number, y: number) => boolean; // anti-alvo recebendo luz proibida
   time: number; // segundos
 }
 
@@ -626,6 +628,36 @@ export function mix(a: string, b: string, k: number): string {
 
 // Trilho da peça arrastável: cápsula contornada cobrindo as células por onde ela desliza, com um pontinho
 // em cada parada. Desenhado por cima dos feixes (senão some quando a luz passa ao longo dele) e por baixo da peça.
+// Peças ligadas (giram juntas): fio pontilhado fino entre elas e um pontinho no centro de cada uma.
+export function drawLinks(ctx: Ctx, l: Layout, cells: Cell[]): void {
+  const K = CONFIG.link;
+  const groups = new Map<number, Cell[]>();
+  for (const c of cells) {
+    const id = c.t === 'mirror' || c.t === 'splitter' || c.t === 'dichroic' ? c.link : undefined;
+    if (id !== undefined) groups.set(id, [...(groups.get(id) ?? []), c]);
+  }
+  ctx.save();
+  for (const [id, g] of groups) {
+    const col = K.colors[id % K.colors.length]!;
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = K.alpha;
+    ctx.lineWidth = K.width;
+    ctx.setLineDash(K.dash);
+    ctx.beginPath();
+    g.forEach((c, i) => (i === 0 ? ctx.moveTo(cx(l, c.x), cy(l, c.y)) : ctx.lineTo(cx(l, c.x), cy(l, c.y))));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = col;
+    for (const c of g) {
+      ctx.beginPath();
+      ctx.arc(cx(l, c.x), cy(l, c.y), K.dotR * l.cell, 0, TAU);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 export function drawRails(ctx: Ctx, l: Layout, cells: Cell[]): void {
   const R = CONFIG.rail;
   ctx.save();
@@ -799,6 +831,116 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         ctx.roundRect(x - s / 2, y - s / 2, s, s, s * 0.16);
         ctx.fill();
         ctx.stroke();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'portal': {
+        // Portal: anel duplo na cor do par, miolo escuro (a luz some aqui e reaparece no outro).
+        const col = CONFIG.portal.colors[cell.pair % CONFIG.portal.colors.length]!;
+        const r = CONFIG.portal.radius * c;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, 'rgba(5,5,10,0.95)');
+        g.addColorStop(0.7, 'rgba(5,5,10,0.85)');
+        g.addColorStop(1, col);
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.55, 0, TAU);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'sensor': {
+        // Sensor: losango na sua cor; aceso, preenche e brilha (abre as portas de mesmo número).
+        const col = CONFIG.colors[cell.color];
+        const r = CONFIG.sensor.size * c;
+        const on = (view.targetReceived(cell.x, cell.y) & cell.color) === cell.color;
+        ctx.beginPath();
+        ctx.moveTo(x, y - r);
+        ctx.lineTo(x + r, y);
+        ctx.lineTo(x, y + r);
+        ctx.lineTo(x - r, y);
+        ctx.closePath();
+        if (on) {
+          ctx.shadowColor = col;
+          ctx.shadowBlur = 14;
+          ctx.fillStyle = col;
+          ctx.globalAlpha = 0.85;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.globalAlpha = 1;
+        }
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'gate': {
+        // Porta: bloco com grade de barras na cor do sensor dela; aberta, só o contorno tracejado.
+        const sensor = cells.find((q) => q.t === 'sensor' && q.gate === cell.id);
+        const col = sensor?.t === 'sensor' ? CONFIG.colors[sensor.color] : '#ffffff';
+        const s = p.wallSize * c;
+        const open = view.gateOpen(cell.id);
+        ctx.beginPath();
+        ctx.roundRect(x - s / 2, y - s / 2, s, s, s * 0.16);
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.5;
+        if (open) {
+          ctx.globalAlpha = 0.35;
+          ctx.setLineDash([4, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          ctx.fillStyle = CONFIG.emitter.fill;
+          ctx.fill();
+          ctx.globalAlpha = 0.9;
+          ctx.stroke();
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          for (let k = 1; k <= 3; k++) {
+            const bx = x - s / 2 + (s * k) / 4;
+            ctx.moveTo(bx, y - s * 0.32);
+            ctx.lineTo(bx, y + s * 0.32);
+          }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.stroke;
+        break;
+      }
+      case 'dark': {
+        // Anti-alvo: buraco escuro com anel tracejado na cor proibida (branco = qualquer luz) e um traço
+        // cortando. Atingido: o anel pisca forte, a fase não fecha enquanto a luz chegar aqui.
+        const col = cell.color === undefined ? '#ffffff' : CONFIG.colors[cell.color];
+        const r = p.ringRadius * c;
+        const hit = view.darkHit(cell.x, cell.y);
+        ctx.fillStyle = 'rgba(3,3,6,0.92)';
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, TAU);
+        ctx.fill();
+        ctx.strokeStyle = col;
+        ctx.lineWidth = hit ? 2.5 : 1.5;
+        ctx.globalAlpha = hit ? 0.6 + 0.4 * Math.sin(view.time * 20) : 0.75;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x - r * 0.55, y + r * 0.55);
+        ctx.lineTo(x + r * 0.55, y - r * 0.55);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
         ctx.strokeStyle = p.color;
         ctx.lineWidth = p.stroke;
         break;

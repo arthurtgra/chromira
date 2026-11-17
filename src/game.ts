@@ -1,6 +1,6 @@
 import { Synth } from './audio/synth.ts';
 import { CONFIG } from './config.ts';
-import { baseStates, isPiece, key, pieces, placeCells, posOf, railOf, rotOf, startRots, trace } from './core/trace.ts';
+import { baseStates, isPiece, key, linkOf, pieces, placeCells, posOf, railOf, rotOf, startRots, trace } from './core/trace.ts';
 import type { Cell, Color, Level, Rots, Segment, TraceResult } from './core/types.ts';
 import { cellAt } from './input.ts';
 import { arrived, cut, extendToObstacles, planBeams, reachedEnd, segLen, visibleSegments, type BeamPiece, type BeamPlan } from './render/beams.ts';
@@ -12,6 +12,7 @@ import {
   drawImpacts,
   drawPrismGlow,
   drawRails,
+  drawLinks,
   drawWinWave,
   mix,
   type BeamStyle,
@@ -237,18 +238,23 @@ export class Game {
   }
 
   private rotate(i: number): void {
-    const cell = this.pieceCells[i]!;
-    const s = this.rots[i]!;
-    const r = rotOf(cell, s);
-    this.rots[i] = s - r + ((r + 1) % baseStates(cell));
-    const a = this.anims[i]!;
-    if (cell.t !== 'filter') {
-      this.anims[i] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
-      this.synth.turn();
-    } else {
-      this.anims[i] = { from: a.to, to: this.rots[i]!, at: this.now };
-      this.synth.filter(rotOf(cell, this.rots[i]!));
+    const link = linkOf(this.pieceCells[i]!);
+    const group = link === undefined ? [i] : this.pieceCells.flatMap((c, j) => (linkOf(c) === link ? [j] : []));
+    for (const j of group) {
+      const cell = this.pieceCells[j]!;
+      const s = this.rots[j]!;
+      const r = rotOf(cell, s);
+      this.rots[j] = s - r + ((r + 1) % baseStates(cell));
+      const a = this.anims[j]!;
+      if (cell.t !== 'filter') {
+        this.anims[j] = { from: this.animValue(a, CONFIG.mirrorSpinMs), to: a.to + QUARTER, at: this.now };
+      } else {
+        this.anims[j] = { from: a.to, to: this.rots[j]!, at: this.now };
+      }
     }
+    const cell = this.pieceCells[i]!;
+    if (cell.t !== 'filter') this.synth.turn();
+    else this.synth.filter(rotOf(cell, this.rots[i]!));
     navigator.vibrate?.(CONFIG.vibrateMs);
     this.retrace();
   }
@@ -277,10 +283,12 @@ export class Game {
     this.beamV = speed / 1000;
     const done: BeamPiece[] = [];
     for (const p of plan.pieces) {
+      const from = (q: BeamPiece): boolean => Math.abs(q.d0 + q.len - p.d0) < 1e-9;
       const prev =
         p.known > 0 || p.d0 === 0
           ? undefined
-          : done.find((q) => q.x2 === p.x1 && q.y2 === p.y1 && Math.abs(q.d0 + q.len - p.d0) < 1e-9);
+          : (done.find((q) => q.x2 === p.x1 && q.y2 === p.y1 && from(q)) ??
+            done.find((q) => from(q) && this.portalPair(q.x2, q.y2) === key(p.x1, p.y1)));
       p.at = prev ? prev.at + (prev.len - prev.known) / this.beamV : this.now;
       done.push(p);
     }
@@ -403,6 +411,7 @@ export class Game {
     drawBeams(ctx, l, this.plan, front, fading, style);
     const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
     drawRails(ctx, l, this.level.cells);
+    drawLinks(ctx, l, this.drawnCells());
     drawPieces(ctx, l, this.drawnCells(), {
       mirrorAngle: (i) => this.animValue(this.anims[i]!, CONFIG.mirrorSpinMs),
       filterColor: (i) => {
@@ -415,6 +424,8 @@ export class Game {
       },
       targetReceived: (x, y) => got[key(x, y)] ?? 0,
       prismAngle: (ci) => this.prismAngle.get(ci)?.cur ?? -QUARTER,
+      gateOpen: (id) => this.result.open.includes(id),
+      darkHit: (x, y) => this.result.dark.includes(key(x, y)),
       time: this.now / 1000,
     });
     drawImpacts(ctx, l, this.hits, this.plan, this.fronts(CONFIG.beam.sparks.lead), style); // clarão junto com as faíscas
@@ -541,11 +552,19 @@ export class Game {
     });
   }
 
+  // Outro portal do par do portal em (x, y), como "x,y".
+  private portalPair(x: number, y: number): string | undefined {
+    const c = this.level.cells.find((q) => q.t === 'portal' && q.x === x && q.y === y);
+    if (c?.t !== 'portal') return undefined;
+    const q = this.level.cells.find((o) => o !== c && o.t === 'portal' && o.pair === c.pair);
+    return q && key(q.x, q.y);
+  }
+
   private beamSegments(): Segment[] {
     const E = CONFIG.emitter.body;
     const W = CONFIG.piece.wallSize / 2;
     const { segs, hits } = extendToObstacles(this.result.segments, this.level.cells, (c) =>
-      c.t === 'wall' ? W : c.t === 'emitter' ? E : 0.5,
+      c.t === 'wall' || c.t === 'gate' ? W : c.t === 'emitter' ? E : 0.5,
     );
     this.hits = segs.flatMap((s, i) =>
       hits[i] ? [{ x: s.x2, y: s.y2, dx: Math.sign(s.x2 - s.x1), dy: Math.sign(s.y2 - s.y1), color: s.color }] : [],

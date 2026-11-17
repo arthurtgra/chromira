@@ -20,8 +20,16 @@ function checkTrail(level: Level, rots: Rots): void {
       expect(emitters.has(`${s.x1},${s.y1}`)).toBe(true);
       continue;
     }
+    // Portal: o trecho que sai continua o que entrou no outro portal do par.
+    const pair = (x: number, y: number): string | undefined => {
+      const c = level.cells.find((q) => q.t === 'portal' && q.x === x && q.y === y);
+      const q = c?.t === 'portal' ? level.cells.find((o) => o !== c && o.t === 'portal' && o.pair === c.pair) : undefined;
+      return q && `${q.x},${q.y}`;
+    };
     const prev = segments.some(
-      (p: Segment) => p.x2 === s.x1 && p.y2 === s.y1 && Math.abs(p.d0! + segLen(p) - s.d0!) < 1e-9,
+      (p: Segment) =>
+        ((p.x2 === s.x1 && p.y2 === s.y1) || pair(p.x2, p.y2) === `${s.x1},${s.y1}`) &&
+        Math.abs(p.d0! + segLen(p) - s.d0!) < 1e-9,
     );
     expect(prev, `trecho de ${s.x1},${s.y1} (d0 ${s.d0}) sem origem`).toBe(true);
   }

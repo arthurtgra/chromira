@@ -20,6 +20,10 @@ export interface GenOptions {
   prism?: boolean; // o primeiro feixe é branco e passa por um prisma
   prisms?: number; // quantos feixes (os primeiros) são brancos e passam por um prisma; substitui prism
   decoys?: number; // peças distratoras: fora da luz na solução, perto do caminho, só para confundir
+  portals?: number; // feixes que atravessam um par de portais (no lugar de uma curva)
+  gates?: number; // feixe extra até um sensor que abre uma porta no caminho de outro feixe
+  darks?: number; // anti-alvos: perto do caminho ou nele, com cor que não passa ali
+  links?: number; // pares de espelhos ligados (giram juntos)
   merge?: number; // alvos de cor combinada, cada um alimentado por um lançador por componente
   mergeMirrors?: number; // máximo de espelhos no caminho de cada componente até o alvo combinado
   splitters?: number; // feixes que passam por um divisor e se ramificam em dois alvos
@@ -69,6 +73,8 @@ function walk(
   end: 'target' | 'emitter' = 'target',
   splitAt = -1,
   dichroic = false,
+  portalAt = -1,
+  sensorGate = -1, // >= 0: o feixe termina num sensor que abre a porta desse número
 ): boolean {
   const fresh: string[] = [];
   for (let m = 0; m <= mirrors; m++) {
@@ -91,6 +97,27 @@ function walk(
     y += dy * run;
     d.used.add(key(x, y));
 
+    if (m === portalAt && m < mirrors) {
+      // Portal no lugar desta curva: a luz salta para o outro portal, numa célula livre, e segue reto.
+      const [ddx, ddy] = DELTA[dir];
+      const free: [number, number][] = [];
+      for (let by = 0; by < H; by++) {
+        for (let bx = 0; bx < W; bx++) {
+          const k = key(bx, by);
+          if (d.used.has(k) || d.path.has(k) || !inside(bx + ddx, by + ddy) || d.used.has(key(bx + ddx, by + ddy))) continue;
+          if (Math.abs(bx - x) + Math.abs(by - y) < 3) continue;
+          free.push([bx, by]);
+        }
+      }
+      if (free.length === 0) return false;
+      const [bx, by] = pick(d.r, free);
+      const pair = d.cells.filter((c) => c.t === 'portal').length / 2;
+      d.cells.push({ x, y, t: 'portal', pair }, { x: bx, y: by, t: 'portal', pair });
+      d.used.add(key(bx, by));
+      x = bx;
+      y = by;
+      continue;
+    }
     if (m === prismAt) {
       d.cells.push({ x, y, t: 'prism' });
       const comps = bits(color);
@@ -117,7 +144,8 @@ function walk(
         d.sol.push(FILTER_COLORS.indexOf(target));
         d.used.add(key(fx, fy));
       }
-      d.cells.push({ x, y, t: 'target', color: target });
+      if (sensorGate >= 0) d.cells.push({ x, y, t: 'sensor', color: target, gate: sensorGate });
+      else d.cells.push({ x, y, t: 'target', color: target });
       return true;
     }
     const next = d.r() < 0.5 ? LEFT[dir] : RIGHT[dir];
@@ -155,6 +183,7 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
   let filters = o.filters ?? 0;
   let splitters = o.splitters ?? 0;
   let dichroics = o.dichroics ?? 0;
+  let portals = o.portals ?? 0;
 
   // Alvos combinados primeiro: cada componente sai do alvo por um lado diferente até seu lançador.
   for (let i = 0; i < (o.merge ?? 0); i++) {
@@ -195,9 +224,33 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     if (split && !dich) splitters--;
     const splitAt = split ? int(r, 0, Math.min(2, k - 2)) : -1;
     const cell = d.cells.at(-1) as Extract<Cell, { t: 'emitter' }>;
-    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter, 'target', splitAt, dich)) return null;
+    const portal = !prism && portals > 0 && k >= 2;
+    if (portal) portals--;
+    const portalAt = portal ? int(r, 0, k - 1) : -1;
+    if (!walk(d, x, y, cell.dir, color, k, prismAt, filter, 'target', splitAt, dich, portalAt)) return null;
   }
-  if (filters > 0 || splitters > 0 || dichroics > 0) return null;
+  if (filters > 0 || splitters > 0 || dichroics > 0 || portals > 0) return null;
+
+  // Sensor e porta: um feixe extra acende um sensor; a porta dele fica num trecho reto de outro feixe.
+  for (let g = 0; g < (o.gates ?? 0); g++) {
+    const before = new Set(d.path);
+    let x: number;
+    let y: number;
+    do {
+      x = int(r, 0, W - 1);
+      y = int(r, 0, H - 1);
+    } while (d.used.has(key(x, y)) || d.path.has(key(x, y)));
+    const color = pick(r, [1, 2, 4, 3, 5, 6] as Color[]);
+    const dir = pick(r, DIRS);
+    d.cells.push({ x, y, t: 'emitter', dir, color });
+    d.used.add(key(x, y));
+    if (!walk(d, x, y, dir, color, int(r, 1, 3), -1, false, 'target', -1, false, -1, g)) return null;
+    const spots = [...before].filter((k) => !d.used.has(k));
+    if (spots.length === 0) return null;
+    const [gx, gy] = pick(r, spots).split(',').map(Number) as [number, number];
+    d.cells.push({ x: gx, y: gy, t: 'gate', id: g });
+    d.used.add(key(gx, gy));
+  }
 
   const walls = int(r, 1, 4);
   for (let i = 0; i < walls * 4 && d.cells.filter((c) => c.t === 'wall').length < walls; i++) {
@@ -280,6 +333,54 @@ function tryBuild(r: Rng, id: number, o: GenOptions): Level | null {
     start.filter((v, i) => real[i] && v !== sol[i]).length < minMoves ||
     (slider !== null && posOf(slider.cell, start[sl]!) === slider.pos)
   );
+
+  // Espelhos ligados (pares): começam ambos certos ou ambos errados, senão a solução seria inalcançável.
+  const free = order.flatMap((c, i) => (c.t === 'mirror' && !c.rail && real[i] ? [i] : []));
+  for (let g = 0; g < (o.links ?? 0); g++) {
+    if (free.length < 2) return null;
+    const a = free.splice(int(r, 0, free.length - 1), 1)[0]!;
+    const b = free.splice(int(r, 0, free.length - 1), 1)[0]!;
+    const off = g === 0 ? 1 : int(r, 0, 1);
+    for (const i of [a, b]) {
+      (order[i] as Extract<Cell, { t: 'mirror' }>).link = g;
+      start[i] = (sol[i]! + off) % 2;
+    }
+  }
+
+  // Anti-alvos: metade numa célula vazia do caminho com uma cor que não passa ali, metade ao lado do caminho.
+  if (o.darks) {
+    const probe = { id, w: W, h: H, cells: d.cells, start } as unknown as Level;
+    const passing = new Map<string, number>();
+    for (const sg of trace(probe, sol).segments) {
+      const len = Math.abs(sg.x2 - sg.x1) + Math.abs(sg.y2 - sg.y1);
+      for (let t = 1; t < len; t++) {
+        const k = key(sg.x1 + Math.sign(sg.x2 - sg.x1) * t, sg.y1 + Math.sign(sg.y2 - sg.y1) * t);
+        passing.set(k, (passing.get(k) ?? 0) | sg.color);
+      }
+    }
+    for (let i = 0; i < o.darks; i++) {
+      const onPath = [...passing].filter(([k, c]) => !d.used.has(k) && c !== 7);
+      if (i % 2 === 0 && onPath.length > 0) {
+        const [k, c] = pick(r, onPath);
+        const [x, y] = k.split(',').map(Number) as [number, number];
+        d.cells.push({ x, y, t: 'dark', color: pick(r, bits(7 & ~c)) });
+        d.used.add(k);
+      } else {
+        const near: [number, number][] = [];
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const k = key(x, y);
+            if (d.used.has(k) || passing.has(k)) continue;
+            if (DIRS.some((dd) => passing.has(key(x + DELTA[dd][0], y + DELTA[dd][1])))) near.push([x, y]);
+          }
+        }
+        if (near.length === 0) return null;
+        const [x, y] = pick(r, near);
+        d.cells.push({ x, y, t: 'dark' });
+        d.used.add(key(x, y));
+      }
+    }
+  }
 
   const level: Level = { id, w: GRID.w, h: GRID.h, cells: d.cells, start };
   if (!trace(level, sol).solved || trace(level, start).solved) return null;

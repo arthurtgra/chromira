@@ -1,30 +1,67 @@
-import { isPiece, key, pieceStates, pieces, placeCells, trace } from './trace.ts';
+import { isPiece, key, linkOf, pieceStates, pieces, placeCells, startRots, trace } from './trace.ts';
 import type { Level, Rots } from './types.ts';
 
 export const MAX_SPACE = 1 << 16;
 
+// Variáveis da busca: cada peça sozinha, ou um grupo de peças ligadas (giram juntas: o grupo só tem
+// "quantos toques a partir do início").
+interface Var {
+  members: number[];
+  radix: number;
+}
+
+function variables(level: Level): Var[] {
+  const vars: Var[] = [];
+  const groups = new Map<number, Var>();
+  pieces(level).forEach((c, i) => {
+    const l = linkOf(c);
+    const g = l === undefined ? undefined : groups.get(l);
+    if (g) g.members.push(i);
+    else {
+      const v = { members: [i], radix: pieceStates(c) };
+      vars.push(v);
+      if (l !== undefined) groups.set(l, v);
+    }
+  });
+  return vars;
+}
+
 export function searchSpace(level: Level): number {
-  return pieces(level).reduce((a, c) => a * pieceStates(c), 1);
+  return variables(level).reduce((a, v) => a * v.radix, 1);
+}
+
+// Percorre todos os estados alcançáveis; fn devolve true para parar.
+function forEachState(level: Level, fn: (rots: Rots) => boolean): void {
+  const vars = variables(level);
+  const space = searchSpace(level);
+  if (space > MAX_SPACE) throw new Error(`solver: ${space} combinações é demais para força bruta`);
+  const start = startRots(level);
+  const states = pieces(level).map(pieceStates);
+  const val = vars.map(() => 0);
+  const rots: Rots = start.map(() => 0);
+  for (let n = 0; n < space; n++) {
+    for (const [vi, v] of vars.entries()) {
+      for (const m of v.members) rots[m] = v.members.length > 1 ? (start[m]! + val[vi]!) % states[m]! : val[vi]!;
+    }
+    if (fn(rots)) return;
+    for (let i = 0; i < val.length; i++) {
+      val[i]! += 1;
+      if (val[i]! < vars[i]!.radix) break;
+      val[i] = 0;
+    }
+  }
 }
 
 export function countSolutions(level: Level, limit: number = Infinity): { count: number; first: Rots | null } {
-  const radix = pieces(level).map(pieceStates);
-  const space = searchSpace(level);
-  if (space > MAX_SPACE) throw new Error(`solver: ${space} combinações é demais para força bruta`);
   let count = 0;
   let first: Rots | null = null;
-  const rots: Rots = radix.map(() => 0);
-  for (let n = 0; n < space && count < limit; n++) {
+  forEachState(level, (rots) => {
     if (trace(level, rots).solved) {
       count++;
       first ??= [...rots];
     }
-    for (let i = 0; i < rots.length; i++) {
-      rots[i]! += 1;
-      if (rots[i]! < radix[i]!) break;
-      rots[i] = 0;
-    }
-  }
+    return count >= limit;
+  });
   return { count, first };
 }
 
@@ -54,18 +91,10 @@ export function essentialKey(level: Level, rots: Rots): string {
 // Soluções diferentes de verdade: duas que só mudam peças distratoras (fora da luz) contam como uma.
 export function countEssential(level: Level, limit: number = Infinity): number {
   const keys = new Set<string>();
-  const radix = pieces(level).map(pieceStates);
-  const space = searchSpace(level);
-  if (space > MAX_SPACE) throw new Error(`solver: ${space} combinações é demais para força bruta`);
-  const rots: Rots = radix.map(() => 0);
-  for (let n = 0; n < space && keys.size < limit; n++) {
+  forEachState(level, (rots) => {
     if (trace(level, rots).solved) keys.add(essentialKey(level, rots));
-    for (let i = 0; i < rots.length; i++) {
-      rots[i]! += 1;
-      if (rots[i]! < radix[i]!) break;
-      rots[i] = 0;
-    }
-  }
+    return keys.size >= limit;
+  });
   return keys.size;
 }
 
@@ -80,7 +109,16 @@ export function difficultyScore(level: Level): number {
   const start = level.start ?? sol.map(() => 0);
   // Só conta peças acesas na solução: girar uma distratora não é um toque necessário.
   const need = essentialKey(level, sol).split(',');
-  const moves = start.filter((v, i) => need[i] !== '*' && v !== sol[i]).length;
+  // Grupo ligado conta um toque só (todas giram juntas).
+  const seen = new Set<number>();
+  const moves = pieces(level).filter((c, i) => {
+    if (need[i] === '*' || start[i] === sol[i]) return false;
+    const l = linkOf(c);
+    if (l === undefined) return true;
+    if (seen.has(l)) return false;
+    seen.add(l);
+    return true;
+  }).length;
   const count = (t: string): number => level.cells.filter((c) => c.t === t).length;
   return moves + 0.6 * Math.log2(searchSpace(level)) + 0.5 * count('target') + 1.2 * count('filter') + count('prism') + 1.3 * count('splitter') + 1.3 * count('dichroic');
 }

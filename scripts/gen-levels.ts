@@ -8,6 +8,7 @@ interface Tier {
   count: number; // fases novas geradas (as mantidas de kept.json entram a mais)
   seed: number; // seed própria: mexer numa faixa não muda as outras
   finale?: boolean; // fica no fim do jogo, fora da ordenação global
+  epilogue?: boolean; // depois do final, uma fase por faixa, na ordem das faixas (mecânicas novas)
   options: (k: number) => GenOptions; // k = 0..1 dentro da faixa
 }
 
@@ -169,6 +170,35 @@ const TIERS: Tier[] = [
       };
     },
   },
+  // 101–104: mecânicas novas, uma por fase, cada uma com peças já conhecidas.
+  // Espelhos ligados: dois pares giram juntos (fio pontilhado), com alvo combinado.
+  {
+    count: 1,
+    seed: 40000,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, merge: 1, mergeMirrors: 2, links: 2, decoys: 1, minMoves: 7 }),
+  },
+  // Portais: dois feixes atravessam um par de portais cada; um passa por filtro.
+  {
+    count: 1,
+    seed: 40100,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 2, portals: 2, filters: 1, decoys: 1, minMoves: 7 }),
+  },
+  // Sensor e porta: um feixe acende o sensor que abre a porta no caminho do feixe que passa pelo prisma.
+  {
+    count: 1,
+    seed: 40200,
+    epilogue: true,
+    options: () => ({ mirrors: 7, beams: 2, gates: 1, prism: true, decoys: 1, minMoves: 7 }),
+  },
+  // Anti-alvos: zonas onde certa cor (ou qualquer luz) não pode chegar, com prisma e dicroico.
+  {
+    count: 1,
+    seed: 40300,
+    epilogue: true,
+    options: () => ({ mirrors: 8, beams: 3, prism: true, darks: 3, dichroics: 1, minMoves: 8 }),
+  },
 ];
 
 // Pontuação → 1..5 marcadores no topo da tela.
@@ -204,7 +234,7 @@ const tiers: Scored[][] = TIERS.map((tier, t) => {
 
 // Ordem: dificuldade estritamente crescente (nota do solver). Cada mecânica aparece pela primeira vez na
 // sua fase mais fácil, onde ela cai na curva; empates seguem a ordem das faixas.
-const all = tiers.filter((_, t) => !TIERS[t]!.finale).flat().sort((a, b) => a.score - b.score || a.tier - b.tier);
+const all = tiers.filter((_, t) => !TIERS[t]!.finale && !TIERS[t]!.epilogue).flat().sort((a, b) => a.score - b.score || a.tier - b.tier);
 const seenTier = new Set<number>();
 for (const x of all) {
   levels.push(x.level);
@@ -218,6 +248,14 @@ for (const [t, batch] of tiers.entries()) {
   for (const x of batch) {
     levels.push(x.level);
     process.stdout.write(`fase ${levels.length}: final nota ${x.score.toFixed(1)}
+`);
+  }
+}
+for (const [t, batch] of tiers.entries()) {
+  if (!TIERS[t]!.epilogue) continue;
+  for (const x of batch) {
+    levels.push(x.level);
+    process.stdout.write(`fase ${levels.length}: nova mecânica nota ${x.score.toFixed(1)}
 `);
   }
 }

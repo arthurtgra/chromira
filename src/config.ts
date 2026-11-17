@@ -33,6 +33,10 @@ export const CONFIG = {
     7: '#f4f6ff',
   } satisfies Record<Color, string>,
 
+  // Peças ligadas (giram juntas): fio pontilhado e pontinho, uma cor por grupo.
+  link: { colors: ['#ffd36b', '#9be7ff', '#ff9bd2'], alpha: 0.75, width: 1.5, dash: [2, 4], dotR: 0.065 },
+  portal: { colors: ['#b48cff', '#ffb347', '#6bffd8'], radius: 0.3 },
+  sensor: { size: 0.24 },
   piece: { stroke: 2, color: '#ffffff', mirrorLen: 0.78, splitterGap: 0.045, wallSize: 0.8, ringRadius: 0.3, prismSize: 0.36, filterRadius: 0.3 },
   // Espelho: placa fina de vidro transparente, mesmo estilo de degradê do prisma (frações da célula).
   mirror: {
