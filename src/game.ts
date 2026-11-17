@@ -379,7 +379,8 @@ export class Game {
     for (const c of placeCells(this.level, this.rots)) {
       if (c.t !== 'prism') continue;
       const k = key(c.x, c.y);
-      if (atCenter[k] === undefined) {
+      // Só luz branca chegando no prisma faz som (luz colorida passa em silêncio).
+      if (atCenter[k] !== 7) {
         this.prismHit.delete(k);
       } else if (!this.prismHit.has(k)) {
         this.prismHit.add(k);
