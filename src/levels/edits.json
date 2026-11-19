@@ -222,10 +222,14 @@
     "w": 7,
     "h": 9,
     "start": [
+      0,
+      1,
+      1,
       1,
       0,
       0,
-      0,
+      1,
+      1,
       0
     ],
     "cells": [
@@ -233,7 +237,7 @@
         "x": 1,
         "y": 8,
         "t": "emitter",
-        "dir": "N",
+        "dir": "E",
         "color": 7
       },
       {
@@ -242,54 +246,55 @@
         "t": "mirror"
       },
       {
-        "x": 4,
+        "x": 3,
+        "y": 8,
+        "t": "mirror"
+      },
+      {
+        "x": 3,
         "y": 6,
         "t": "prism"
       },
       {
-        "x": 4,
-        "y": 3,
-        "t": "mirror"
-      },
-      {
-        "x": 1,
-        "y": 3,
-        "t": "target",
-        "color": 1
-      },
-      {
         "x": 5,
         "y": 6,
         "t": "mirror"
       },
       {
+        "x": 1,
+        "y": 4,
+        "t": "mirror"
+      },
+      {
         "x": 5,
-        "y": 8,
-        "t": "target",
-        "color": 2
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 2,
+        "y": 3,
+        "t": "mirror"
       },
       {
         "x": 4,
-        "y": 7,
+        "y": 4,
         "t": "mirror"
       },
       {
         "x": 2,
         "y": 1,
-        "t": "emitter",
-        "dir": "E",
-        "color": 1
+        "t": "mirror"
       },
       {
-        "x": 6,
+        "x": 4,
         "y": 1,
         "t": "mirror"
       },
       {
-        "x": 6,
-        "y": 7,
+        "x": 3,
+        "y": 1,
         "t": "target",
-        "color": 5
+        "color": 7
       }
     ],
     "difficulty": 3
