@@ -669,6 +669,76 @@
     ],
     "difficulty": 2
   },
+  "15": {
+    "id": 15,
+    "w": 7,
+    "h": 9,
+    "cells": [
+      {
+        "x": 5,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 7
+      },
+      {
+        "x": 5,
+        "y": 6,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 5,
+        "y": 5,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 5,
+        "y": 4,
+        "t": "dichroic",
+        "color": 4
+      },
+      {
+        "x": 3,
+        "y": 6,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 3,
+        "y": 5,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 3,
+        "y": 4,
+        "t": "dichroic",
+        "color": 4
+      },
+      {
+        "x": 3,
+        "y": 2,
+        "t": "prism"
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "t": "target",
+        "color": 7
+      }
+    ],
+    "start": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "difficulty": 2
+  },
   "28": {
     "id": 28,
     "w": 7,
