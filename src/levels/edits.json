@@ -304,7 +304,9 @@
     "w": 7,
     "h": 9,
     "start": [
-      2
+      1,
+      2,
+      0
     ],
     "cells": [
       {
@@ -323,49 +325,85 @@
         "x": 5,
         "y": 4,
         "t": "target",
-        "color": 2
+        "color": 4
       },
       {
         "x": 1,
-        "y": 1,
+        "y": 0,
         "t": "emitter",
         "dir": "E",
         "color": 3
       },
       {
         "x": 1,
-        "y": 2,
+        "y": 1,
         "t": "emitter",
         "dir": "E",
         "color": 5
       },
       {
         "x": 1,
-        "y": 3,
+        "y": 2,
         "t": "emitter",
         "dir": "E",
         "color": 6
       },
       {
         "x": 1,
-        "y": 5,
+        "y": 6,
         "t": "emitter",
         "dir": "E",
         "color": 1
       },
       {
         "x": 1,
-        "y": 6,
+        "y": 7,
         "t": "emitter",
         "dir": "E",
         "color": 2
       },
       {
         "x": 1,
-        "y": 7,
+        "y": 8,
         "t": "emitter",
         "dir": "E",
         "color": 4
+      },
+      {
+        "x": 1,
+        "y": 3,
+        "t": "emitter",
+        "dir": "E",
+        "color": 7
+      },
+      {
+        "x": 1,
+        "y": 5,
+        "t": "emitter",
+        "dir": "E",
+        "color": 7
+      },
+      {
+        "x": 5,
+        "y": 5,
+        "t": "target",
+        "color": 1
+      },
+      {
+        "x": 5,
+        "y": 3,
+        "t": "target",
+        "color": 2
+      },
+      {
+        "x": 3,
+        "y": 5,
+        "t": "filter"
+      },
+      {
+        "x": 3,
+        "y": 3,
+        "t": "filter"
       }
     ],
     "difficulty": 1
