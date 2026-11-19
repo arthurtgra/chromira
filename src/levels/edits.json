@@ -408,6 +408,79 @@
     ],
     "difficulty": 1
   },
+  "10": {
+    "id": 10,
+    "w": 7,
+    "h": 9,
+    "start": [
+      2,
+      0,
+      1,
+      0,
+      0
+    ],
+    "cells": [
+      {
+        "x": 3,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 7
+      },
+      {
+        "x": 3,
+        "y": 6,
+        "t": "filter"
+      },
+      {
+        "x": 3,
+        "y": 1,
+        "t": "target",
+        "color": 2
+      },
+      {
+        "x": 6,
+        "y": 5,
+        "t": "emitter",
+        "dir": "W",
+        "color": 7
+      },
+      {
+        "x": 4,
+        "y": 5,
+        "t": "filter"
+      },
+      {
+        "x": 1,
+        "y": 5,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 2,
+        "t": "target",
+        "color": 6
+      },
+      {
+        "x": 1,
+        "y": 6,
+        "t": "emitter",
+        "dir": "E",
+        "color": 7
+      },
+      {
+        "x": 1,
+        "y": 2,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 6,
+        "t": "mirror"
+      }
+    ],
+    "difficulty": 2
+  },
   "11": {
     "id": 11,
     "w": 7,
