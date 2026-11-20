@@ -131,8 +131,8 @@ for (const ev of ['pointerup', 'touchend', 'click', 'keydown'] as const) {
 
 let last = performance.now();
 function frame(t: number): void {
-  // Parado (luz assentada, sem toque recente): desenha a 30 quadros por segundo em vez de 60/120.
-  if (!game.busy() && t - last < 1000 / CONFIG.idleFps) {
+  // No máximo 60 quadros por segundo (a folga de 2 ms absorve a variação do intervalo numa tela de 60 Hz).
+  if (t - last < 1000 / CONFIG.maxFps - 2) {
     requestAnimationFrame(frame);
     return;
   }

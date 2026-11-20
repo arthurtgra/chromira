@@ -65,7 +65,6 @@ export class Game {
   private prismAngle = new Map<number, { cur: number; to: number }>(); // por índice em level.cells; // ponta do prisma virada para a luz que chega
   private wonAt: number | null = null;
   private autoAt = 0; // último giro dos espelhos automáticos
-  private inputAt = -Infinity; // último toque
   private waves: WaveOrigin[] = [];
   private replayAt = Infinity; // quando o pulso de vitória começa a caminhar
   private pulseAt = Infinity;
@@ -212,21 +211,7 @@ export class Game {
 
   // Toque/arrasto. Peça sem trilho gira no toque (na hora). Peça em trilho: arrastar desliza de célula em
   // célula (nunca fica entre duas) e a luz acompanha; toque sem arrastar gira (espelho).
-  // Algo mudando agora (luz crescendo/recolhendo, toque recente, vitória, editor): quadros cheios.
-  busy(): boolean {
-    return (
-      this.growing() ||
-      this.fades.length > 0 ||
-      this.drag !== null ||
-      this.wonAt !== null ||
-      this.editing ||
-      this.now - this.inputAt < CONFIG.busyMs ||
-      this.now - this.loadedAt < CONFIG.busyMs
-    );
-  }
-
   press(px: number, py: number): void {
-    this.inputAt = this.now;
     this.synth.unlock();
     if (this.wonAt !== null || this.editing) return;
     const c = cellAt(this.layout, px, py, this.level.w, this.level.h);

@@ -190,10 +190,10 @@ function buildRuns(plan: BeamPlan, front: Front, fading: FadingBeam[]): Run[] {
   return runs;
 }
 
-function strokeRun(ctx: Ctx, l: Layout, r: Run): void {
-  ctx.beginPath();
+function runPath(l: Layout, r: Run): Path2D {
+  const ctx = new Path2D();
   r.pts.forEach(([x, y], i) => (i === 0 ? ctx.moveTo(cx(l, x), cy(l, y)) : ctx.lineTo(cx(l, x), cy(l, y))));
-  ctx.stroke();
+  return ctx;
 }
 
 // Engorda das ondas em volta do pulso de vitória (gaussiana estreita).
@@ -233,7 +233,21 @@ function drawPulseHeads(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle): void {
   }
 }
 
-function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1, lenMul = 1, speedMul = 1): void {
+// Curvas das ondas do quadro atual: a aura (camada de brilho) e a linha usam a mesma curva.
+const waveMemo = new Map<Run, Map<string, Path2D>>();
+
+function wavePath(l: Layout, r: Run, phase: number, st: BeamStyle, ampMul = 1, lenMul = 1, speedMul = 1): Path2D {
+  const k = `${phase},${ampMul},${lenMul},${speedMul}`;
+  let m = waveMemo.get(r);
+  if (!m) waveMemo.set(r, (m = new Map()));
+  const hit = m.get(k);
+  if (hit) return hit;
+  const made = buildWave(l, r, phase, st, ampMul, lenMul, speedMul);
+  m.set(k, made);
+  return made;
+}
+
+function buildWave(l: Layout, r: Run, phase: number, st: BeamStyle, ampMul: number, lenMul: number, speedMul: number): Path2D {
   const W = CONFIG.beam.waves;
   const amp = W.amp * ampMul * l.cell * st.widthMul;
   const k = TAU / (W.length * lenMul);
@@ -256,7 +270,8 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
     segs.push({ x: x1, y: y1, ux, uy, len, s, sign });
     s += len;
   }
-  if (segs.length === 0) return;
+  const path = new Path2D();
+  if (segs.length === 0) return path;
   const total = s - r.d0;
   const offAt = (d: number): number => {
     const a = d - r.d0;
@@ -272,11 +287,10 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
   const face = (CONFIG.mirror.thick * l.cell) / 2; // px do centro da placa até a face
   // Até onde, em volta do vértice, a onda pode cruzar a face (amplitude + recuo da face a 45°).
   const ext = (amp * CONFIG.winPulse.swell) / l.cell + CONFIG.mirror.thick * Math.SQRT1_2 + W.step;
-  ctx.beginPath();
   let started = false;
   const put = ([px, py]: [number, number]): void => {
-    if (started) ctx.lineTo(px, py);
-    else ctx.moveTo(px, py);
+    if (started) path.lineTo(px, py);
+    else path.moveTo(px, py);
     started = true;
   };
   for (let i = 0; i < segs.length; i++) {
@@ -313,7 +327,7 @@ function strokeWave(ctx: Ctx, l: Layout, r: Run, phase: number, st: BeamStyle, a
       }
     }
   }
-  ctx.stroke();
+  return path;
 }
 
 export interface BeamStyle {
@@ -337,12 +351,67 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: Front, fad
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   const runs = buildRuns(plan, front, fading);
+  waveMemo.clear();
   // Trechos sendo recolhidos: mesmo visual, mais fracos (cada um com a sua transparência).
   for (const r of runs) if (r.alpha < 1) drawRuns(ctx, l, [r], st, r.alpha);
   const lit = runs.filter((r) => r.alpha >= 1);
-  drawRuns(ctx, l, lit, st, 1);
+  // Névoa e miolos não se mexem (só as ondas andam): com a luz parada, ficam guardados numa imagem e são
+  // copiados a cada quadro, em vez de redesenhar todos os traços.
+  const key = `${l.w}x${l.h}@${ctx.getTransform().a}:${l.cell}:` + lit.map((r) => `${r.color}:${r.pts.join(';')}`).join('|');
+  if (key === stillKey) {
+    if (stillImg?.key !== key) stillImg = { key, img: paintStill(ctx, l, lit, st) };
+    ctx.globalAlpha = 1;
+    ctx.drawImage(stillImg.img, 0, 0, l.w, l.h);
+  } else drawRuns(ctx, l, lit, st, 1, 'still');
+  stillKey = key;
+  // Auras das ondas: largas e suaves, desenhadas numa camada com metade da resolução e ampliadas
+  // (o olho não vê diferença num brilho borrado; são a maior parte dos pixels pintados a cada quadro).
+  const g = glowLayer(ctx, l);
+  drawRuns(g, l, lit, st, 1, 'glow');
+  ctx.globalAlpha = 1;
+  ctx.drawImage(g.canvas, 0, 0, l.w, l.h);
+  drawRuns(ctx, l, lit, st, 1, 'lines');
   drawPulseHeads(ctx, l, lit, st);
   ctx.restore();
+}
+
+let glowCtx: CanvasRenderingContext2D | null = null;
+
+function glowLayer(ctx: Ctx, l: Layout): CanvasRenderingContext2D {
+  const scale = (ctx.getTransform().a || 1) * CONFIG.beam.glowScale;
+  glowCtx ??= document.createElement('canvas').getContext('2d')!;
+  const c = glowCtx;
+  const w = Math.max(1, Math.round(l.w * scale));
+  const h = Math.max(1, Math.round(l.h * scale));
+  if (c.canvas.width !== w || c.canvas.height !== h) {
+    c.canvas.width = w;
+    c.canvas.height = h;
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, w, h);
+  c.setTransform(w / l.w, 0, 0, h / l.h, 0, 0);
+  c.globalCompositeOperation = 'lighter';
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  return c;
+}
+
+let stillKey = '';
+let stillImg: { key: string; img: HTMLCanvasElement } | null = null;
+
+function paintStill(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle): HTMLCanvasElement {
+  const dpr = ctx.getTransform().a || 1;
+  const img = stillImg?.img ?? document.createElement('canvas');
+  img.width = Math.round(l.w * dpr);
+  img.height = Math.round(l.h * dpr);
+  const c = img.getContext('2d')!;
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, l.w, l.h);
+  c.globalCompositeOperation = 'lighter';
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  drawRuns(c, l, runs, st, 1, 'still');
+  return img;
 }
 
 // Névoa e miolo na cor do feixe, miolo de mistura, e as ondas (uma por componente R/G/B, fases a 120°;
@@ -359,13 +428,18 @@ function soft(ctx: Ctx, width: number, alpha: number, draw: () => void): void {
   }
 }
 
-function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number): void {
+// still = névoa e miolos (parados); glow = auras largas das ondas; lines = as ondas em si.
+type Part2 = 'all' | 'still' | 'glow' | 'lines';
+
+function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: number, part: Part2 = 'all'): void {
   const B = CONFIG.beam;
   const W = B.waves;
   const cell = l.cell * B.thickness; // espessura geral do feixe (todas as linhas)
   // Feixe branco (as três cores juntas) um pouco mais grosso que os outros: ondas mais largas e abertas.
   const thick = (r: Run): number => (r.color === 7 ? B.white.width : 1);
   const spread = (r: Run): number => (r.color === 7 ? B.white.amp : 1);
+  if (part === 'all' || part === 'still') {
+  const paths = new Map(runs.map((r) => [r, runPath(l, r)]));
   B.layers.forEach((layer, li) => {
     for (const r of runs) {
       // Núcleo: branco tem o seu (fecha os espaços entre as três ondas); misturas de 2 cores, um fraco.
@@ -374,7 +448,8 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       const L = core && r.color === 7 ? B.white.core : core && pair ? B.pairCore : layer;
       ctx.strokeStyle = CONFIG.colors[r.color];
       const f = W.fill[r.color] ?? 1;
-      soft(ctx, L.width * (L === layer ? thick(r) : 1) * cell, L.alpha * f * alphaMul, () => strokeRun(ctx, l, r));
+      const path = paths.get(r)!;
+      soft(ctx, L.width * (L === layer ? thick(r) : 1) * cell, L.alpha * f * alphaMul, () => ctx.stroke(path));
     }
   });
   for (const r of runs) {
@@ -382,9 +457,12 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
     ctx.strokeStyle = CONFIG.colors[r.color];
     const mx = W.mix[r.color];
     for (const m of mx ? [mx.glow, mx.core] : [W.mixGlow, W.mixCore]) {
-      soft(ctx, m.width * cell, m.alpha * (W.fill[r.color] ?? 1) * alphaMul, () => strokeRun(ctx, l, r));
+      const path = paths.get(r)!;
+      soft(ctx, m.width * cell, m.alpha * (W.fill[r.color] ?? 1) * alphaMul, () => ctx.stroke(path));
     }
   }
+  }
+  if (part === 'still') return;
   for (const r of runs) {
     const comps = COMPONENTS.filter((c) => (r.color & c) !== 0);
     const tw = thick(r);
@@ -406,21 +484,21 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
           });
     // Deriva: uma só onda larga por feixe, na cor combinada (1 cor: nenhuma; branco: a mais grossa).
     const drift = W.driftByColors[comps.length] ?? 0;
-    if (drift > 0) {
+    if (drift > 0 && part !== 'lines') {
       ctx.strokeStyle = CONFIG.colors[r.color];
-      soft(ctx, W.driftWidth * drift * cell, W.driftAlpha * (W.fill[r.color] ?? 1) * alphaMul, () =>
-        strokeWave(ctx, l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed),
-      );
+      const path = wavePath(l, r, 0, st, W.driftAmp * ta, W.driftLength, W.driftSpeed);
+      soft(ctx, W.driftWidth * drift * cell, W.driftAlpha * (W.fill[r.color] ?? 1) * alphaMul, () => ctx.stroke(path));
     }
     for (const w of waves) {
       const bw = w.blue ? W.blueBoost : 1;
       ctx.strokeStyle = w.color;
-      soft(ctx, W.glowWidth * tw * bw * cell, W.glowAlpha * (w.blue ? W.blueGlow : 1) * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
+      const path = wavePath(l, r, w.ph, st, ta);
+      if (part !== 'lines') soft(ctx, W.glowWidth * tw * bw * cell, W.glowAlpha * (w.blue ? W.blueGlow : 1) * alphaMul, () => ctx.stroke(path));
       // A própria onda também em degradê (mais larga, centro forte, borda sumindo): brilho, não tubo contornado.
-      soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * (w.blue ? W.blueLine : 1) * alphaMul, () => strokeWave(ctx, l, r, w.ph, st, ta));
+      if (part !== 'glow') soft(ctx, W.width * w.width * tw * bw * cell * W.lineSoft, w.alpha * (w.blue ? W.blueLine : 1) * alphaMul, () => ctx.stroke(path));
     }
   }
-  if (st.rainbow > 0 && CONFIG.rainbow.beamWaves) {
+  if (st.rainbow > 0 && CONFIG.rainbow.beamWaves && part !== 'glow') {
     const R = CONFIG.rainbow;
     ctx.lineWidth = Math.max(1, W.width * 0.7 * B.white.width * cell);
     ctx.globalAlpha = R.alpha * st.rainbow * alphaMul;
@@ -429,7 +507,7 @@ function drawRuns(ctx: Ctx, l: Layout, runs: Run[], st: BeamStyle, alphaMul: num
       if (r.color !== 7) continue;
       R.hues.forEach((h, i) => {
         ctx.strokeStyle = `hsl(${h}, 100%, 62%)`;
-        strokeWave(ctx, l, r, ((i + 0.5) * TAU) / R.hues.length, st, ampMul);
+        ctx.stroke(wavePath(l, r, ((i + 0.5) * TAU) / R.hues.length, st, ampMul));
       });
     }
   }
