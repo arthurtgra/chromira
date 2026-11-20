@@ -655,8 +655,8 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       drawGlow(ctx, l, x, y, R * (P.appearScale + (1 - P.appearScale) * f), glow, k * f, st);
     }
     const fc = appear(`${id}:core:${all}`, st.time);
-    // Prisma completo (abrindo ou juntando as cores): o centro fica limpo, desenhado por cima das ondas.
-    if (full) prismCenters.push({ x, y, f: appear(`${id}:center`, st.time) });
+    // Prisma completo (abrindo ou juntando as cores): o vidro fica mais claro, como luz lá dentro.
+    if (full) prismLit.set(id, appear(`${id}:lit`, st.time));
 
     // Miolo fraco na cor que entra.
     ctx.save();
@@ -673,30 +673,12 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
   }
   // Brilho que sumiu volta a aparecer do zero da próxima vez.
   for (const key of glowSince.keys()) if (!glowSeen.has(key)) glowSince.delete(key);
+  for (const key of prismLit.keys()) if (!glowSeen.has(`${key}:lit`)) prismLit.delete(key);
   glowSeen.clear();
 }
 
-// Centro claro dos prismas completos: um disco suave por cima das ondas (as ondas somem no meio).
-let prismCenters: { x: number; y: number; f: number }[] = [];
-
-export function drawPrismCenters(ctx: Ctx, l: Layout): void {
-  const C = CONFIG.rainbow.prism.center;
-  ctx.save();
-  for (const { x, y, f } of prismCenters) {
-    const r = C.radius * l.cell;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, `rgba(${C.rgb},${C.alpha})`);
-    g.addColorStop(0.45, `rgba(${C.rgb},${C.alpha * 0.7})`);
-    g.addColorStop(1, `rgba(${C.rgb},0)`);
-    ctx.globalAlpha = f;
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
-  }
-  ctx.restore();
-  prismCenters = [];
-}
+// Quanto cada prisma está aceso (0..1, com a mesma animação do brilho): o vidro clareia.
+const prismLit = new Map<string, number>();
 
 const glowSince = new Map<string, number>(); // quando cada brilho de prisma começou (segundos do jogo)
 const glowSeen = new Set<string>();
@@ -1522,12 +1504,19 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         const oy = y + Math.sin(t2) * s;
         const glass = ctx.createLinearGradient((tipX + ex) / 2, (tipY + ey) / 2, ox, oy);
         // Sempre claro até o vértice oposto (sem trecho escuro, que sumia no fundo e parecia faltar a ponta).
-        glass.addColorStop(0, 'rgba(255,255,255,0.5)');
-        glass.addColorStop(0.3, 'rgba(255,255,255,0.16)');
-        glass.addColorStop(0.5, 'rgba(255,255,255,0.32)');
-        glass.addColorStop(0.7, 'rgba(255,255,255,0.14)');
-        glass.addColorStop(1, 'rgba(255,255,255,0.22)');
+        // Aceso (luz se abrindo ou se juntando lá dentro): o mesmo degradê, mais claro.
+        const lit = prismLit.get(`${cell.x},${cell.y}`) ?? 0;
+        const gain = 1 + (CONFIG.prismLit.gain - 1) * lit;
+        for (const [at, al] of [[0, 0.5], [0.3, 0.16], [0.5, 0.32], [0.7, 0.14], [1, 0.22]] as const)
+          glass.addColorStop(at, `rgba(255,255,255,${Math.min(1, al * gain)})`);
+        // Fundo sólido: as ondas não aparecem dentro do prisma.
         tri(s);
+        ctx.fillStyle = CONFIG.mirror.base;
+        ctx.fill();
+        if (lit > 0) {
+          ctx.fillStyle = `rgba(255,255,255,${CONFIG.prismLit.lift * lit})`;
+          ctx.fill();
+        }
         ctx.fillStyle = glass;
         ctx.fill();
         tri(s);

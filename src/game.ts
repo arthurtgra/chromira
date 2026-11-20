@@ -11,7 +11,6 @@ import {
   drawPieces,
   drawImpacts,
   drawPrismGlow,
-  drawPrismCenters,
   drawRails,
   drawLinks,
   drawFibers,
@@ -457,7 +456,6 @@ export class Game {
     });
     drawPrismGlow(ctx, l, placeCells(this.level, this.rots), visibleSegments(this.plan, front), style);
     drawBeams(ctx, l, this.plan, front, fading, style);
-    drawPrismCenters(ctx, l);
     const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
     drawRails(ctx, l, this.level.cells);
     drawLinks(ctx, l, this.drawnCells());
