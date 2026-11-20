@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.ts';
-import { DELTA, FILTER_COLORS } from '../core/trace.ts';
+import { DELTA, FILTER_COLORS, OPP } from '../core/trace.ts';
 import type { Cell, Color, Dir, Segment } from '../core/types.ts';
 import { cut, reachedEnd, visibleLength, type BeamPlan, type Front } from './beams.ts';
 import { cx, cy, type Layout } from './layout.ts';
@@ -558,96 +558,163 @@ const rgba = (hex: string, a: number): string => {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 };
 
+// Volta completa a partir da direção reta (verde), no sentido horário da tela: o leque da luz branca.
+const FAN: [number, Color, number | 'mix' | 'mix6'][] = [
+  [0, 2, 1],
+  [0.125, 6, 'mix'],
+  [0.25, 4, 1],
+  [0.375, 5, 'mix'],
+  [0.5, 5, 'mix6'],
+  [0.625, 5, 'mix'],
+  [0.75, 1, 1],
+  [0.875, 3, 'mix'],
+  [1, 2, 1],
+];
+
+type Glow = { a0: number; stops: [number, string, number][] };
+
+// Branca entrando (ou as três cores juntas, saindo branca): o leque inteiro, com a cor reta em a0.
+function fanGlow(a0: number, color: number, mixAlpha: number): Glow {
+  const has = (c: number): boolean => (color & c) === c;
+  const alpha = (v: number | 'mix' | 'mix6'): number => (v === 'mix' ? mixAlpha : v === 'mix6' ? mixAlpha * 0.6 : v);
+  return { a0, stops: FAN.map(([t, c, v]) => [t, CONFIG.colors[c], has(c) ? alpha(v) : 0]) };
+}
+
+// Cores chegando separadas: cada uma brilha virada para o lado por onde entrou.
+function sideGlow(arrivals: { side: number; color: Color }[]): Glow {
+  const n = 32;
+  const stops: [number, string, number][] = [];
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    let best: [string, number] = [CONFIG.colors[7], 0];
+    for (const a of arrivals) {
+      const d = Math.abs((((t - a.side) % 1) + 1.5) % 1 - 0.5); // distância em voltas, 0..0.5
+      const v = Math.max(0, 1 - d / 0.14);
+      if (v > best[1]) best = [CONFIG.colors[a.color], v];
+    }
+    stops.push([t, best[0], best[1]]);
+  }
+  return { a0: 0, stops };
+}
+
 export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
   const P = CONFIG.rainbow.prism;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
+  const dirOf = (s: Segment): Dir =>
+    DIRS.find((d) => DELTA[d][0] === Math.sign(s.x2 - s.x1) && DELTA[d][1] === Math.sign(s.y2 - s.y1))!;
+  const angle = (d: Dir): number => Math.atan2(DELTA[d][1], DELTA[d][0]);
   for (const p of cells) {
     if (p.t !== 'prism') continue;
-    const inc = segments.find((s) => s.x2 === p.x && s.y2 === p.y);
-    if (!inc) continue;
-    const dir = DIRS.find((d) => DELTA[d][0] === Math.sign(inc.x2 - inc.x1) && DELTA[d][1] === Math.sign(inc.y2 - inc.y1))!;
+    const incs = segments.filter((s) => s.x2 === p.x && s.y2 === p.y && (s.x1 !== s.x2 || s.y1 !== s.y2));
+    if (incs.length === 0) continue;
+    const all = incs.reduce((m: number, s) => m | s.color, 0) as Color;
+    const white = incs.find((s) => s.color === 7);
+    const dirs = [...new Set(incs.map(dirOf))];
+    const layers: Glow[] = [];
+    if (white) layers.push(fanGlow(angle(dirOf(white)), 7, P.mixAlpha));
+    else {
+      // Cada cor no lado por onde entrou (ângulo do lado, em voltas a partir do leste, sentido horário).
+      layers.push(
+        sideGlow(
+          incs.map((s) => {
+            const a = angle(OPP[dirOf(s)]) / TAU;
+            return { side: ((a % 1) + 1) % 1, color: s.color };
+          }),
+        ),
+      );
+      // As três cores chegaram por três lados: a luz sai branca pelo quarto, com o leque inteiro.
+      // O leque fica alinhado às cores que entraram: verde no lado do verde, vermelho e azul nos seus
+      // lados (espelhado se preciso).
+      if (all === 7 && dirs.length >= 3) {
+        const sideOf = (c: number): number | undefined => {
+          const s = incs.find((q) => (q.color & c) !== 0);
+          return s && angle(OPP[dirOf(s)]);
+        };
+        const g = sideOf(2) ?? 0;
+        const b = sideOf(4);
+        const quarter = (v: number): number => Math.round((((v / TAU) % 1) + 1) % 1 * 4) % 4;
+        const fan = fanGlow(g, 7, P.mixAlpha);
+        if (b !== undefined && quarter(b - g) === 3) {
+          fan.stops = fan.stops.map(([t, c, al]) => [1 - t, c, al] as [number, string, number]).reverse();
+        }
+        layers.push(fan);
+      }
+    }
     const x = cx(l, p.x);
     const y = cy(l, p.y);
     const R = P.halo * l.cell * (0.94 + 0.06 * pulse);
-    const a0 = Math.atan2(DELTA[dir][1], DELTA[dir][0]);
-    const has = (c: number): boolean => (inc.color & c) === c;
-    // Volta completa a partir da direção reta (verde), no sentido horário da tela.
-    const stops: [number, Color, number][] = [
-      [0, 2, 1],
-      [0.125, 6, P.mixAlpha],
-      [0.25, 4, 1],
-      [0.375, 5, P.mixAlpha],
-      [0.5, 5, P.mixAlpha * 0.6],
-      [0.625, 5, P.mixAlpha],
-      [0.75, 1, 1],
-      [0.875, 3, P.mixAlpha],
-      [1, 2, 1],
-    ];
-    const at = (t: number): [string, number] => {
-      const [, c, a] = stops.reduce((best, s) => (Math.abs(s[0] - t) < Math.abs(best[0] - t) ? s : best));
-      return [CONFIG.colors[c], has(c) ? a : 0];
-    };
-
-    // Halo: degradê cônico (cores em volta) recortado por um radial (some para fora), num canvas à parte.
-    const size = Math.ceil(R * 2);
-    haloCanvas ??= document.createElement('canvas');
-    if (haloCanvas.width < size) haloCanvas.width = haloCanvas.height = size;
-    const h = haloCanvas.getContext('2d')!;
-    h.clearRect(0, 0, size, size);
-    h.globalCompositeOperation = 'source-over';
-    const cone = h.createConicGradient(a0, R, R);
-    for (const [t, c, a] of stops) cone.addColorStop(t, rgba(CONFIG.colors[c], has(c) ? a : 0));
-    h.fillStyle = cone;
-    h.fillRect(0, 0, size, size);
-    h.globalCompositeOperation = 'destination-in';
-    const fall = h.createRadialGradient(R, R, R * P.haloInner, R, R, R);
-    fall.addColorStop(0, 'rgba(0,0,0,1)');
-    fall.addColorStop(0.35, 'rgba(0,0,0,0.75)');
-    fall.addColorStop(1, 'rgba(0,0,0,0)');
-    h.fillStyle = fall;
-    h.fillRect(0, 0, size, size);
-
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = k * P.haloAlpha;
-    ctx.drawImage(haloCanvas, 0, 0, size, size, x - R, y - R, size, size);
+    for (const glow of layers) drawGlow(ctx, l, x, y, R, glow, k, st);
 
     // Miolo fraco na cor que entra.
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(x, y, 0, x, y, P.core * l.cell);
-    g.addColorStop(0, CONFIG.colors[inc.color]);
+    g.addColorStop(0, CONFIG.colors[all]);
     g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.globalAlpha = k * P.coreAlpha;
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, P.core * l.cell, 0, TAU);
     ctx.fill();
-
-    // Raiozinhos: traços finos saindo do centro, girando devagar, cada um com seu próprio tremor.
-    ctx.lineCap = 'round';
-    ctx.lineWidth = P.rays.width;
-    for (let i = 0; i < P.rays.count; i++) {
-      const t = (i / P.rays.count + st.time * P.rays.spin) % 1;
-      const [col, a] = at(t);
-      if (a === 0) continue;
-      const flick = 0.5 + 0.5 * Math.sin(st.time * (2.1 + (i % 5) * 0.7) + i * 2.4);
-      const ang = a0 + t * TAU;
-      const r0 = P.rays.from * l.cell;
-      const r1 = r0 + (P.rays.len[0] + (P.rays.len[1] - P.rays.len[0]) * flick) * l.cell;
-      const ux = Math.cos(ang);
-      const uy = Math.sin(ang);
-      const lg = ctx.createLinearGradient(x + ux * r0, y + uy * r0, x + ux * r1, y + uy * r1);
-      lg.addColorStop(0, rgba(col, 0.9 * a));
-      lg.addColorStop(1, rgba(col, 0));
-      ctx.globalAlpha = k * P.rays.alpha * (0.5 + 0.5 * flick);
-      ctx.strokeStyle = lg;
-      ctx.beginPath();
-      ctx.moveTo(x + ux * r0, y + uy * r0);
-      ctx.lineTo(x + ux * r1, y + uy * r1);
-      ctx.stroke();
-    }
     ctx.restore();
   }
+}
+
+// Halo (degradê cônico recortado por um radial, num canvas à parte) e raiozinhos girando.
+function drawGlow(ctx: Ctx, l: Layout, x: number, y: number, R: number, glow: Glow, k: number, st: BeamStyle): void {
+  const P = CONFIG.rainbow.prism;
+  const { a0, stops } = glow;
+  const at = (t: number): [string, number] => {
+    const [, c, a] = stops.reduce((best, s) => (Math.abs(s[0] - t) < Math.abs(best[0] - t) ? s : best));
+    return [c, a];
+  };
+  const size = Math.ceil(R * 2);
+  haloCanvas ??= document.createElement('canvas');
+  if (haloCanvas.width < size) haloCanvas.width = haloCanvas.height = size;
+  const h = haloCanvas.getContext('2d')!;
+  h.clearRect(0, 0, size, size);
+  h.globalCompositeOperation = 'source-over';
+  const cone = h.createConicGradient(a0, R, R);
+  for (const [t, c, a] of stops) cone.addColorStop(t, rgba(c, a));
+  h.fillStyle = cone;
+  h.fillRect(0, 0, size, size);
+  h.globalCompositeOperation = 'destination-in';
+  const fall = h.createRadialGradient(R, R, R * P.haloInner, R, R, R);
+  fall.addColorStop(0, 'rgba(0,0,0,1)');
+  fall.addColorStop(0.35, 'rgba(0,0,0,0.75)');
+  fall.addColorStop(1, 'rgba(0,0,0,0)');
+  h.fillStyle = fall;
+  h.fillRect(0, 0, size, size);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = k * P.haloAlpha;
+  ctx.drawImage(haloCanvas, 0, 0, size, size, x - R, y - R, size, size);
+
+  ctx.lineCap = 'round';
+  ctx.lineWidth = P.rays.width;
+  for (let i = 0; i < P.rays.count; i++) {
+    const t = (i / P.rays.count + st.time * P.rays.spin) % 1;
+    const [col, a] = at(t);
+    if (a === 0) continue;
+    const flick = 0.5 + 0.5 * Math.sin(st.time * (2.1 + (i % 5) * 0.7) + i * 2.4);
+    const ang = a0 + t * TAU;
+    const r0 = P.rays.from * l.cell;
+    const r1 = r0 + (P.rays.len[0] + (P.rays.len[1] - P.rays.len[0]) * flick) * l.cell;
+    const ux = Math.cos(ang);
+    const uy = Math.sin(ang);
+    const lg = ctx.createLinearGradient(x + ux * r0, y + uy * r0, x + ux * r1, y + uy * r1);
+    lg.addColorStop(0, rgba(col, 0.9 * a));
+    lg.addColorStop(1, rgba(col, 0));
+    ctx.globalAlpha = k * P.rays.alpha * (0.5 + 0.5 * flick);
+    ctx.strokeStyle = lg;
+    ctx.beginPath();
+    ctx.moveTo(x + ux * r0, y + uy * r0);
+    ctx.lineTo(x + ux * r1, y + uy * r1);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 export interface PieceView {
