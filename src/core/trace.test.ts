@@ -177,6 +177,52 @@ describe('trace', () => {
     expect(r.segments).toHaveLength(1);
   });
 
+  it('beams on the same path in the same direction become one mixed beam', () => {
+    const r = trace(
+      level([
+        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 1 },
+        { x: 2, y: 0, t: 'emitter', dir: 'S', color: 4 },
+        { x: 2, y: 3, t: 'dichroic', color: 4 },
+        { x: 5, y: 3, t: 'target', color: 5 },
+      ]),
+      [1],
+    );
+    expect(r.solved).toBe(true);
+    expect(r.segments.filter((s) => s.x1 === 2 && s.y1 === 3).map((s) => [s.color, s.x2])).toEqual([[5, 5]]);
+  });
+
+  it('red, green and blue merged on one path split again at a prism', () => {
+    const r = trace(
+      level([
+        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 1 },
+        { x: 1, y: 0, t: 'emitter', dir: 'S', color: 2 },
+        { x: 2, y: 0, t: 'emitter', dir: 'S', color: 4 },
+        { x: 1, y: 3, t: 'dichroic', color: 2 },
+        { x: 2, y: 3, t: 'dichroic', color: 4 },
+        { x: 4, y: 3, t: 'prism' },
+      ]),
+      [1, 1],
+    );
+    expect(r.segments.some((s) => s.x1 === 2 && s.x2 === 4 && s.color === 7)).toBe(true);
+    const out = r.segments.filter((s) => s.x1 === 4 && s.y1 === 3).map((s) => [s.color, s.x2, s.y2]);
+    expect(out).toEqual(expect.arrayContaining([[1, 4, -0.5], [2, 6.5, 3], [4, 4, 8.5]]));
+  });
+
+  it('red, green and blue entering a prism from three sides leave white by the fourth', () => {
+    const r = trace(
+      level([
+        { x: 0, y: 3, t: 'emitter', dir: 'E', color: 1 },
+        { x: 3, y: 0, t: 'emitter', dir: 'S', color: 2 },
+        { x: 6, y: 3, t: 'emitter', dir: 'W', color: 4 },
+        { x: 3, y: 3, t: 'prism' },
+        { x: 3, y: 7, t: 'target', color: 7 },
+      ]),
+      [],
+    );
+    expect(r.solved).toBe(true);
+    expect(r.segments.filter((s) => s.x1 === 3 && s.y1 === 3).map((s) => s.color)).toEqual([7]);
+  });
+
   it('colored light passes straight through a prism, unchanged', () => {
     for (const color of [1, 2, 4, 5] as const) {
       const r = trace(
@@ -186,7 +232,7 @@ describe('trace', () => {
         ]),
         [],
       );
-      expect(r.segments.map((s) => [s.color, s.y1, s.y2])).toEqual([[color, 3, 3]]);
+      expect(r.segments.map((s) => [s.color, s.x1, s.x2])).toEqual([[color, 0, 2], [color, 2, 6.5]]);
     }
   });
 

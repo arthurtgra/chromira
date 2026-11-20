@@ -115,6 +115,10 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
   // Lentes que fundem: juntam o que chega e só soltam o feixe somado depois que todo o resto andou.
   const fused = new Map<string, { x: number; y: number; dir: Dir; color: number; d: number }>();
   const released = new Set<string>();
+  // Prismas também esperam: a luz que chega por cada lado se soma antes de decidir (cores que vêm juntas
+  // pelo mesmo caminho viram uma luz só; três lados com as três cores saem brancos pelo quarto lado).
+  const prismIn = new Map<string, { x: number; y: number; by: Map<Dir, { color: number; d: number }> }>();
+  const prismOut = new Map<string, number>(); // "x,y,dir" (ou "x,y,white") -> cor já solta
 
   for (;;) {
   while (queue.length > 0 && beams < MAX_BEAMS) {
@@ -267,15 +271,17 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
           push(x - dx * 0.5, y - dy * 0.5);
           ended = true;
           break;
-        case 'prism':
-          // Só a luz branca se abre nas três cores; luz colorida atravessa reto, sem mudar.
-          if (color !== 7) break;
+        case 'prism': {
           push(x, y);
-          if (color & 1) queue.push({ x, y, dir: LEFT[dir], color: 1, d: dist });
-          if (color & 2) queue.push({ x, y, dir, color: 2, d: dist });
-          if (color & 4) queue.push({ x, y, dir: RIGHT[dir], color: 4, d: dist });
           ended = true;
+          const p = prismIn.get(k) ?? { x, y, by: new Map() };
+          const a = p.by.get(dir) ?? { color: 0, d: 0 };
+          a.color |= color;
+          a.d = Math.max(a.d, dist);
+          p.by.set(dir, a);
+          prismIn.set(k, p);
           break;
+        }
         default:
           push(x - dx * 0.5, y - dy * 0.5);
           ended = true;
@@ -284,6 +290,33 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
     if (!ended) push(x, y);
   }
   let more = false;
+  for (const [k, p] of prismIn) {
+    if (prismOut.has(`${k},white`)) continue;
+    const sides = [...p.by];
+    const all = sides.reduce((m, [, a]) => m | a.color, 0);
+    // Três cores entrando por três lados (nenhum já branco): saem juntas, brancas, pelo lado livre.
+    if (sides.length === 3 && all === 7 && sides.every(([, a]) => a.color !== 7)) {
+      const out = COMBINER_DIRS.find((side) => !sides.some(([d]) => OPP[d] === side))!;
+      prismOut.set(`${k},white`, 7);
+      queue.push({ x: p.x, y: p.y, dir: out, color: 7, d: Math.max(...sides.map(([, a]) => a.d)) });
+      more = true;
+      continue;
+    }
+    for (const [dir, a] of sides) {
+      const ok = `${k},${dir}`;
+      if (prismOut.get(ok) === a.color) continue;
+      prismOut.set(ok, a.color);
+      more = true;
+      // Só a luz branca se abre nas três cores; luz colorida atravessa reto, sem mudar.
+      if (a.color !== 7) {
+        queue.push({ x: p.x, y: p.y, dir, color: a.color as Color, d: a.d });
+        continue;
+      }
+      queue.push({ x: p.x, y: p.y, dir: LEFT[dir], color: 1, d: a.d });
+      queue.push({ x: p.x, y: p.y, dir, color: 2, d: a.d });
+      queue.push({ x: p.x, y: p.y, dir: RIGHT[dir], color: 4, d: a.d });
+    }
+  }
   for (const [k, f] of fused) {
     if (released.has(k)) continue;
     released.add(k);
@@ -298,5 +331,118 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
     targets.length > 0 &&
     dark.length === 0 &&
     targets.every((t) => t.t === 'target' && received[key(t.x, t.y)] === t.color);
-  return { segments, received, solved, open: [...open], dark };
+  const stops = new Set(level.cells.filter((c) => c.t === 'prism').map((c) => key(c.x, c.y)));
+  for (const c of placeCells(level, rots)) if (c.t === 'prism') stops.add(key(c.x, c.y));
+  const jumps = new Map<string, string>();
+  for (const g of [...portals.values(), ...fibers.values()]) {
+    const [a, b] = g;
+    if (a && b) {
+      jumps.set(key(a.x, a.y), key(b.x, b.y));
+      jumps.set(key(b.x, b.y), key(a.x, a.y));
+    }
+  }
+  return { segments: mergeSegments(segments, stops, jumps), received, solved, open: [...open], dark };
+}
+
+// Luzes que andam pelo mesmo caminho, no mesmo sentido, viram uma luz só com as cores somadas: os trechos
+// são quebrados em passos de uma célula, somados por passo e emendados de novo onde a cor continua igual.
+// Prismas (stops) sempre quebram o trecho, para o desenho saber que a luz chega neles.
+export function mergeSegments(
+  segments: Segment[],
+  stops: Set<string> = new Set(),
+  jumps: Map<string, string> = new Map(), // portal/fibra: célula de saída -> célula de entrada do par
+): Segment[] {
+  interface Step { x: number; y: number; dir: Dir; len: number; color: number; d: number }
+  const steps = new Map<string, Step>();
+  const dirOf = (dx: number, dy: number): Dir => (dx > 0 ? 'E' : dx < 0 ? 'W' : dy > 0 ? 'S' : 'N');
+  const lenOf = (sg: Segment): number => Math.abs(sg.x2 - sg.x1) + Math.abs(sg.y2 - sg.y1);
+  const own: Step[][] = []; // passos (já somados) de cada trecho original
+  for (const sg of segments) {
+    const len = lenOf(sg);
+    const dir = dirOf(sg.x2 - sg.x1, sg.y2 - sg.y1);
+    const [dx, dy] = DELTA[dir];
+    const list: Step[] = [];
+    for (let t = 0; t < len; t++) {
+      const x = sg.x1 + dx * t;
+      const y = sg.y1 + dy * t;
+      const sl = Math.min(1, len - t);
+      const k = `${x},${y},${dir},${sl}`;
+      const d = (sg.d0 ?? 0) + t;
+      let st = steps.get(k);
+      if (st) {
+        st.color |= sg.color;
+        st.d = Math.min(st.d, d);
+      } else steps.set(k, (st = { x, y, dir, len: sl, color: sg.color, d }));
+      list.push(st);
+    }
+    own.push(list);
+  }
+  // De onde vem cada passo, pelo caminho da própria luz: o passo anterior do mesmo trecho, ou o último
+  // passo do trecho que terminou onde este começa (ou no outro portal do par) na mesma distância.
+  const prev = new Map<Step, Set<Step>>();
+  const succ = new Map<Step, Set<Step>>();
+  const link = (from: Step, to: Step): void => {
+    if (from === to) return;
+    prev.set(to, (prev.get(to) ?? new Set()).add(from));
+    succ.set(from, (succ.get(from) ?? new Set()).add(to));
+  };
+  const endAt = new Map<string, number[]>();
+  segments.forEach((sg, i) => {
+    const k = key(sg.x2, sg.y2);
+    endAt.set(k, [...(endAt.get(k) ?? []), i]);
+  });
+  segments.forEach((sg, i) => {
+    const list = own[i]!;
+    for (let t = 1; t < list.length; t++) link(list[t - 1]!, list[t]!);
+    if (list.length === 0) return;
+    const k = key(sg.x1, sg.y1);
+    const j = jumps.get(k);
+    for (const pi of [...(endAt.get(k) ?? []), ...(j ? (endAt.get(j) ?? []) : [])]) {
+      const p = segments[pi]!;
+      if (Math.abs((p.d0 ?? 0) + lenOf(p) - (sg.d0 ?? 0)) < 1e-9 && own[pi]!.length > 0) link(own[pi]!.at(-1)!, list[0]!);
+    }
+  });
+  // Somados, a distância de cada passo volta a ser contínua com o passo de onde ele vem (a mais curta).
+  for (let it = 0, changed = true; changed && it < 500; it++) {
+    changed = false;
+    for (const [st, ps] of prev) {
+      const m = Math.min(...[...ps].map((q) => q.d + q.len));
+      if (m < st.d) {
+        st.d = m;
+        changed = true;
+      }
+    }
+  }
+  const next = (st: Step): Step | undefined => {
+    const [dx, dy] = DELTA[st.dir];
+    const x = st.x + dx;
+    const y = st.y + dy;
+    // Onde a luz se divide (parte segue, parte desvia), o trecho acaba: o ramo precisa de um fim para começar.
+    if (st.len !== 1 || stops.has(key(x, y)) || (succ.get(st)?.size ?? 0) > 1) return undefined;
+    for (const len of [1, 0.5]) {
+      const n = steps.get(`${x},${y},${st.dir},${len}`);
+      if (n && n.color === st.color && n.d === st.d + 1 && prev.get(n)?.has(st)) return n;
+    }
+    return undefined;
+  };
+  const hasPrev = new Set<Step>();
+  for (const st of steps.values()) {
+    const n = next(st);
+    if (n) hasPrev.add(n);
+  }
+  const out: Segment[] = [];
+  const done = new Set<Step>();
+  const chain = (st: Step): void => {
+    let end: Step = st;
+    done.add(st);
+    for (let n = next(end); n && !done.has(n); n = next(end)) {
+      done.add(n);
+      end = n;
+    }
+    const [dx, dy] = DELTA[st.dir];
+    out.push({ x1: st.x, y1: st.y, x2: end.x + dx * end.len, y2: end.y + dy * end.len, color: st.color as Color, d0: st.d });
+  };
+  for (const st of steps.values()) if (!hasPrev.has(st)) chain(st);
+  for (const st of steps.values()) if (!done.has(st)) chain(st); // voltas fechadas
+  return out.sort((a, b) => (a.d0 ?? 0) - (b.d0 ?? 0));
 }
