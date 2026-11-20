@@ -237,17 +237,17 @@ export const CONFIG = {
     // Trocar a cor do filtro: roda de filtros girando (dois cliques de trava) + tom abafado da nova cor.
     filter: {
       clicks: [
-        [0, 2600, 0.9], // [ms, Hz do clique, volume]: trava saindo
-        [48, 1800, 1.0], // encaixe na nova cor, mais grave
+        [0, 2600, 1.2], // [ms, Hz do clique, volume]: trava saindo
+        [48, 1800, 1.5], // encaixe na nova cor, mais grave
       ],
-      clickMs: 22,
+      clickMs: 28,
       clickQ: 6,
       hz: [196, 246.94, 293.66], // vermelho sol, verde si, azul ré (graves, abafados)
       toneAtMs: 48,
-      toneMs: 160,
-      toneLowpassHz: 900,
-      toneVolume: 0.35,
-      volume: 0.7,
+      toneMs: 210,
+      toneLowpassHz: 1200,
+      toneVolume: 0.6,
+      volume: 1.1,
     },
     // Luz atravessando o prisma: tigela de vidro grave + três taças (lá, dó, mi) se abrindo, ressoando longo.
     prism: {
