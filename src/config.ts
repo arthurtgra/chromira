@@ -174,6 +174,7 @@ export const CONFIG = {
       rays: { count: 18, width: 1.3, from: 0.18, len: [0.22, 0.5], alpha: 0.85, spin: 0.015 },
       appearMs: 220, // brilho surgindo quando a luz chega (acende e cresce)
       appearScale: 0.6, // tamanho inicial do halo ao surgir
+      center: { radius: 0.4, alpha: 0.6, rgb: '236,240,255' }, // centro limpo do prisma completo (esconde as ondas no meio)
     },
   },
 

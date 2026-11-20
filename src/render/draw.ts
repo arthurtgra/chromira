@@ -609,16 +609,23 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const incs = segments.filter((s) => s.x2 === p.x && s.y2 === p.y && (s.x1 !== s.x2 || s.y1 !== s.y2));
     if (incs.length === 0) continue;
     const all = incs.reduce((m: number, s) => m | s.color, 0) as Color;
-    const white = incs.find((s) => s.color === 7);
-    const dirs = [...new Set(incs.map(dirOf))];
+    // Luz que chega pelo mesmo lado se soma: vermelho, verde e azul juntos pelo mesmo caminho são branco.
+    const bySide = new Map<Dir, number>();
+    for (const q of incs) bySide.set(dirOf(q), (bySide.get(dirOf(q)) ?? 0) | q.color);
+    const whiteDir = [...bySide].find(([, c]) => c === 7)?.[0];
+    const white = whiteDir && incs.find((q) => dirOf(q) === whiteDir);
+    const dirs = [...bySide.keys()];
     const id = `${p.x},${p.y}`;
     const layers: [string, Glow][] = [];
-    if (white) layers.push([`${id}:fan:${dirOf(white)}`, fanGlow(angle(dirOf(white)), 7, P.mixAlpha)]);
-    else {
+    let full = false;
+    if (white) {
+      layers.push([`${id}:fan:${dirOf(white)}`, fanGlow(angle(dirOf(white)), 7, P.mixAlpha)]);
+      full = true;
+    } else {
       // Cada cor no lado por onde entrou (ângulo do lado, em voltas a partir do leste, sentido horário).
-      for (const q of incs) {
-        const a = angle(OPP[dirOf(q)]) / TAU;
-        layers.push([`${id}:side:${dirOf(q)}:${q.color}`, sideGlow([{ side: ((a % 1) + 1) % 1, color: q.color }])]);
+      for (const [d, c] of bySide) {
+        const a = angle(OPP[d]) / TAU;
+        layers.push([`${id}:side:${d}:${c}`, sideGlow([{ side: ((a % 1) + 1) % 1, color: c as Color }])]);
       }
       // As três cores chegaram por três lados: a luz sai branca pelo quarto, com o leque inteiro.
       // O leque fica alinhado às cores que entraram: verde no lado do verde, vermelho e azul nos seus
@@ -636,6 +643,7 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
           fan.stops = fan.stops.map(([t, c, al]) => [1 - t, c, al] as [number, string, number]).reverse();
         }
         layers.push([`${id}:fan3`, fan]);
+        full = true;
       }
     }
     const x = cx(l, p.x);
@@ -647,6 +655,8 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
       drawGlow(ctx, l, x, y, R * (P.appearScale + (1 - P.appearScale) * f), glow, k * f, st);
     }
     const fc = appear(`${id}:core:${all}`, st.time);
+    // Prisma completo (abrindo ou juntando as cores): o centro fica limpo, desenhado por cima das ondas.
+    if (full) prismCenters.push({ x, y, f: appear(`${id}:center`, st.time) });
 
     // Miolo fraco na cor que entra.
     ctx.save();
@@ -664,6 +674,28 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
   // Brilho que sumiu volta a aparecer do zero da próxima vez.
   for (const key of glowSince.keys()) if (!glowSeen.has(key)) glowSince.delete(key);
   glowSeen.clear();
+}
+
+// Centro claro dos prismas completos: um disco suave por cima das ondas (as ondas somem no meio).
+let prismCenters: { x: number; y: number; f: number }[] = [];
+
+export function drawPrismCenters(ctx: Ctx, l: Layout): void {
+  const C = CONFIG.rainbow.prism.center;
+  ctx.save();
+  for (const { x, y, f } of prismCenters) {
+    const r = C.radius * l.cell;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${C.rgb},${C.alpha})`);
+    g.addColorStop(0.45, `rgba(${C.rgb},${C.alpha * 0.7})`);
+    g.addColorStop(1, `rgba(${C.rgb},0)`);
+    ctx.globalAlpha = f;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, TAU);
+    ctx.fill();
+  }
+  ctx.restore();
+  prismCenters = [];
 }
 
 const glowSince = new Map<string, number>(); // quando cada brilho de prisma começou (segundos do jogo)
