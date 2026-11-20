@@ -536,6 +536,7 @@ export function setupEditor(
   const select = (t: Tool): void => {
     game.synth.uiTap();
     editor.tool = t;
+    lens.hidden = true;
     render();
     status.textContent = HINTS[t];
   };
@@ -569,21 +570,81 @@ export function setupEditor(
     return b;
   });
 
-  // Tamanho do trilho: aparece só com a ferramenta de trilho escolhida.
+  // Tamanho do trilho: toque escolhe o trilho (2 por padrão); tocar e segurar abre 2, 3 e 4 para cima.
+  // Dá para arrastar o dedo até o tamanho e soltar, ou soltar e tocar no tamanho depois.
+  const railBtn = itemButtons[ITEMS.findIndex(([t]) => t === 'rail')]!;
+  const badge = document.createElement('span');
+  badge.className = 'ed-badge';
+  railBtn.append(badge);
   const lens = document.createElement('div');
   lens.className = 'ed-lens';
+  lens.hidden = true;
   const lenButtons = RAIL_LENS.map((n) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = String(n);
+    b.dataset.len = String(n);
     b.setAttribute('aria-label', `Rail length ${n}`);
-    b.addEventListener('click', () => {
-      game.synth.uiTap();
-      editor.railLen = n;
-      render();
-    });
+    b.addEventListener('click', () => pickLen(n));
     lens.append(b);
     return b;
+  });
+  const pickLen = (n: number): void => {
+    game.synth.uiTap();
+    editor.railLen = n;
+    editor.tool = 'rail';
+    lens.hidden = true;
+    render();
+    status.textContent = HINTS.rail;
+  };
+  const lenAt = (x: number, y: number): number | null => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const n = el?.closest<HTMLElement>('.ed-lens button')?.dataset.len;
+    return n ? Number(n) : null;
+  };
+  let hold: number | null = null;
+  let held = false;
+  railBtn.addEventListener('pointerdown', (e) => {
+    held = false;
+    railBtn.setPointerCapture(e.pointerId);
+    hold = window.setTimeout(() => {
+      hold = null;
+      held = true;
+      const r = railBtn.getBoundingClientRect();
+      lens.hidden = false;
+      lens.style.left = `${r.left + r.width / 2}px`;
+      lens.style.bottom = `${window.innerHeight - r.top + 6}px`;
+      navigator.vibrate?.(CONFIG.vibrateMs);
+    }, CONFIG.editor.holdMs);
+  });
+  railBtn.addEventListener('pointermove', (e) => {
+    if (!held) return;
+    const n = lenAt(e.clientX, e.clientY);
+    lenButtons.forEach((b) => b.classList.toggle('hover', Number(b.dataset.len) === n));
+  });
+  const endHold = (e: PointerEvent): void => {
+    if (hold !== null) window.clearTimeout(hold);
+    hold = null;
+    if (!held) return;
+    const n = lenAt(e.clientX, e.clientY);
+    lenButtons.forEach((b) => b.classList.remove('hover'));
+    if (n !== null) pickLen(n);
+  };
+  railBtn.addEventListener('pointerup', endHold);
+  railBtn.addEventListener('pointercancel', endHold);
+  railBtn.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Depois de segurar, o clique que vem ao soltar não fecha a lista nem troca nada.
+  railBtn.addEventListener(
+    'click',
+    (e) => {
+      if (!held) return;
+      e.stopImmediatePropagation();
+      held = false;
+    },
+    true,
+  );
+  document.addEventListener('pointerdown', (e) => {
+    if (!lens.hidden && !lens.contains(e.target as Node) && e.target !== railBtn) lens.hidden = true;
   });
 
   actions.prepend(modes);
@@ -599,7 +660,7 @@ export function setupEditor(
 
   function render(): void {
     for (const b of toolButtons) b.classList.toggle('on', b.dataset.tool === editor.tool);
-    lens.hidden = editor.tool !== 'rail';
+    badge.textContent = String(editor.railLen);
     lenButtons.forEach((b, k) => b.classList.toggle('on', RAIL_LENS[k] === editor.railLen));
   }
 
@@ -629,6 +690,6 @@ const HINTS: Record<Tool, string> = {
   wall: 'Tap an empty cell to add a wall',
   target: 'Tap an empty cell to add a target',
   color: 'Tap an emitter, target, dichroic or filter to change its color',
-  rail: 'Pick a length · tap a mirror or prism to add a rail (tap again: vertical, then none) · tap an empty cell for a mirror on a rail',
+  rail: 'Hold the rail button for 2, 3 or 4 · tap a mirror or prism to add a rail (again: vertical, then none) · tap an empty cell for a mirror on a rail',
   erase: 'Tap a piece to delete it',
 };

@@ -180,6 +180,7 @@ export const CONFIG = {
   pulse: { ms: 450, radius: 0.9 },
   targetFillMs: 110,
   maxDpr: 2, // densidade máxima do canvas
+  editor: { holdMs: 380 }, // segurar o botão do trilho abre os tamanhos
   maxFps: 60, // telas de 120 Hz desenham a 60: mesma fluidez percebida, metade do trabalho
 
   particles: { min: 60, max: 100, speed: [80, 320], lifeMs: [500, 1100], size: [1.5, 3.5], drag: 2.2 },

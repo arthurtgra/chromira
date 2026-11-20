@@ -678,27 +678,54 @@ body:not([data-screen='game']) #editor {
   opacity: 1;
   background: rgba(255, 255, 255, 0.14);
 }
+/* Tamanhos do trilho: coluna que sobe do botão ao segurar (2 embaixo, 4 em cima). */
 #editor .ed-lens {
+  position: fixed;
+  z-index: 5;
+  transform: translateX(-50%);
   display: flex;
-  gap: 6px;
-  justify-content: center;
+  flex-direction: column-reverse;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(16, 18, 28, 0.96);
 }
 #editor .ed-lens[hidden] {
   display: none;
 }
 #editor .ed-lens button {
-  width: 44px;
-  padding: 6px 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 9px;
   background: rgba(255, 255, 255, 0.05);
   color: var(--ink);
-  font-size: 14px;
-  touch-action: manipulation;
+  font-size: 16px;
+  touch-action: none;
 }
 #editor .ed-lens button.on {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.18);
+}
+#editor .ed-lens button.hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+#editor .ed-tools button[data-tool='rail'] {
+  position: relative;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+#editor .ed-badge {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--ink);
+  opacity: 0.9;
+  pointer-events: none;
 }
 #dev-panel .dev-publish {
   display: flex;
