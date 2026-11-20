@@ -606,6 +606,7 @@ body:not([data-screen='game']) #editor {
 }
 #editor .ed-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   justify-content: center;
 }
@@ -627,30 +628,77 @@ body:not([data-screen='game']) #editor {
 }
 #editor .ed-tools {
   display: flex;
+  justify-content: center;
+}
+/* Mover, cor e lixo: fixos à esquerda, num bloco próprio. */
+#editor .ed-modes {
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+}
+/* Peças: rolam de lado se não couberem. */
+#editor .ed-items {
+  min-width: 0;
+  display: flex;
   gap: 2px;
   overflow-x: auto;
   scrollbar-width: none;
-  justify-content: safe center;
 }
-#editor .ed-tools button {
+#editor .ed-items::-webkit-scrollbar {
+  display: none;
+}
+#editor .ed-tools button,
+#editor .ed-modes button {
   flex: none;
-  width: 40px;
-  height: 40px;
-  padding: 9px;
+  width: 38px;
+  height: 38px;
+  padding: 4px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: #fff;
-  opacity: 0.5;
+  opacity: 0.55;
   touch-action: manipulation;
 }
-#editor .ed-tools button svg {
+#editor .ed-modes button {
+  padding: 9px;
+}
+#editor .ed-tools button svg,
+#editor .ed-modes button svg,
+#editor .ed-tools button canvas {
+  display: block;
   width: 100%;
   height: 100%;
 }
-#editor .ed-tools button.on {
+#editor .ed-tools button.on,
+#editor .ed-modes button.on {
   opacity: 1;
   background: rgba(255, 255, 255, 0.14);
+}
+#editor .ed-lens {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+#editor .ed-lens[hidden] {
+  display: none;
+}
+#editor .ed-lens button {
+  width: 44px;
+  padding: 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  font-size: 14px;
+  touch-action: manipulation;
+}
+#editor .ed-lens button.on {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 #dev-panel .dev-publish {
   display: flex;

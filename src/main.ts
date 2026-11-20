@@ -40,7 +40,7 @@ setupDev(game);
 const ed = fb
   ? setupEditor(game, original, (on) => {
       // A barra do editor ocupa mais espaço embaixo: a grade encolhe enquanto ele está aberto.
-      (CONFIG.layout as { bottom: number }).bottom = on ? 170 : 80;
+      (CONFIG.layout as { bottom: number }).bottom = on ? 205 : 80;
       game.relayout();
     })
   : null;

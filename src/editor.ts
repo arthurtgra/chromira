@@ -7,13 +7,16 @@ import { CONFIG } from './config.ts';
 import { expand, GRID } from './core/grid.ts';
 import { countSolutions, MAX_SPACE, searchSpace } from './core/solver.ts';
 import { baseStates, isPiece, placeCells, railOf, rotOf, startRots, trace } from './core/trace.ts';
-import type { Cell, Color, Dir, Level } from './core/types.ts';
+import type { Cell, Color, Dir, Level, Rail } from './core/types.ts';
+import { drawPieces, drawRails, type PieceView } from './render/draw.ts';
 import type { Game } from './game.ts';
 import { githubToken, publishEdits, setGithubToken } from './github.ts';
 import fileEdits from './levels/edits.json';
 
 type PlaceTool = 'emitter' | 'mirror' | 'splitter' | 'filter' | 'prism' | 'dichroic' | 'wall' | 'target';
-export type Tool = 'move' | PlaceTool | 'color' | 'erase';
+type Mode = 'move' | 'color' | 'erase';
+export type Tool = Mode | PlaceTool | 'rail';
+const RAIL_LENS = [2, 3, 4] as const;
 
 const COLOR_CYCLE: Color[] = [7, 1, 2, 4, 3, 5, 6];
 const PRIMARY: (1 | 2 | 4)[] = [1, 2, 4];
@@ -100,6 +103,7 @@ interface Drag {
 
 export class Editor {
   tool: Tool = 'move';
+  railLen: number = 2;
   private drag: Drag | null = null;
   private readonly game: Game;
   private readonly notify: (msg: string) => void;
@@ -151,11 +155,13 @@ export class Editor {
     if (!c) return;
     const i = this.indexAt(c.x, c.y);
     if (i < 0) {
-      if (this.tool !== 'move' && this.tool !== 'color' && this.tool !== 'erase') this.add(this.tool, c.x, c.y);
+      if (this.tool === 'rail') this.addRailed(c.x, c.y);
+      else if (this.tool !== 'move' && this.tool !== 'color' && this.tool !== 'erase') this.add(this.tool, c.x, c.y);
       return;
     }
     if (this.tool === 'erase') return this.remove(i);
     if (this.tool === 'color') return this.recolor(i);
+    if (this.tool === 'rail') return this.rail(i);
     this.drag = { ci: i, px, py, moved: false, out: false };
     this.game.editMark = c;
   }
@@ -218,6 +224,63 @@ export class Editor {
     else return;
     this.commit(cells, this.states());
     this.game.synth.turn(true);
+  }
+
+  // Trilho cabe: dentro da grade e sem outra peça nas células por onde a peça desliza.
+  private railFits(c: Cell, i: number): boolean {
+    if (!this.fits(c)) return false;
+    const rail = railOf(c);
+    if (!rail) return true;
+    for (let k = 0; k < rail.len; k++) {
+      const x = c.x + (rail.axis === 'x' ? k : 0);
+      const y = c.y + (rail.axis === 'y' ? k : 0);
+      if (this.indexAt(x, y, i) >= 0) return false;
+    }
+    return true;
+  }
+
+  // Ferramenta de trilho num espelho ou prisma: sem trilho ganha um (horizontal; se não couber,
+  // vertical); com trilho de outro tamanho troca o tamanho; do mesmo tamanho gira para vertical e,
+  // tocando de novo, tira o trilho. A peça volta para o começo do trilho.
+  private rail(i: number): void {
+    const placed = this.placed()[i]!;
+    if (placed.t !== 'mirror' && placed.t !== 'prism') {
+      this.notify('Rails go on mirrors and prisms');
+      return;
+    }
+    const cur = placed.rail;
+    const options: (Rail | undefined)[] =
+      !cur || cur.len !== this.railLen
+        ? [{ axis: cur?.axis ?? 'x', len: this.railLen }, { axis: cur?.axis === 'y' ? 'x' : 'y', len: this.railLen }]
+        : cur.axis === 'x'
+          ? [{ axis: 'y', len: this.railLen }, undefined]
+          : [undefined];
+    for (const rail of options) {
+      const cell = { ...placed, rail } as Cell;
+      if (!rail) delete (cell as { rail?: Rail }).rail;
+      if (!this.railFits(cell, i)) continue;
+      const cells = [...this.level.cells];
+      const states = this.states();
+      cells[i] = cell;
+      states[i] = rotOf(cell, states[i] ?? 0);
+      this.commit(cells, states);
+      this.game.synth.turn(true);
+      navigator.vibrate?.(CONFIG.vibrateMs);
+      return;
+    }
+    this.notify(`No room for a ${this.railLen}-cell rail here`);
+  }
+
+  private addRailed(x: number, y: number): void {
+    for (const axis of ['x', 'y'] as const) {
+      const cell: Cell = { x, y, t: 'mirror', rail: { axis, len: this.railLen } };
+      if (!this.railFits(cell, -1)) continue;
+      this.commit([...this.level.cells, cell], [...this.states(), 0]);
+      this.game.synth.turn();
+      navigator.vibrate?.(CONFIG.vibrateMs);
+      return;
+    }
+    this.notify(`No room for a ${this.railLen}-cell rail here`);
   }
 
   private add(tool: PlaceTool, x: number, y: number): void {
@@ -325,19 +388,54 @@ async function publishDeviceEdits(): Promise<string> {
 const svg = (body: string): string =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`;
 
-const TOOL_ICONS: Record<Tool, [string, string]> = {
+const MODE_ICONS: Record<Mode, [string, string]> = {
   move: ['Move / turn', '<path d="M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/>'],
-  emitter: ['Emitter', '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 9l3 3-3 3"/>'],
-  mirror: ['Mirror', '<path d="M5 19L19 5" stroke-width="3"/>'],
-  splitter: ['Splitter', '<path d="M5 19L19 5" stroke-dasharray="3 3"/><path d="M3 12h18" opacity=".4"/>'],
-  filter: ['Filter', '<circle cx="12" cy="12" r="7"/><path d="M12 5v14" opacity=".5"/>'],
-  prism: ['Prism', '<path d="M12 4l8 15H4z"/>'],
-  dichroic: ['Dichroic', '<path d="M5 19L19 5" stroke="#ff3358" stroke-width="3"/>'],
-  wall: ['Wall', '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>'],
-  target: ['Target', '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/>'],
   color: ['Color', '<circle cx="8" cy="9" r="3.5" stroke="#ff3358"/><circle cx="16" cy="9" r="3.5" stroke="#29f58a"/><circle cx="12" cy="16" r="3.5" stroke="#4c7dff"/>'],
   erase: ['Erase', '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>'],
 };
+
+// Peças da paleta: desenhadas pelo mesmo código do jogo, então o ícone é a peça.
+const ITEMS: [PlaceTool | 'rail', string, Cell][] = [
+  ['emitter', 'Emitter', { x: 0, y: 0, t: 'emitter', dir: 'E', color: 7 }],
+  ['target', 'Target', { x: 0, y: 0, t: 'target', color: 7 }],
+  ['mirror', 'Mirror', { x: 0, y: 0, t: 'mirror' }],
+  ['splitter', 'Splitter', { x: 0, y: 0, t: 'splitter' }],
+  ['dichroic', 'Dichroic', { x: 0, y: 0, t: 'dichroic', color: 1 }],
+  ['filter', 'Filter', { x: 0, y: 0, t: 'filter' }],
+  ['prism', 'Prism', { x: 0, y: 0, t: 'prism' }],
+  ['wall', 'Wall', { x: 0, y: 0, t: 'wall' }],
+  ['rail', 'Rail', { x: 0, y: 0, t: 'mirror', rail: { axis: 'x', len: 2 } }],
+];
+
+const ICON_VIEW: PieceView = {
+  mirrorAngle: () => -Math.PI / 4,
+  filterColor: () => ({ from: 0, to: 0, k: 1 }),
+  targetFill: () => 0,
+  targetReceived: () => 0,
+  prismAngle: () => -Math.PI / 2,
+  gateOpen: () => false,
+  bender: () => ({ from: 0, to: 0, k: 1 }),
+  charge: () => 0,
+  autoPhase: 0,
+  darkHit: () => false,
+  time: 0,
+};
+
+function pieceIcon(cell: Cell, size: number): HTMLCanvasElement {
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(size * dpr);
+  canvas.height = Math.round(size * dpr);
+  const ctx = canvas.getContext('2d')!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const rail = railOf(cell);
+  const n = rail?.len ?? 1;
+  const cellPx = size / (n === 1 ? 1.15 : n + 0.3);
+  const l = { cell: cellPx, ox: (size - cellPx * n) / 2, oy: (size - cellPx) / 2, w: size, h: size };
+  drawRails(ctx, l, [cell]);
+  drawPieces(ctx, l, [cell], ICON_VIEW);
+  return canvas;
+}
 
 export const EDIT_ICON = svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>');
 
@@ -435,33 +533,74 @@ export function setupEditor(
   });
   action('Done', () => toggle());
 
-  const tools = document.createElement('div');
-  tools.className = 'ed-tools';
-  const toolButtons = (Object.keys(TOOL_ICONS) as Tool[]).map((t) => {
-    const [label, icon] = TOOL_ICONS[t];
+  const select = (t: Tool): void => {
+    game.synth.uiTap();
+    editor.tool = t;
+    render();
+    status.textContent = HINTS[t];
+  };
+  const toolButton = (t: Tool, label: string, content: string | HTMLElement): HTMLButtonElement => {
     const b = document.createElement('button');
     b.type = 'button';
     b.dataset.tool = t;
     b.title = label;
     b.setAttribute('aria-label', label);
-    b.innerHTML = svg(icon);
-    b.addEventListener('click', () => {
-      game.synth.uiTap();
-      editor.tool = t;
-      render();
-      status.textContent = HINTS[t];
-    });
-    tools.append(b);
+    if (typeof content === 'string') b.innerHTML = content;
+    else b.append(content);
+    b.addEventListener('click', () => select(t));
+    return b;
+  };
+
+  // Mover, cor e lixo: sempre à mão, à esquerda, separados das peças.
+  const modes = document.createElement('div');
+  modes.className = 'ed-modes';
+  const modeButtons = (Object.keys(MODE_ICONS) as Mode[]).map((t) => {
+    const [label, icon] = MODE_ICONS[t];
+    const b = toolButton(t, label, svg(icon));
+    modes.append(b);
     return b;
   });
 
-  bar.append(status, actions, tools);
+  const items = document.createElement('div');
+  items.className = 'ed-items';
+  const itemButtons = ITEMS.map(([t, label, cell]) => {
+    const b = toolButton(t, label, pieceIcon(cell, 30));
+    items.append(b);
+    return b;
+  });
+
+  // Tamanho do trilho: aparece só com a ferramenta de trilho escolhida.
+  const lens = document.createElement('div');
+  lens.className = 'ed-lens';
+  const lenButtons = RAIL_LENS.map((n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = String(n);
+    b.setAttribute('aria-label', `Rail length ${n}`);
+    b.addEventListener('click', () => {
+      game.synth.uiTap();
+      editor.railLen = n;
+      render();
+    });
+    lens.append(b);
+    return b;
+  });
+
+  actions.prepend(modes);
+  const tools = document.createElement('div');
+  tools.className = 'ed-tools';
+  tools.append(items);
+  const toolButtons = [...modeButtons, ...itemButtons];
+
+  bar.append(status, actions, lens, tools);
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
   document.body.append(bar);
   setupPublishPanel();
 
   function render(): void {
     for (const b of toolButtons) b.classList.toggle('on', b.dataset.tool === editor.tool);
+    lens.hidden = editor.tool !== 'rail';
+    lenButtons.forEach((b, k) => b.classList.toggle('on', RAIL_LENS[k] === editor.railLen));
   }
 
   function toggle(): void {
@@ -490,5 +629,6 @@ const HINTS: Record<Tool, string> = {
   wall: 'Tap an empty cell to add a wall',
   target: 'Tap an empty cell to add a target',
   color: 'Tap an emitter, target, dichroic or filter to change its color',
+  rail: 'Pick a length · tap a mirror or prism to add a rail (tap again: vertical, then none) · tap an empty cell for a mirror on a rail',
   erase: 'Tap a piece to delete it',
 };
