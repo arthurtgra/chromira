@@ -94,22 +94,92 @@ interface Run {
   d0: number;
 }
 
+interface Part {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  color: Color;
+  d0: number;
+  join: boolean; // continua a parte anterior (mesma luz, sem falha)
+}
+
+// Luzes que já chegaram ao mesmo trecho, em qualquer sentido, viram a cor somada (azul + vermelho = rosa,
+// as três = branco). Só a parte visível conta: a mistura começa onde e quando a segunda luz chega.
+// Cada trecho comum é desenhado uma vez só, para a mistura não ficar mais forte que uma luz normal.
+function mixParts(vis: (Part | null)[]): Part[] {
+  const segs = vis.filter((v): v is Part => v !== null);
+  const lineOf = (v: Part): string => (v.y1 === v.y2 ? `h${v.y1}` : `v${v.x1}`);
+  const span = (v: Part): [number, number] =>
+    v.y1 === v.y2 ? [Math.min(v.x1, v.x2), Math.max(v.x1, v.x2)] : [Math.min(v.y1, v.y2), Math.max(v.y1, v.y2)];
+  const lines = new Map<string, { v: Part; i: number; a: number; b: number }[]>();
+  segs.forEach((v, i) => {
+    if (v.x1 === v.x2 && v.y1 === v.y2) return;
+    const [a, b] = span(v);
+    const k = lineOf(v);
+    lines.set(k, [...(lines.get(k) ?? []), { v, i, a, b }]);
+  });
+  const out: Part[] = [];
+  let open = false;
+  let idx = -1;
+  for (const v of vis) {
+    if (v === null) {
+      open = false;
+      continue;
+    }
+    idx++;
+    const len = Math.abs(v.x2 - v.x1) + Math.abs(v.y2 - v.y1);
+    if (len === 0) continue;
+    const [a, b] = span(v);
+    const same = (lines.get(lineOf(v)) ?? []).filter((o) => o.b > a && o.a < b);
+    const cuts = [...new Set([a, b, ...same.flatMap((o) => [o.a, o.b]).filter((t) => t > a && t < b)])].sort((p, q) => p - q);
+    const forward = v.x2 > v.x1 || v.y2 > v.y1;
+    if (!forward) cuts.reverse();
+    const at = (t: number): [number, number] => (v.y1 === v.y2 ? [t, v.y1] : [v.x1, t]);
+    let join: boolean = v.join && open;
+    for (let c = 1; c < cuts.length; c++) {
+      const t1 = cuts[c - 1]!;
+      const t2 = cuts[c]!;
+      const mid = (t1 + t2) / 2;
+      const here = same.filter((o) => o.a < mid && o.b > mid);
+      const owner = Math.min(...here.map((o) => o.i));
+      if (owner !== idx) {
+        join = false;
+        continue;
+      }
+      const color = here.reduce((m: number, o) => m | o.v.color, 0) as Color;
+      const [x1, y1] = at(t1);
+      const [x2, y2] = at(t2);
+      out.push({ x1, y1, x2, y2, color, d0: v.d0 + Math.abs(t1 - (forward ? a : b)), join });
+      join = true;
+    }
+    open = join;
+  }
+  return out;
+}
+
 // Junta segmentos encadeados da mesma cor numa polilinha: cantos sem emenda.
 function buildRuns(plan: BeamPlan, front: Front): Run[] {
-  const runs: Run[] = [];
+  const vis: (Part | null)[] = [];
   let open = false;
   for (const p of plan.pieces) {
     const v = visibleLength(p, front);
     if (v <= 0) {
+      vis.push(null);
       open = false;
       continue;
     }
     const s = cut(p, 0, v);
+    vis.push({ ...s, d0: p.d0, join: open });
+    open = v >= p.len;
+    if (!open) vis.push(null);
+  }
+  const runs: Run[] = [];
+  for (const s of mixParts(vis)) {
     const last = runs.at(-1);
     const tail = last?.pts.at(-1);
-    if (open && last && tail && last.color === s.color && tail[0] === s.x1 && tail[1] === s.y1) last.pts.push([s.x2, s.y2]);
-    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: p.d0 });
-    open = v >= p.len;
+    if (s.join && last && tail && last.color === s.color && tail[0] === s.x1 && tail[1] === s.y1) last.pts.push([s.x2, s.y2]);
+    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: s.d0 });
   }
   return runs;
 }

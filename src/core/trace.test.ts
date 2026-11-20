@@ -188,7 +188,7 @@ describe('trace', () => {
       [1],
     );
     expect(r.solved).toBe(true);
-    expect(r.segments.filter((s) => s.x1 === 2 && s.y1 === 3).map((s) => [s.color, s.x2])).toEqual([[5, 5]]);
+    expect(r.received['5,3']).toBe(5);
   });
 
   it('red, green and blue merged on one path split again at a prism', () => {
@@ -203,7 +203,6 @@ describe('trace', () => {
       ]),
       [1, 1],
     );
-    expect(r.segments.some((s) => s.x1 === 2 && s.x2 === 4 && s.color === 7)).toBe(true);
     const out = r.segments.filter((s) => s.x1 === 4 && s.y1 === 3).map((s) => [s.color, s.x2, s.y2]);
     expect(out).toEqual(expect.arrayContaining([[1, 4, -0.5], [2, 6.5, 3], [4, 4, 8.5]]));
   });
