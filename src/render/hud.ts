@@ -52,16 +52,15 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
   ctx.fillText(text, 0, 0);
   ctx.restore();
 
-  // Dificuldade: 5 barrinhas; cheias até o nível, em tons do espectro.
-  const n = 5;
+  // Dificuldade: só as barrinhas do nível (sem as apagadas), centralizadas, em tons do espectro.
+  const n = Math.max(1, Math.min(5, s.difficulty));
   const total = n * H.barW + (n - 1) * H.barGap;
   for (let i = 0; i < n; i++) {
     const a = clamp01((s.appear - 200 - i * 60) / 220);
-    const on = i < s.difficulty;
     const bx = x - total / 2 + i * (H.barW + H.barGap);
     const w = H.barW * a;
-    ctx.globalAlpha = on ? 0.95 : 0.16;
-    ctx.fillStyle = on ? `hsl(${difficultyHue(i + 1)}, 90%, 64%)` : '#ffffff';
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = `hsl(${difficultyHue(i + 1)}, 90%, 64%)`;
     ctx.beginPath();
     ctx.roundRect(bx + (H.barW - w) / 2, H.barY - H.barH / 2, w, H.barH, H.barH / 2);
     ctx.fill();
