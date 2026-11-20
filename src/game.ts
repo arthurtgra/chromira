@@ -310,11 +310,19 @@ export class Game {
     this.plan = this.planAll(before, this.beamSegments(), CONFIG.beam.turnSpeed);
     this.quiet = false;
     // Recolhe o que sumiu a partir do ponto que mudou: trechos encadeados recolhem em sequência.
+    // A luz antiga que sai de um ponto só começa a recolher quando a nova sai dele (no prisma: quando
+    // a última cor chega e ele se abre; até lá a luz de antes segue reto).
     let off = 0;
+    let at = this.now;
     let prev: Segment | null = null;
     for (const seg of this.plan.fading) {
-      off = prev && prev.x2 === seg.x1 && prev.y2 === seg.y1 ? off + segLen(prev) : 0;
-      this.fades.push({ seg, at: this.now, off });
+      const chained = prev && prev.x2 === seg.x1 && prev.y2 === seg.y1;
+      off = chained ? off + segLen(prev!) : 0;
+      if (!chained) {
+        const starts = this.plan.pieces.filter((q) => q.x1 === seg.x1 && q.y1 === seg.y1 && q.known < q.len);
+        at = Math.max(this.now, ...starts.map((q) => q.at));
+      }
+      this.fades.push({ seg, at, off });
       prev = seg;
     }
   }
@@ -328,12 +336,13 @@ export class Game {
     const done: BeamPiece[] = [];
     for (const p of plan.pieces) {
       const from = (q: BeamPiece): boolean => Math.abs(q.d0 + q.len - p.d0) < 1e-9;
-      const prev =
-        p.known > 0 || p.d0 === 0
-          ? undefined
-          : (done.find((q) => q.x2 === p.x1 && q.y2 === p.y1 && from(q)) ??
-            done.find((q) => from(q) && this.portalPair(q.x2, q.y2) === key(p.x1, p.y1)));
-      p.at = prev ? prev.at + (prev.len - prev.known) / this.beamV : this.now;
+      // Mais de uma luz chegando ao mesmo ponto (prisma que se abre quando as cores se juntam): espera a
+      // última chegar.
+      const arrive = (q: BeamPiece): number => q.at + (q.len - q.known) / this.beamV;
+      let preds = p.known > 0 || p.d0 === 0 ? [] : done.filter((q) => q.x2 === p.x1 && q.y2 === p.y1 && from(q));
+      if (preds.length === 0 && p.known === 0 && p.d0 !== 0)
+        preds = done.filter((q) => from(q) && this.portalPair(q.x2, q.y2) === key(p.x1, p.y1));
+      p.at = preds.length > 0 ? Math.max(...preds.map(arrive)) : this.now;
       done.push(p);
     }
     return plan;
