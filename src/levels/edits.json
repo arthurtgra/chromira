@@ -855,7 +855,19 @@
         "x": 3,
         "y": 0,
         "t": "target",
-        "color": 7
+        "color": 2
+      },
+      {
+        "x": 0,
+        "y": 1,
+        "t": "target",
+        "color": 1
+      },
+      {
+        "x": 6,
+        "y": 1,
+        "t": "target",
+        "color": 4
       }
     ],
     "start": [
