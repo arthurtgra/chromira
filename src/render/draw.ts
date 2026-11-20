@@ -92,6 +92,7 @@ interface Run {
   pts: [number, number][];
   color: Color;
   d0: number;
+  alpha: number;
 }
 
 interface Part {
@@ -102,6 +103,7 @@ interface Part {
   color: Color;
   d0: number;
   join: boolean; // continua a parte anterior (mesma luz, sem falha)
+  alpha: number; // 1 = luz acesa; menos = trecho sendo recolhido
 }
 
 // Luzes que já chegaram ao mesmo trecho, em qualquer sentido, viram a cor somada (azul + vermelho = rosa,
@@ -150,7 +152,7 @@ function mixParts(vis: (Part | null)[]): Part[] {
       const color = here.reduce((m: number, o) => m | o.v.color, 0) as Color;
       const [x1, y1] = at(t1);
       const [x2, y2] = at(t2);
-      out.push({ x1, y1, x2, y2, color, d0: v.d0 + Math.abs(t1 - (forward ? a : b)), join });
+      out.push({ x1, y1, x2, y2, color, d0: v.d0 + Math.abs(t1 - (forward ? a : b)), join, alpha: v.alpha });
       join = true;
     }
     open = join;
@@ -158,8 +160,9 @@ function mixParts(vis: (Part | null)[]): Part[] {
   return out;
 }
 
-// Junta segmentos encadeados da mesma cor numa polilinha: cantos sem emenda.
-function buildRuns(plan: BeamPlan, front: Front): Run[] {
+// Junta segmentos encadeados da mesma cor numa polilinha: cantos sem emenda. Trechos sendo recolhidos
+// entram na mistura: a cor somada continua até a ponta da luz que foi cortada passar.
+function buildRuns(plan: BeamPlan, front: Front, fading: FadingBeam[]): Run[] {
   const vis: (Part | null)[] = [];
   let open = false;
   for (const p of plan.pieces) {
@@ -170,16 +173,19 @@ function buildRuns(plan: BeamPlan, front: Front): Run[] {
       continue;
     }
     const s = cut(p, 0, v);
-    vis.push({ ...s, d0: p.d0, join: open });
+    vis.push({ ...s, d0: p.d0, join: open, alpha: 1 });
     open = v >= p.len;
     if (!open) vis.push(null);
   }
+  // Depois das acesas: num trecho comum, quem desenha é a luz acesa (a primeira da lista).
+  for (const f of fading) vis.push(null, { ...f.seg, d0: f.d0, join: false, alpha: f.alpha });
   const runs: Run[] = [];
   for (const s of mixParts(vis)) {
     const last = runs.at(-1);
     const tail = last?.pts.at(-1);
-    if (s.join && last && tail && last.color === s.color && tail[0] === s.x1 && tail[1] === s.y1) last.pts.push([s.x2, s.y2]);
-    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: s.d0 });
+    if (s.join && last && tail && last.color === s.color && last.alpha === s.alpha && tail[0] === s.x1 && tail[1] === s.y1)
+      last.pts.push([s.x2, s.y2]);
+    else runs.push({ pts: [[s.x1, s.y1], [s.x2, s.y2]], color: s.color, d0: s.d0, alpha: s.alpha });
   }
   return runs;
 }
@@ -330,13 +336,12 @@ export function drawBeams(ctx: Ctx, l: Layout, plan: BeamPlan, front: Front, fad
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  // Trechos sendo recolhidos: mesmo visual, mais fracos.
-  for (const f of fading) {
-    drawRuns(ctx, l, [{ pts: [[f.seg.x1, f.seg.y1], [f.seg.x2, f.seg.y2]], color: f.seg.color, d0: f.d0 }], st, f.alpha);
-  }
-  const runs = buildRuns(plan, front);
-  drawRuns(ctx, l, runs, st, 1);
-  drawPulseHeads(ctx, l, runs, st);
+  const runs = buildRuns(plan, front, fading);
+  // Trechos sendo recolhidos: mesmo visual, mais fracos (cada um com a sua transparência).
+  for (const r of runs) if (r.alpha < 1) drawRuns(ctx, l, [r], st, r.alpha);
+  const lit = runs.filter((r) => r.alpha >= 1);
+  drawRuns(ctx, l, lit, st, 1);
+  drawPulseHeads(ctx, l, lit, st);
   ctx.restore();
 }
 
