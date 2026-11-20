@@ -45,9 +45,16 @@ export function drawHud(ctx: CanvasRenderingContext2D, l: Layout, s: HudState): 
     fill.addColorStop(0, '#ffffff');
     fill.addColorStop(1, s.accent);
   }
+  // Brilho borrado em volta do número: contornos largos e fracos na cor da fase, do mais largo ao mais
+  // fino (sem shadowBlur: no Safari do iPhone a sombra do texto saía deslocada, uma faixa embaixo).
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = s.accent;
+  ctx.globalAlpha = k * H.glow.alpha;
+  for (let i = 0; i < H.glow.steps; i++) {
+    ctx.lineWidth = H.glow.width * (1 - i / H.glow.steps);
+    ctx.strokeText(text, 0, 0);
+  }
   ctx.globalAlpha = k;
-  ctx.shadowColor = s.accent;
-  ctx.shadowBlur = 14;
   ctx.fillStyle = fill;
   ctx.fillText(text, 0, 0);
   ctx.restore();

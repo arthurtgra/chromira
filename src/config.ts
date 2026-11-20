@@ -320,6 +320,7 @@ export const CONFIG = {
     family: '"Outfit Variable", "SF Pro Display", system-ui, sans-serif',
     numberPx: 60,
     numberWeight: 200,
+    glow: { width: 14, steps: 8, alpha: 0.045 }, // brilho do número: contornos do mais largo ao mais fino, cada um bem fraco
     stepDx: 74, // distância das setas (fase anterior/seguinte) ao centro do número
     y: 50,
     appearMs: 650,
