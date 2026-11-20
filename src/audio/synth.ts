@@ -320,13 +320,56 @@ export class Synth {
     if (!ctx || !this.echo) return;
     const P = A.prism;
     const t0 = ctx.currentTime;
-    const end = t0 + P.ms / 1000;
     const out = ctx.createGain();
     out.gain.value = A.volume * P.volume;
     out.connect(this.bus!);
     out.connect(this.echo);
-    out.connect(this.space(ctx, t0, end));
+    out.connect(this.space(ctx, t0, t0 + P.ms / 1000, this.bus!));
+    this.prismVoice(ctx, out, t0);
+  }
 
+  // Luz entrando no prisma pelos três lados e saindo branca: o mesmo som, gravado uma vez em memória
+  // e tocado de trás para frente (o eco vira um sopro que cresce até o golpe da tigela).
+  prismIn(): void {
+    const ctx = this.ready();
+    if (!ctx || !this.echo) return;
+    this.reversed ??= this.renderReversed(ctx.sampleRate).catch(() => null);
+    void this.reversed.then((buf) => {
+      const c = this.ready();
+      if (!c || !buf || !this.echo) return;
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      const g = c.createGain();
+      g.gain.value = A.volume * A.prismIn.volume;
+      src.connect(g);
+      g.connect(this.bus!);
+      g.connect(this.echo);
+      src.start();
+    });
+  }
+
+  private reversed: Promise<AudioBuffer | null> | null = null;
+
+  private async renderReversed(rate: number): Promise<AudioBuffer> {
+    const R = A.prismIn;
+    const len = Math.ceil((rate * R.ms) / 1000);
+    const off = new OfflineAudioContext(2, len, rate);
+    const out = off.createGain();
+    out.connect(off.destination);
+    out.connect(this.space(off, 0, A.prism.ms / 1000, off.destination));
+    this.prismVoice(off, out, 0);
+    const buf = await off.startRendering();
+    const fade = Math.ceil((rate * R.fadeInMs) / 1000);
+    for (let ch = 0; ch < buf.numberOfChannels; ch++) {
+      const d = buf.getChannelData(ch);
+      d.reverse();
+      for (let i = 0; i < fade && i < d.length; i++) d[i]! *= i / fade; // começa do silêncio, sem estalo
+    }
+    return buf;
+  }
+
+  private prismVoice(ctx: BaseAudioContext, out: AudioNode, t0: number): void {
+    const P = A.prism;
     const bowl = (hz: number, at: number, x: number, vol: number): void => {
       const pan = ctx.createStereoPanner?.();
       const dest: AudioNode = pan ?? out;
@@ -359,7 +402,7 @@ export class Synth {
   }
 
   // Espaço do prisma: eco pingue-pongue longo, escurecendo a cada volta. Criado por som e desligado no fim.
-  private space(ctx: AudioContext, t0: number, end: number): AudioNode {
+  private space(ctx: BaseAudioContext, t0: number, end: number, dest: AudioNode): AudioNode {
     const S = A.prism.space;
     const input = ctx.createGain();
     const wet = ctx.createGain();
@@ -379,7 +422,7 @@ export class Synth {
     dl.connect(merge, 0, 0);
     dr.connect(merge, 0, 1);
     dr.connect(dark).connect(fb).connect(dl);
-    merge.connect(wet).connect(this.bus!);
+    merge.connect(wet).connect(dest);
     const off = end + S.tailMs / 1000;
     wet.gain.setValueAtTime(S.wet, off - 0.3);
     wet.gain.linearRampToValueAtTime(0, off);

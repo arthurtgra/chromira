@@ -272,6 +272,9 @@ export const CONFIG = {
       volume: 0.5,
       minGapMs: 250,
     },
+    // Três cores entrando no prisma e saindo branco: o som do prisma tocado ao contrário (as taças
+    // crescem do azul ao vermelho, a tigela grave cresce e corta seco quando a luz vira branca).
+    prismIn: { ms: 1700, fadeInMs: 350, volume: 0.5 },
     echo: { delayMs: 110, feedback: 0.25, wet: 0.2 },
     // Sons do menu: sino zen.
     ui: { tapHz: 659.25, selectHz: [523.25, 783.99], stepMs: 95, ms: 900, volume: 0.5 },

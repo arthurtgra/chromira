@@ -73,4 +73,5 @@ export interface TraceResult {
   solved: boolean;
   open: number[]; // portas abertas (sensores acesos)
   dark: string[]; // "x,y" dos anti-alvos atingidos
+  combined: string[]; // "x,y" dos prismas onde três cores entraram e saiu branco
 }

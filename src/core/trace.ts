@@ -118,7 +118,8 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
   // Prismas também esperam: a luz que chega por cada lado se soma antes de decidir (cores que vêm juntas
   // pelo mesmo caminho viram uma luz só; três lados com as três cores saem brancos pelo quarto lado).
   const prismIn = new Map<string, { x: number; y: number; by: Map<Dir, { color: number; d: number }[]> }>();
-  const prismOut = new Set<string>(); // luzes já soltas: "x,y,white", "x,y,dir,split" ou "x,y,dir,cor,d"
+  const prismOut = new Set<string>();
+  const combined: string[] = []; // luzes já soltas: "x,y,white", "x,y,dir,split" ou "x,y,dir,cor,d"
 
   for (;;) {
   while (queue.length > 0 && beams < MAX_BEAMS) {
@@ -300,6 +301,7 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
     if (sides.length === 3 && all === 7 && sides.every((sd) => sd.color !== 7)) {
       const out = COMBINER_DIRS.find((side) => !sides.some((sd) => OPP[sd.dir] === side))!;
       prismOut.add(`${k},white`);
+      combined.push(k);
       queue.push({ x: p.x, y: p.y, dir: out, color: 7, d: Math.max(...sides.map((sd) => sd.d)) });
       more = true;
       continue;
@@ -339,5 +341,5 @@ function traceOnce(level: Level, rots: Rots, maxSteps: number, open: Set<number>
     targets.length > 0 &&
     dark.length === 0 &&
     targets.every((t) => t.t === 'target' && received[key(t.x, t.y)] === t.color);
-  return { segments, received, solved, open: [...open], dark };
+  return { segments, received, solved, open: [...open], dark, combined };
 }

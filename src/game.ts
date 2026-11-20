@@ -431,7 +431,8 @@ export class Game {
         this.prismHit.add(k);
         if (this.now - this.prismSoundAt >= CONFIG.audio.prism.minGapMs) {
           this.prismSoundAt = this.now;
-          this.synth.prism();
+          if (this.result.combined.includes(k)) this.synth.prismIn();
+          else this.synth.prism();
         }
       }
     }
