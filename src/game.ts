@@ -454,10 +454,11 @@ export class Game {
       const r = Math.max(0, this.retracted(f));
       return { seg: cut(f.seg, r, len), d0: r, alpha: 1 - 0.5 * clamp01(r / len) };
     });
-    drawPrismGlow(ctx, l, placeCells(this.level, this.rots), visibleSegments(this.plan, front), style);
+    const seen = visibleSegments(this.plan, front);
+    drawPrismGlow(ctx, l, placeCells(this.level, this.rots), seen, style, this.drawnCells());
     drawBeams(ctx, l, this.plan, front, fading, style);
     const got = arrived(this.plan, this.fronts(CONFIG.piece.ringRadius));
-    drawRails(ctx, l, this.level.cells);
+    drawRails(ctx, l, this.level.cells, seen);
     drawLinks(ctx, l, this.drawnCells());
     drawFibers(ctx, l, this.level.cells, this.plan, this.fronts());
     drawPieces(ctx, l, this.drawnCells(), {

@@ -194,7 +194,23 @@ export const CONFIG = {
   // Vitória: depois de uma pausa, um pulso de luz caminha por cada feixe, do lançador até o fim:
   // as ondas engordam só num trecho estreito em volta dele, com um ponto de luz andando junto.
   // Trilho (fases 71+): cápsula por baixo da peça arrastável.
-  rail: { width: 0.2, fill: 'rgba(10,10,14,0.35)', color: 'rgba(255,255,255,0.3)', line: 1, dot: 'rgba(255,255,255,0.8)', dotR: 0.06 },
+  rail: {
+    width: 0.2,
+    fill: 'rgba(10,10,14,0.35)',
+    color: 'rgba(255,255,255,0.3)',
+    line: 1,
+    dot: 'rgba(255,255,255,0.8)',
+    dotR: 0.06,
+    // Com luz passando por cima: fundo quase opaco, contorno escuro por fora e linha e pontos fortes.
+    lit: {
+      fill: 'rgba(8,10,16,0.6)',
+      color: 'rgba(255,255,255,0.75)',
+      line: 1.3,
+      dot: 'rgba(255,255,255,1)',
+      outline: 'rgba(0,0,0,0.55)',
+      outlineWidth: 4,
+    },
+  },
   slideRate: 22, // deslize da peça até a célula do trilho (1/s, suavização exponencial)
   dragSlop: 8, // px de movimento antes de virar arrasto (menos que isso é toque)
   // Vitória: cada alvo solta um anel fino na sua cor que atravessa a tela; os pontos da grade acendem

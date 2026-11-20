@@ -597,17 +597,20 @@ function sideGlow(arrivals: { side: number; color: Color }[]): Glow {
   return { a0: 0, stops };
 }
 
-export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle): void {
+// cells = posições da luz (inteiras); drawn = onde as peças aparecem (fracionárias deslizando no trilho).
+export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[], st: BeamStyle, drawn: Cell[] = cells): void {
   const P = CONFIG.rainbow.prism;
   const k = P.alpha[0] + (P.alpha[1] - P.alpha[0]) * st.rainbow;
   const pulse = 0.5 + 0.5 * Math.sin(st.time * TAU * P.pulseHz);
   const dirOf = (s: Segment): Dir =>
     DIRS.find((d) => DELTA[d][0] === Math.sign(s.x2 - s.x1) && DELTA[d][1] === Math.sign(s.y2 - s.y1))!;
   const angle = (d: Dir): number => Math.atan2(DELTA[d][1], DELTA[d][0]);
-  for (const p of cells) {
+  for (const [ci, p] of cells.entries()) {
     if (p.t !== 'prism') continue;
     const incs = segments.filter((s) => s.x2 === p.x && s.y2 === p.y && (s.x1 !== s.x2 || s.y1 !== s.y2));
     if (incs.length === 0) continue;
+    // Luz passando por dentro: o vidro ganha fundo sólido (as ondas não aparecem lá dentro).
+    prismFilled.set(`p${ci}`, appear(`p${ci}:filled`, st.time));
     const all = incs.reduce((m: number, s) => m | s.color, 0) as Color;
     // Luz que chega pelo mesmo lado se soma: vermelho, verde e azul juntos pelo mesmo caminho são branco.
     const bySide = new Map<Dir, number>();
@@ -615,7 +618,7 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const whiteDir = [...bySide].find(([, c]) => c === 7)?.[0];
     const white = whiteDir && incs.find((q) => dirOf(q) === whiteDir);
     const dirs = [...bySide.keys()];
-    const id = `${p.x},${p.y}`;
+    const id = `p${ci}`;
     const layers: [string, Glow][] = [];
     let full = false;
     if (white) {
@@ -646,8 +649,9 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
         full = true;
       }
     }
-    const x = cx(l, p.x);
-    const y = cy(l, p.y);
+    const at = drawn[ci] ?? p;
+    const x = cx(l, at.x);
+    const y = cy(l, at.y);
     const R = P.halo * l.cell * (0.94 + 0.06 * pulse);
     // Cada brilho aparece rápido e suave (cresce e acende) quando a luz chega.
     for (const [key, glow] of layers) {
@@ -674,11 +678,13 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
   // Brilho que sumiu volta a aparecer do zero da próxima vez.
   for (const key of glowSince.keys()) if (!glowSeen.has(key)) glowSince.delete(key);
   for (const key of prismLit.keys()) if (!glowSeen.has(`${key}:lit`)) prismLit.delete(key);
+  for (const key of prismFilled.keys()) if (!glowSeen.has(`${key}:filled`)) prismFilled.delete(key);
   glowSeen.clear();
 }
 
 // Quanto cada prisma está aceso (0..1, com a mesma animação do brilho): o vidro clareia.
 const prismLit = new Map<string, number>();
+const prismFilled = new Map<string, number>();
 
 const glowSince = new Map<string, number>(); // quando cada brilho de prisma começou (segundos do jogo)
 const glowSeen = new Set<string>();
@@ -977,13 +983,23 @@ export function drawFibers(ctx: Ctx, l: Layout, cells: Cell[], plan: BeamPlan, f
   ctx.restore();
 }
 
-export function drawRails(ctx: Ctx, l: Layout, cells: Cell[]): void {
+// segments = luz visível: trilho com luz passando por cima ganha contraste (fica nítido sobre o feixe).
+export function drawRails(ctx: Ctx, l: Layout, cells: Cell[], segments: Segment[] = []): void {
   const R = CONFIG.rail;
+  const lit = (x: number, y: number): boolean =>
+    segments.some(
+      (s) =>
+        (s.y1 === y && s.y2 === y && Math.min(s.x1, s.x2) <= x + 0.5 && Math.max(s.x1, s.x2) >= x - 0.5) ||
+        (s.x1 === x && s.x2 === x && Math.min(s.y1, s.y2) <= y + 0.5 && Math.max(s.y1, s.y2) >= y - 0.5),
+    );
   ctx.save();
   for (const c of cells) {
     if ((c.t !== 'mirror' && c.t !== 'prism') || !c.rail) continue;
     const n = c.rail.len - 1;
     const [dx, dy] = c.rail.axis === 'x' ? [1, 0] : [0, 1];
+    let under = false;
+    for (let i = 0; i <= n && !under; i++) under = lit(c.x + dx * i, c.y + dy * i);
+    const S = under ? R.lit : R;
     const h = (R.width * l.cell) / 2;
     const x0 = cx(l, c.x) - h;
     const y0 = cy(l, c.y) - h;
@@ -991,12 +1007,17 @@ export function drawRails(ctx: Ctx, l: Layout, cells: Cell[]): void {
     const hh = dy * n * l.cell + 2 * h;
     ctx.beginPath();
     ctx.roundRect(x0, y0, w, hh, h);
-    ctx.fillStyle = R.fill;
+    if (under) {
+      ctx.strokeStyle = R.lit.outline;
+      ctx.lineWidth = R.lit.outlineWidth;
+      ctx.stroke();
+    }
+    ctx.fillStyle = S.fill;
     ctx.fill();
-    ctx.strokeStyle = R.color;
-    ctx.lineWidth = R.line;
+    ctx.strokeStyle = S.color;
+    ctx.lineWidth = S.line;
     ctx.stroke();
-    ctx.fillStyle = R.dot;
+    ctx.fillStyle = S.dot;
     for (let i = 0; i <= n; i++) {
       ctx.beginPath();
       ctx.arc(cx(l, c.x + dx * i), cy(l, c.y + dy * i), R.dotR * l.cell, 0, TAU);
@@ -1505,14 +1526,20 @@ export function drawPieces(ctx: Ctx, l: Layout, cells: Cell[], view: PieceView):
         const glass = ctx.createLinearGradient((tipX + ex) / 2, (tipY + ey) / 2, ox, oy);
         // Sempre claro até o vértice oposto (sem trecho escuro, que sumia no fundo e parecia faltar a ponta).
         // Aceso (luz se abrindo ou se juntando lá dentro): o mesmo degradê, mais claro.
-        const lit = prismLit.get(`${cell.x},${cell.y}`) ?? 0;
+        const lit = prismLit.get(`p${ci}`) ?? 0;
         const gain = 1 + (CONFIG.prismLit.gain - 1) * lit;
         for (const [at, al] of [[0, 0.5], [0.3, 0.16], [0.5, 0.32], [0.7, 0.14], [1, 0.22]] as const)
           glass.addColorStop(at, `rgba(255,255,255,${Math.min(1, al * gain)})`);
-        // Fundo sólido: as ondas não aparecem dentro do prisma.
+        // Com luz passando, fundo sólido: as ondas não aparecem dentro do prisma. Sem luz, vidro transparente.
         tri(s);
-        ctx.fillStyle = CONFIG.mirror.base;
-        ctx.fill();
+        const filled = prismFilled.get(`p${ci}`) ?? 0;
+        if (filled > 0) {
+          ctx.save();
+          ctx.globalAlpha = filled;
+          ctx.fillStyle = CONFIG.mirror.base;
+          ctx.fill();
+          ctx.restore();
+        }
         if (lit > 0) {
           ctx.fillStyle = `rgba(255,255,255,${CONFIG.prismLit.lift * lit})`;
           ctx.fill();
