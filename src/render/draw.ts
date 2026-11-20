@@ -611,18 +611,15 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const all = incs.reduce((m: number, s) => m | s.color, 0) as Color;
     const white = incs.find((s) => s.color === 7);
     const dirs = [...new Set(incs.map(dirOf))];
-    const layers: Glow[] = [];
-    if (white) layers.push(fanGlow(angle(dirOf(white)), 7, P.mixAlpha));
+    const id = `${p.x},${p.y}`;
+    const layers: [string, Glow][] = [];
+    if (white) layers.push([`${id}:fan:${dirOf(white)}`, fanGlow(angle(dirOf(white)), 7, P.mixAlpha)]);
     else {
       // Cada cor no lado por onde entrou (ângulo do lado, em voltas a partir do leste, sentido horário).
-      layers.push(
-        sideGlow(
-          incs.map((s) => {
-            const a = angle(OPP[dirOf(s)]) / TAU;
-            return { side: ((a % 1) + 1) % 1, color: s.color };
-          }),
-        ),
-      );
+      for (const q of incs) {
+        const a = angle(OPP[dirOf(q)]) / TAU;
+        layers.push([`${id}:side:${dirOf(q)}:${q.color}`, sideGlow([{ side: ((a % 1) + 1) % 1, color: q.color }])]);
+      }
       // As três cores chegaram por três lados: a luz sai branca pelo quarto, com o leque inteiro.
       // O leque fica alinhado às cores que entraram: verde no lado do verde, vermelho e azul nos seus
       // lados (espelhado se preciso).
@@ -638,13 +635,18 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
         if (b !== undefined && quarter(b - g) === 3) {
           fan.stops = fan.stops.map(([t, c, al]) => [1 - t, c, al] as [number, string, number]).reverse();
         }
-        layers.push(fan);
+        layers.push([`${id}:fan3`, fan]);
       }
     }
     const x = cx(l, p.x);
     const y = cy(l, p.y);
     const R = P.halo * l.cell * (0.94 + 0.06 * pulse);
-    for (const glow of layers) drawGlow(ctx, l, x, y, R, glow, k, st);
+    // Cada brilho aparece rápido e suave (cresce e acende) quando a luz chega.
+    for (const [key, glow] of layers) {
+      const f = appear(key, st.time);
+      drawGlow(ctx, l, x, y, R * (P.appearScale + (1 - P.appearScale) * f), glow, k * f, st);
+    }
+    const fc = appear(`${id}:core:${all}`, st.time);
 
     // Miolo fraco na cor que entra.
     ctx.save();
@@ -652,13 +654,27 @@ export function drawPrismGlow(ctx: Ctx, l: Layout, cells: Cell[], segments: Segm
     const g = ctx.createRadialGradient(x, y, 0, x, y, P.core * l.cell);
     g.addColorStop(0, CONFIG.colors[all]);
     g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = k * P.coreAlpha;
+    ctx.globalAlpha = k * P.coreAlpha * fc;
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, P.core * l.cell, 0, TAU);
     ctx.fill();
     ctx.restore();
   }
+  // Brilho que sumiu volta a aparecer do zero da próxima vez.
+  for (const key of glowSince.keys()) if (!glowSeen.has(key)) glowSince.delete(key);
+  glowSeen.clear();
+}
+
+const glowSince = new Map<string, number>(); // quando cada brilho de prisma começou (segundos do jogo)
+const glowSeen = new Set<string>();
+
+function appear(key: string, time: number): number {
+  glowSeen.add(key);
+  let t0 = glowSince.get(key);
+  if (t0 === undefined || t0 > time) glowSince.set(key, (t0 = time));
+  const u = Math.min(1, (time - t0) / (CONFIG.rainbow.prism.appearMs / 1000));
+  return 1 - (1 - u) * (1 - u) * (1 - u); // sai rápido e assenta suave
 }
 
 // Halo (degradê cônico recortado por um radial, num canvas à parte) e raiozinhos girando.
