@@ -1522,6 +1522,143 @@
     ],
     "difficulty": 3
   },
+  "19": {
+    "id": 19,
+    "w": 7,
+    "h": 9,
+    "cells": [
+      {
+        "x": 4,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 3
+      },
+      {
+        "x": 0,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 6
+      },
+      {
+        "x": 0,
+        "y": 7,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 2,
+        "y": 7,
+        "t": "dichroic",
+        "color": 4
+      },
+      {
+        "x": 4,
+        "y": 7,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 1,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 3,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 0,
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 2,
+        "y": 4,
+        "t": "mirror"
+      },
+      {
+        "x": 4,
+        "y": 5,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 4,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 6,
+        "y": 5,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 6,
+        "y": 8,
+        "t": "target",
+        "color": 7
+      },
+      {
+        "x": 1,
+        "y": 2,
+        "t": "mirror"
+      },
+      {
+        "x": 5,
+        "y": 2,
+        "t": "mirror"
+      },
+      {
+        "x": 3,
+        "y": 2,
+        "t": "prism"
+      },
+      {
+        "x": 2,
+        "y": 8,
+        "t": "emitter",
+        "dir": "N",
+        "color": 5
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "t": "target",
+        "color": 7
+      }
+    ],
+    "start": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      0
+    ],
+    "difficulty": 3
+  },
   "28": {
     "id": 28,
     "w": 7,
