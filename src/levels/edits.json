@@ -1393,6 +1393,130 @@
     ],
     "difficulty": 3
   },
+  "18": {
+    "id": 18,
+    "w": 7,
+    "h": 9,
+    "cells": [
+      {
+        "x": 3,
+        "y": 2,
+        "t": "emitter",
+        "dir": "S",
+        "color": 5
+      },
+      {
+        "x": 5,
+        "y": 4,
+        "t": "emitter",
+        "dir": "W",
+        "color": 6
+      },
+      {
+        "x": 1,
+        "y": 5,
+        "t": "emitter",
+        "dir": "E",
+        "color": 3
+      },
+      {
+        "x": 4,
+        "y": 4,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 2,
+        "y": 5,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 3,
+        "y": 3,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 6,
+        "y": 3,
+        "t": "mirror"
+      },
+      {
+        "x": 6,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 0,
+        "y": 4,
+        "t": "mirror"
+      },
+      {
+        "x": 0,
+        "y": 7,
+        "t": "mirror"
+      },
+      {
+        "x": 3,
+        "y": 6,
+        "t": "target",
+        "color": 4
+      },
+      {
+        "x": 2,
+        "y": 3,
+        "t": "target",
+        "color": 1
+      },
+      {
+        "x": 5,
+        "y": 5,
+        "t": "target",
+        "color": 2
+      },
+      {
+        "x": 4,
+        "y": 7,
+        "t": "dichroic",
+        "color": 2
+      },
+      {
+        "x": 2,
+        "y": 7,
+        "t": "dichroic",
+        "color": 1
+      },
+      {
+        "x": 3,
+        "y": 7,
+        "t": "target",
+        "color": 7
+      },
+      {
+        "x": 0,
+        "y": 2,
+        "t": "wall"
+      },
+      {
+        "x": 4,
+        "y": 1,
+        "t": "wall"
+      }
+    ],
+    "start": [
+      1,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      1,
+      0
+    ],
+    "difficulty": 3
+  },
   "28": {
     "id": 28,
     "w": 7,
